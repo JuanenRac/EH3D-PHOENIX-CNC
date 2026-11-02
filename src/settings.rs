@@ -40,6 +40,23 @@ pub struct Settings {
     /// When a program goes on after a failure: the Z (work coordinates) the head goes up to before it moves sideways, and the seconds the spindle gets to reach its speed.
     pub resume_safe_z_mm: f64,
     pub resume_spindle_wait_s: f64,
+    /// Show the summary (time, reach, what looks wrong) before a program starts, and let the operator start it or not.
+    pub confirm_start: bool,
+    /// A program whose moves leave the travel of the machine cannot be started from the summary (off: it is only said, and can be started anyway).
+    pub reject_out_of_travel: bool,
+    /// The speed of the rapid moves in mm per minute, which the estimate of the time uses.
+    pub rapid_mm_min: f64,
+    /// The checks of the summary: a program smaller than `tiny_mm` on both sides, or that starts farther than `far_mm` from the corner of the travel, looks like a wrong unit or offset; `margin_mm` is how far past the travel a move may go before it counts.
+    pub summary_tiny_mm: f64,
+    pub summary_far_mm: f64,
+    pub summary_margin_mm: f64,
+    /// The keys of the keyboard that open, save, start, pause and stop (off: only the mouse).
+    pub shortcuts: bool,
+    pub show_toolbar: bool,
+    /// The file chosen in the Open window is drawn beside the list.
+    pub open_preview: bool,
+    /// The centre of the window shows the path in 3D instead of from above.
+    pub view_3d: bool,
 }
 
 impl Default for Settings {
@@ -64,6 +81,16 @@ impl Default for Settings {
             server_restore_outputs: false,
             resume_safe_z_mm: 5.0,
             resume_spindle_wait_s: 3.0,
+            confirm_start: true,
+            reject_out_of_travel: true,
+            rapid_mm_min: 3000.0,
+            summary_tiny_mm: 5.0,
+            summary_far_mm: 1000.0,
+            summary_margin_mm: 0.5,
+            shortcuts: true,
+            show_toolbar: true,
+            open_preview: true,
+            view_3d: false,
         }
     }
 }
@@ -135,6 +162,32 @@ impl Settings {
                         .filter(|x| (0.0..=120.0).contains(x))
                         .unwrap_or(s.resume_spindle_wait_s)
                 }
+                "confirm_start" => s.confirm_start = on(v),
+                "reject_out_of_travel" => s.reject_out_of_travel = on(v),
+                "rapid" => {
+                    s.rapid_mm_min = num(v)
+                        .filter(|x| (1.0..=1_000_000.0).contains(x))
+                        .unwrap_or(s.rapid_mm_min)
+                }
+                "summary_tiny" => {
+                    s.summary_tiny_mm = num(v)
+                        .filter(|x| (0.0..=10_000.0).contains(x))
+                        .unwrap_or(s.summary_tiny_mm)
+                }
+                "summary_far" => {
+                    s.summary_far_mm = num(v)
+                        .filter(|x| (0.0..=1_000_000.0).contains(x))
+                        .unwrap_or(s.summary_far_mm)
+                }
+                "summary_margin" => {
+                    s.summary_margin_mm = num(v)
+                        .filter(|x| (0.0..=1000.0).contains(x))
+                        .unwrap_or(s.summary_margin_mm)
+                }
+                "shortcuts" => s.shortcuts = on(v),
+                "show_toolbar" => s.show_toolbar = on(v),
+                "open_preview" => s.open_preview = on(v),
+                "view_3d" => s.view_3d = on(v),
                 "recent" => {
                     s.recent = v
                         .split('|')
@@ -163,7 +216,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -187,7 +240,17 @@ impl Settings {
             one_line(&self.server_machine),
             yes(self.server_restore_outputs),
             self.resume_safe_z_mm,
-            self.resume_spindle_wait_s
+            self.resume_spindle_wait_s,
+            yes(self.confirm_start),
+            yes(self.reject_out_of_travel),
+            self.rapid_mm_min,
+            self.summary_tiny_mm,
+            self.summary_far_mm,
+            self.summary_margin_mm,
+            yes(self.shortcuts),
+            yes(self.show_toolbar),
+            yes(self.open_preview),
+            yes(self.view_3d)
         )
     }
 
@@ -260,6 +323,16 @@ mod tests {
             server_restore_outputs: true,
             resume_safe_z_mm: 7.5,
             resume_spindle_wait_s: 4.0,
+            confirm_start: false,
+            reject_out_of_travel: false,
+            rapid_mm_min: 4500.0,
+            summary_tiny_mm: 2.5,
+            summary_far_mm: 800.0,
+            summary_margin_mm: 1.0,
+            shortcuts: false,
+            show_toolbar: false,
+            open_preview: false,
+            view_3d: true,
         };
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
@@ -333,5 +406,19 @@ mod tests {
         assert_eq!(s.recent[0], "C:/jobs/9.nc");
         assert_eq!(s.recent.iter().filter(|p| p.ends_with("/9.nc")).count(), 1);
         assert_eq!(Settings::parse(&s.to_text()).recent, s.recent);
+    }
+
+    #[test]
+    fn the_safety_and_interface_settings_default_to_the_careful_choice_and_what_is_wrong_keeps_it()
+    {
+        let d = Settings::default();
+        assert!(d.confirm_start && d.reject_out_of_travel && d.shortcuts);
+        let s = Settings::parse(
+            "rapid = 0\nsummary_far = -3\nsummary_margin = lots\nconfirm_start = no\n",
+        );
+        assert_eq!(s.rapid_mm_min, d.rapid_mm_min);
+        assert_eq!(s.summary_far_mm, d.summary_far_mm);
+        assert_eq!(s.summary_margin_mm, d.summary_margin_mm);
+        assert!(!s.confirm_start);
     }
 }

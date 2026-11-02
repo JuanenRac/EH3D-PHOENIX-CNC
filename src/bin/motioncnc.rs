@@ -8,6 +8,7 @@
 use eh3d_motioncnc::cli::Options;
 
 fn main() -> eframe::Result {
+    eh3d_motioncnc::crash::install("motioncnc", env!("CARGO_PKG_VERSION"));
     attach_console();
     match Options::parse(std::env::args().skip(1)) {
         Ok(o) => eh3d_motioncnc::gui::run(&o),

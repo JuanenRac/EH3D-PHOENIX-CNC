@@ -16,8 +16,10 @@ pub struct Options {
     pub wait: u32,
     /// Starts the program as soon as the window is open (`--start`): for the pictures of a program in progress.
     pub start: bool,
-    /// A window to open at the start (`--window settings|open|save|edit|about`): for the pictures.
+    /// A window to open at the start (`--window settings|open|save|edit|about|summary|keys`): for the pictures.
     pub window: Option<String>,
+    /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
+    pub view_3d: Option<bool>,
     /// Drives GRBL on a serial port instead of the simulator (`--grbl PORT[@BAUD]`).
     pub grbl: Option<String>,
     /// Lists the serial ports and leaves (`--ports`).
@@ -51,6 +53,14 @@ impl Options {
                 }
                 "--start" => o.start = true,
                 "--window" => o.window = Some(value("--window")?),
+                "--view" => {
+                    let v = value("--view")?;
+                    o.view_3d = Some(match v.as_str() {
+                        "plan" | "2d" => false,
+                        "3d" => true,
+                        _ => return Err(format!("unknown view '{v}' (plan or 3d)")),
+                    });
+                }
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
                 other if !other.starts_with("--") && o.file.is_none() => {
@@ -87,6 +97,10 @@ mod tests {
         let g = parse("--grbl COM3@250000 --ports").unwrap();
         assert_eq!((g.grbl.as_deref(), g.ports), (Some("COM3@250000"), true));
         assert!(parse("--grbl").is_err());
+        assert_eq!(parse("--view 3d").unwrap().view_3d, Some(true));
+        assert_eq!(parse("--view plan").unwrap().view_3d, Some(false));
+        assert_eq!(parse("").unwrap().view_3d, None);
+        assert!(parse("--view side").is_err());
     }
 
     #[test]

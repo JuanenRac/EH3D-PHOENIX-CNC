@@ -13,12 +13,17 @@ pub struct Segment {
     pub rapid: bool,
     /// The line of the program it comes from (from 0).
     pub line: usize,
+    /// The feed rate in force (`F`, in mm per minute) when the move was made; 0 when the program had not set one yet.
+    pub feed: f64,
+    /// The line is an arc (`G2`/`G3`): the segment is the chord between its ends, not the arc, so the time and the reach leave it out.
+    pub arc: bool,
 }
 
 /// The straight moves of the program, in order, starting at the origin.
 pub fn toolpath(lines: &[String]) -> Vec<Segment> {
     let mut out = Vec::new();
     let (mut pos, mut absolute, mut scale, mut rapid) = ((0.0, 0.0, 0.0), true, 1.0, true);
+    let (mut feed, mut arc) = (0.0, false);
     for (n, raw) in lines.iter().enumerate() {
         let text = raw.split(';').next().unwrap_or("");
         let mut target = [None; 3];
@@ -48,8 +53,9 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
             match letter {
                 // in tenths, so that G90.1 and G91.1 (the arc centres) are not read as G90 and G91
                 "G" => match (v * 10.0).round() as i32 {
-                    0 => rapid = true,
-                    10 => rapid = false,
+                    0 => (rapid, arc) = (true, false),
+                    10 => (rapid, arc) = (false, false),
+                    20 | 30 => (rapid, arc) = (false, true),
                     900 => absolute = true,
                     910 => absolute = false,
                     200 => scale = 25.4,
@@ -59,6 +65,7 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
                 "X" => target[0] = Some(v * scale),
                 "Y" => target[1] = Some(v * scale),
                 "Z" => target[2] = Some(v * scale),
+                "F" => feed = v * scale,
                 _ => {}
             }
         }
@@ -79,12 +86,77 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
                     to,
                     rapid,
                     line: n,
+                    feed,
+                    arc,
                 });
             }
             pos = to;
         }
     }
     out
+}
+
+/// A program seen before it is opened: its path and how big it is.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Preview {
+    pub segments: Vec<Segment>,
+    /// (min x, min y, max x, max y) of the path in mm, when there is one.
+    pub bounds: Option<[f64; 4]>,
+    pub moves: usize,
+}
+
+/// The biggest file the preview reads: a bigger one would make the window wait.
+pub const PREVIEW_MAX_BYTES: u64 = 2_000_000;
+
+/// The path of the G-code file at `path`, or nothing when it cannot be read or is too big for a preview.
+pub fn read_preview(path: &std::path::Path) -> Option<Preview> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() || meta.len() > PREVIEW_MAX_BYTES {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    // the same reading as the program: every byte is a character, so a file in any code page is read
+    let text: String = bytes.iter().map(|&b| b as char).collect();
+    let lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let segments = toolpath(&lines);
+    let mut bounds: Option<[f64; 4]> = None;
+    for s in &segments {
+        for p in [s.from, s.to] {
+            bounds = Some(match bounds {
+                None => [p.0, p.1, p.0, p.1],
+                Some([x0, y0, x1, y1]) => [x0.min(p.0), y0.min(p.1), x1.max(p.0), y1.max(p.1)],
+            });
+        }
+    }
+    Some(Preview {
+        moves: segments.len(),
+        segments,
+        bounds,
+    })
+}
+
+/// How many lines of the program move along an arc (`G2` or `G3`): the path does not draw them and the time and the reach leave them out.
+pub fn arc_moves(lines: &[String]) -> usize {
+    let mut motion = 0;
+    let mut count = 0;
+    for raw in lines {
+        let mut moves = false;
+        for (letter, v) in words(raw) {
+            match letter {
+                'G' => match (v * 10.0).round() as i32 {
+                    0 | 10 => motion = 0,
+                    20 | 30 => motion = 2,
+                    _ => {}
+                },
+                'X' | 'Y' | 'Z' | 'I' | 'J' | 'K' | 'R' => moves = true,
+                _ => {}
+            }
+        }
+        if motion == 2 && moves {
+            count += 1;
+        }
+    }
+    count
 }
 
 /// The words of a line of G-code (a letter and its number), without the comments; what is not a word is left out.
@@ -282,5 +354,48 @@ mod tests {
         assert!(toolpath(&lines("M3 S1000\n; nothing\nG21\nM5")).is_empty());
         // a move to where it already is is not a segment
         assert_eq!(toolpath(&lines("G0 X0 Y0")).len(), 0);
+    }
+    #[test]
+    fn each_move_keeps_the_feed_in_force_in_mm_per_minute() {
+        let p = toolpath(&lines("G0 X1\nG1 X5 F200\nG1 X9\nG20\nG1 X1 F10"));
+        assert_eq!(
+            p.iter().map(|s| s.feed).collect::<Vec<_>>(),
+            [0.0, 200.0, 200.0, 254.0]
+        );
+    }
+
+    #[test]
+    fn an_arc_is_marked_so_that_the_estimate_can_leave_it_out() {
+        let p = toolpath(&lines("G1 X10 F100\nG2 X20 Y10 I5 J0\nG1 X30"));
+        let arcs: Vec<bool> = p.iter().map(|s| s.arc).collect();
+        assert_eq!(arcs, [false, true, false]);
+    }
+
+    #[test]
+    fn the_preview_reads_a_file_and_leaves_out_what_is_not_one_or_is_too_big() {
+        let dir = std::env::temp_dir().join(format!("eh3d-gcode-preview-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let file = dir.join("a.nc");
+        std::fs::write(&file, "G0 X10 Y5\nG1 X20 Y25 F100\n").unwrap();
+        let pv = read_preview(&file).expect("a preview");
+        assert_eq!(pv.moves, 2);
+        assert_eq!(pv.bounds, Some([0.0, 0.0, 20.0, 25.0]));
+        // a folder, a file that is not there and a file that is too big have none
+        assert!(read_preview(&dir).is_none());
+        assert!(read_preview(&dir.join("missing.nc")).is_none());
+        let big = dir.join("big.nc");
+        std::fs::write(&big, vec![b'\n'; PREVIEW_MAX_BYTES as usize + 1]).unwrap();
+        assert!(read_preview(&big).is_none());
+        // a file with nothing to move has a preview with no bounds
+        std::fs::write(&file, "M3 S100\n").unwrap();
+        assert_eq!(read_preview(&file).unwrap().bounds, None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn arcs_are_counted_once_per_line_that_moves() {
+        let program = lines("G1 X1\nG2 X2 Y2 I1 J0\nX3 Y3 I1 J1\nG1 X4\nG3 X0 R5\nG2");
+        assert_eq!(arc_moves(&program), 3);
+        assert_eq!(arc_moves(&lines("G0 X1\nG1 X2 F100")), 0);
     }
 }

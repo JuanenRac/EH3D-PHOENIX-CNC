@@ -637,8 +637,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "eh3d-bungard-formats"
+version = "0.0.1"
+
+[[package]]
 name = "eh3d-common"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "semver",
@@ -669,10 +673,19 @@ dependencies = [
  "eframe",
  "eh3d-controller",
  "eh3d-filedialog",
+ "eh3d-summary",
  "eh3d-view",
  "png 0.17.16",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "eh3d-summary"
+version = "0.0.1"
+dependencies = [
+ "eh3d-bungard-formats",
+ "eh3d-view",
 ]
 
 [[package]]
