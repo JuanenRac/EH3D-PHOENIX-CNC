@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **The CI builds against the tag of each sibling:** the sibling repositories are read from `depends_on` of the manifest (the ones they need in turn included) and checked out at the tag the repository is built from, so a build does not move when a sibling changes; a separate job, `Siblings at main`, builds against the main branch of every sibling to show a break before the sibling is tagged and does not hold a merge. The release workflow builds from the same tag.
 
 - **Each dependency on a sibling by path says the version it needs** (`eh3d-view`, `eh3d-controller`, `eh3d-filedialog`: `>=0.0.1`), so a package built from the repository is not rejected for lacking one.
 
