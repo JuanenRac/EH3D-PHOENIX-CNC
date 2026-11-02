@@ -3,6 +3,8 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+
+## [0.0.9] - Queue of programs, Esc, Space and F5 keys, and the travel of GRBL
 - **A queue of programs:** several files chosen in the Open window with Ctrl+click, dropped together or given on the command line run one after the other; each one shows its summary before it starts, the window lists them with their state and lets you remove, skip and reorder the ones that wait, and the queue stops when a program does not finish.
 - **New keys:** Space pauses and Esc stops the job (F5 still starts); with the keyboard in a box of text they leave the job alone, and with a window open Esc only closes the window. F6 and F8 are free.
 - **The travel of a GRBL controller shortens the one in the settings:** on connecting, `$130` to `$132` are read and the smaller travel of each axis is used for the summary and the refusal; if the controller does not answer or does not give them the settings are used and the log says so. `read_controller_travel` turns the reading off.
