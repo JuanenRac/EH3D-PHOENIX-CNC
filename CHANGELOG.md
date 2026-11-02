@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+
+- **A summary before a program starts:** the moves, the cutting distance, the time at the rapid speed and the feed of the program, the reach of the axes and a check against the travel of the machine (the zero of the work taken into account), with the warnings the suite shares (a program that is tiny or far from the corner of the travel, bigger than the table, arcs the estimate leaves out, cuts before any feed). **Start anyway** when something looks wrong; a program that leaves the travel is refused (`reject_out_of_travel = no` makes it a warning, `confirm_start = no` turns the summary off). It comes before Start and before sending the program to the server; the measure is `eh3d-summary` of EH3D-COMMON.
+
+- **Keys of the keyboard:** Ctrl+O, Ctrl+S, Ctrl+E, Ctrl+, (settings), F5 start, F6 pause, F8 stop, Ctrl+Q, F1 (the list), F3 (plan or 3D), Ctrl+0 (reset the view) and Esc (closes a window, but never a question that needs an answer); with a window open only Esc, F1 and Ctrl+Q act; they are written beside the menu entries and `shortcuts = no` turns them off.
+
+- **A toolbar with drawn pictures and names:** open, save, edit, start, pause, stop, rewind and settings, greyed out where they do not apply; the pictures are drawn with lines, so they take the colour of the theme (`show_toolbar` in the settings).
+
+- **Numbers that are stepped or written:** the spindle speed, the limits of the travel, the feed and the rapid speed in the settings take the minus and plus buttons or the value written (a point or a comma, Enter or a click elsewhere accepts it, Esc leaves it as it was, the range is kept).
+
+- **A Safety section in the settings window:** the summary on or off, refusing a program that leaves the travel, and the rapid speed (`confirm_start`, `reject_out_of_travel`, `rapid`); the thresholds of the checks live in the settings file (`summary_tiny`, `summary_far`, `summary_margin`).
+
+- **The path from above is dragged and zoomed:** the wheel zooms about the pointer, dragging moves it and a double click or Ctrl+0 brings it back.
+
+- **The path in 3D:** the table with its grid, the volume the axes reach, the path with the part that is done and the tool with a line down to the table, turned and tilted with the pointer and zoomed with the wheel (`2D` and `3D` tabs, F3, `--view 3d`; the choice is remembered in `view_3d`).
+
+- **The path and the tool are drawn where the machine is:** the program speaks in work coordinates, so its path is moved by the zero of the work before it is drawn on the table of the machine.
+
+- **A picture of the G-code file in the Open window:** the path of the file chosen, its size and its moves, read once for each file and only up to 2 MB (`open_preview`, and a switch in the window).
+
+- **A file that cannot be opened is said in the language:** the log gives the file and the reason.
+
+- **A crash is recorded:** a panic is appended to `eh3d-crash.log` in the settings folder with the program, its version and the place (`eh3d_view::crash`, shared).
+
+- **The words:** the summary, the safety section, the keys and the toolbar in the 37 languages (they live in the texts of EH3D-COMMON). 31 tests more (the measure of a program, the settings, the pointer movements of both views, the numbers, the keys, the summary and the picture of a file).
 - **The CI builds against the tag of each sibling:** the sibling repositories are read from `depends_on` of the manifest (the ones they need in turn included) and checked out at the tag the repository is built from, so a build does not move when a sibling changes; a separate job, `Siblings at main`, builds against the main branch of every sibling to show a break before the sibling is tagged and does not hold a merge. The release workflow builds from the same tag.
 
 - **Each dependency on a sibling by path says the version it needs** (`eh3d-view`, `eh3d-controller`, `eh3d-filedialog`: `>=0.0.1`), so a package built from the repository is not rejected for lacking one.

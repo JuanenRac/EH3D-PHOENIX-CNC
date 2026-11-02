@@ -14,12 +14,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.0.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-scaffolding-FFB020.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-38-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-72-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`motioncnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 38 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`motioncnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 72 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Version | `0.0.7` |
 | Maturity | Scaffolding |
-| Tests | 38 |
+| Tests | 72 |
 | Stack | Rust |
 | On real hardware | No: it drives only a simulated machine |
 
@@ -48,7 +48,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 38 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 72 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -66,6 +66,7 @@ Each line is one part of this repository and the light says how far it is today.
 * **Going on after a failure:** while a program runs, the line it has reached is saved to a small file; if the window, the computer or the link goes down, the next start asks whether to go on from that line or to leave it. Nothing is sent to the controller until the operator answers.
 * **Sent to the EH3D server:** with the address of the server, the token of this program and the id of the machine in the settings (section Server of the settings window, or `server_address`, `server_token` and `server_machine` in the settings file), **Program > Send to the server** sends the text of the program as a G-code job; the server runs it on its machine (a GRBL controller on its serial port, or its simulator) and the window follows it: the state, the percentage and the line it has reached in the top bar, the panel and the log. Start, Pause and Stop of the window reach the job on the server, closing the window does not stop it, and a job that stopped is taken up again from the line the server reached (the next start of the window offers it, as it does for a program of the controller): the server gives the codes in force back and waits for the operator before the first move. The spindle and the coolant are started again only with `server_restore_outputs = yes`. Tested against a stand-in server; the server's own tests send the same requests to its simulator. Never run on a machine.
 * **Resuming after a failure:** a program left in the middle is first put back in its state: units and absolute distances, a safe Z (`resume_safe_z` in the settings file, 5 mm), the spindle with the time to reach its speed (`resume_spindle_wait`, 3 s), the coolant, the point it had reached and the modal state; the recovery file keeps the SHA-256 of the program and refuses to go on if the program changed.
+* **The helpers of the window:** a **summary before a program starts** (the moves, the cutting distance, the time at the speeds of the settings, the reach of the axes and a check against the travel of the machine, with the warnings the suite shares: a program that is tiny or far from the corner, bigger than the table, arcs the estimate leaves out and cuts before any feed; **Start anyway**, or a refusal when the program leaves the travel, which `reject_out_of_travel = no` turns into a warning, and `confirm_start = no` turns the summary off); **keys of the keyboard** (Ctrl+O open, Ctrl+S save, Ctrl+E edit, F5 start, F6 pause, F8 stop, Esc closes a window, F1 lists them; `shortcuts = no` turns them off); a **toolbar** with drawn pictures and their names; numbers that are stepped with minus and plus or **written**; the path **dragged and zoomed from above or turned and zoomed in 3D** with the tool; a **picture of the G-code file** in the Open window; the **record of a crash** (`eh3d-crash.log`); and a Safety section in the settings (`rapid`, `summary_tiny`, `summary_far` and `summary_margin` in the settings file).
 
 ## 🧩 Role in EH3D
 
@@ -132,7 +133,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 38 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 72 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -154,12 +155,19 @@ EH3D-MOTIONCNC/
 │   ├── gui.rs                                   the window: position, jog, program, path, commands and log
 │   ├── session.rs                               what is done with a controller: jog, zero, home, a program line by line, pause, stop, alarms
 │   ├── gcode.rs                                 the straight moves of a G-code program, to draw its path
+│   ├── view.rs                                  the plan that is dragged and zoomed and the 3D view that is turned, as numbers
+│   ├── plan.rs                                  the check before a start: time, reach and travel of the moves
 │   ├── cli.rs                                   the command line: the file, the language, the theme and the picture options
 │   ├── bin/motioncnc.rs                         the program that opens the window
 │   ├── server.rs                                the link to the EH3D server: send, follow, hold, stop
 │   ├── settings.rs                              what is kept between runs
 │   ├── gui/dialogs.rs                           menus, settings, Open, Save, editor
-│   └── gui/remote.rs                            the program on the server: Start, Pause, Stop and going on
+│   ├── gui/remote.rs                            the program on the server: Start, Pause, Stop and going on
+│   ├── gui/views.rs                             the centre of the window: the path from above or in 3D, with the tool
+│   ├── gui/summary.rs                           the summary window before a start and the list of keys
+│   ├── gui/numfield.rs                          a number set with the minus and plus buttons or by writing it
+│   ├── gui/keys.rs                              the keys of the keyboard and the table the menus and the list of keys read
+│   └── gui/icons.rs                             the pictures of the buttons, drawn with lines, and the toolbar button
 ├── examples/                                    three sample G-code programs, from a square to a long spiral
 ├── tools/                                       CI check, README check and the picture tools
 ├── docs/                                        the sources of the Architecture and Repository Structure pictures

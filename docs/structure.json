@@ -85,6 +85,32 @@
           }
         },
         {
+          "name": "view.rs",
+          "desc": {
+            "en": "the plan that is dragged and zoomed and the 3D view that is turned, as numbers",
+            "es": "el plano que se arrastra y se amplía y la vista 3D que se gira, como números",
+            "de": "der Plan, der gezogen und gezoomt wird, und die gedrehte 3D-Ansicht, als Zahlen",
+            "fr": "le plan qu'on déplace et zoome et la vue 3D qu'on tourne, en nombres",
+            "it": "il piano che si trascina e si ingrandisce e la vista 3D che si ruota, come numeri",
+            "ja": "ドラッグとズームのできる平面図と、回転できる 3D ビュー（数値のみ）",
+            "zh": "可拖动缩放的平面图和可旋转的 3D 视图（仅数值）",
+            "pt": "o plano que se arrasta e amplia e a vista 3D que se roda, como números"
+          }
+        },
+        {
+          "name": "plan.rs",
+          "desc": {
+            "en": "the check before a start: time, reach and travel of the moves",
+            "es": "la revisión antes de empezar: tiempo, alcance y recorrido de los movimientos",
+            "de": "die Prüfung vor dem Start: Zeit, Reichweite und Verfahrweg der Bewegungen",
+            "fr": "la vérification avant le démarrage : durée, portée et course des mouvements",
+            "it": "il controllo prima dell'avvio: tempo, escursione e corsa dei movimenti",
+            "ja": "開始前のチェック：移動の時間・到達範囲・可動範囲",
+            "zh": "开始前的检查：移动的时间、范围和行程",
+            "pt": "a verificação antes do arranque: tempo, alcance e curso dos movimentos"
+          }
+        },
+        {
           "name": "cli.rs",
           "desc": {
             "en": "the command line: the file, the language, the theme and the picture options",
@@ -160,6 +186,71 @@
             "ja": "サーバー上のプログラム：開始、一時停止、停止、再開",
             "zh": "服务器上的程序：开始、暂停、停止与继续",
             "pt": "o programa no servidor: Iniciar, Pausa, Parar e retomar"
+          }
+        },
+        {
+          "name": "gui/views.rs",
+          "desc": {
+            "en": "the centre of the window: the path from above or in 3D, with the tool",
+            "es": "el centro de la ventana: la trayectoria vista desde arriba o en 3D, con la herramienta",
+            "de": "die Fenstermitte: die Bahn von oben oder in 3D, mit dem Werkzeug",
+            "fr": "le centre de la fenêtre : la trajectoire vue de dessus ou en 3D, avec l'outil",
+            "it": "il centro della finestra: il percorso dall'alto o in 3D, con l'utensile",
+            "ja": "ウィンドウの中央：上から見た、または 3D の経路と工具",
+            "zh": "窗口中央：俯视或 3D 的路径与刀具",
+            "pt": "o centro da janela: a trajetória vista de cima ou em 3D, com a ferramenta"
+          }
+        },
+        {
+          "name": "gui/summary.rs",
+          "desc": {
+            "en": "the summary window before a start and the list of keys",
+            "es": "la ventana de resumen antes de empezar y la lista de teclas",
+            "de": "das Zusammenfassungsfenster vor dem Start und die Tastenliste",
+            "fr": "la fenêtre de résumé avant le démarrage et la liste des touches",
+            "it": "la finestra di riepilogo prima dell'avvio e l'elenco dei tasti",
+            "ja": "開始前の概要ウィンドウとキー一覧",
+            "zh": "开始前的摘要窗口和按键列表",
+            "pt": "a janela de resumo antes do arranque e a lista de teclas"
+          }
+        },
+        {
+          "name": "gui/numfield.rs",
+          "desc": {
+            "en": "a number set with the minus and plus buttons or by writing it",
+            "es": "un número que se fija con los botones menos y más o escribiéndolo",
+            "de": "eine Zahl, die mit den Tasten Minus und Plus oder durch Eintippen gesetzt wird",
+            "fr": "un nombre réglé avec les boutons moins et plus ou en l'écrivant",
+            "it": "un numero impostato con i pulsanti meno e più o scrivendolo",
+            "ja": "マイナス／プラスのボタンまたは直接入力で設定する数値",
+            "zh": "用减号和加号按钮或直接输入设置的数值",
+            "pt": "um número definido com os botões menos e mais ou escrevendo-o"
+          }
+        },
+        {
+          "name": "gui/keys.rs",
+          "desc": {
+            "en": "the keys of the keyboard and the table the menus and the list of keys read",
+            "es": "las teclas del teclado y la tabla que leen los menús y la lista de teclas",
+            "de": "die Tasten der Tastatur und die Tabelle, die Menüs und Tastenliste lesen",
+            "fr": "les touches du clavier et le tableau que lisent les menus et la liste des touches",
+            "it": "i tasti della tastiera e la tabella che leggono i menu e l'elenco dei tasti",
+            "ja": "キーボードのキーと、メニューとキー一覧が読む表",
+            "zh": "键盘按键以及菜单和按键列表所读取的表",
+            "pt": "as teclas do teclado e a tabela que os menus e a lista de teclas leem"
+          }
+        },
+        {
+          "name": "gui/icons.rs",
+          "desc": {
+            "en": "the pictures of the buttons, drawn with lines, and the toolbar button",
+            "es": "los dibujos de los botones, trazados con líneas, y el botón de la barra de herramientas",
+            "de": "die Bilder der Schaltflächen, mit Linien gezeichnet, und die Schaltfläche der Werkzeugleiste",
+            "fr": "les dessins des boutons, tracés avec des lignes, et le bouton de la barre d'outils",
+            "it": "i disegni dei pulsanti, tracciati con linee, e il pulsante della barra degli strumenti",
+            "ja": "線で描いたボタンの絵と、ツールバーのボタン",
+            "zh": "用线条绘制的按钮图标和工具栏按钮",
+            "pt": "os desenhos dos botões, traçados com linhas, e o botão da barra de ferramentas"
           }
         }
       ]

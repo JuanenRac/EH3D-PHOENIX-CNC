@@ -14,12 +14,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.0.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-scaffolding-FFB020.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-38-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-72-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`motioncnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 38 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
+**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`motioncnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 72 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Versão | `0.0.7` |
 | Maturidade | Estrutura inicial |
-| Testes | 38 |
+| Testes | 72 |
 | Tecnologias | Rust |
 | Em hardware real | Não: comanda apenas uma máquina simulada |
 
@@ -48,7 +48,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 | Biblioteca base | 🟡 | Um crate de Rust que reexporta `scene`, `texts` e `theme` do `eh3d-view` com o nome deste programa; precisa da pasta do EH3D-COMMON ao lado. |
 | Cena e vistas | 🟡 | Escrita e testada no EH3D-COMMON; a janela deste programa desenha a trajetória de um programa na mesa e a posição da ferramenta (vista num computador). |
 | Temas e textos | 🟡 | Onze temas e as palavras da interface em 37 idiomas, vistos na janela deste programa. |
-| Testes | 🟡 | Passam 38 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
+| Testes | 🟡 | Passam 72 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
 | Janela e jog | 🟡 | Funciona num computador com o controlador simulado: posição, teclado de jog, passos, avanço, referência, zero, desbloqueio, uma linha de comandos e um registo; sem máquina real. |
 | Controlo de máquina | 🟠 | Só o simulador: um programa corre linha a linha com pausa, paragem e paragem de emergência; ainda não se liga nenhum controlador real a partir daqui. |
 | Documentação | 🟡 | README em oito idiomas, as duas imagens, três programas de exemplo e o changelog. |
@@ -66,6 +66,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 * **Continuar após uma falha:** enquanto um programa corre, a linha alcançada é guardada num ficheiro pequeno; se a janela, o computador ou a ligação cair, o arranque seguinte pergunta se continua a partir dessa linha ou se deixa. Nada é enviado ao controlador até o operador responder.
 * **Enviado para o servidor EH3D:** com o endereço do servidor, o token deste programa e o id da máquina nas definições (secção Servidor da janela de definições, ou `server_address`, `server_token` e `server_machine` no ficheiro de definições), **Programa > Enviar para o servidor** envia o texto do programa como um trabalho de G-code; o servidor executa-o na sua máquina (um controlador GRBL na sua porta série, ou o seu simulador) e a janela acompanha-o: o estado, a percentagem e a linha alcançada na barra de topo, no painel e no registo. Iniciar, Pausa e Parar da janela chegam ao trabalho no servidor, fechar a janela não o pára, e um trabalho que parou é retomado a partir da linha a que o servidor chegou (o arranque seguinte da janela oferece-o, como faz com um programa do controlador): o servidor devolve os códigos em vigor e espera pelo operador antes do primeiro movimento. O fuso e o refrigerante só voltam a arrancar com `server_restore_outputs = yes`. Experimentado com um servidor de substituição; os testes do próprio servidor enviam os mesmos pedidos ao seu simulador. Nunca numa máquina.
 * **Retomar após uma falha:** um programa que ficou a meio é primeiro devolvido ao seu estado: unidades e distâncias absolutas, um Z seguro (`resume_safe_z` no ficheiro de definições, 5 mm), o fuso com o tempo para atingir a velocidade (`resume_spindle_wait`, 3 s), o refrigerante, o ponto atingido e o estado modal; o ficheiro de recuperação guarda o SHA-256 do programa e não continua se o programa mudou.
+* **As ajudas da janela:** um **resumo antes de iniciar um programa** (os movimentos, a distância de corte, o tempo às velocidades das definições, o alcance dos eixos e uma verificação face ao curso da máquina, com os avisos que a suite partilha: um programa minúsculo ou longe do canto, maior do que a mesa, arcos que a estimativa deixa de fora e cortes antes de qualquer avanço; **Iniciar mesmo assim**, ou uma recusa quando o programa sai do curso, que `reject_out_of_travel = no` transforma em aviso, e `confirm_start = no` desativa o resumo); **teclas do teclado** (Ctrl+O abrir, Ctrl+S guardar, Ctrl+E editar, F5 iniciar, F6 pausa, F8 parar, Esc fecha uma janela, F1 lista-as; `shortcuts = no` desativa-as); uma **barra de ferramentas** com desenhos e os seus nomes; números que se alteram com menos e mais ou **escrevendo-os**; a trajetória **arrastada e ampliada de cima ou rodada e ampliada em 3D** com a ferramenta; uma **pré-visualização do ficheiro G-code** na janela Abrir; o **registo de uma falha** (`eh3d-crash.log`); e uma secção Segurança nas definições (`rapid`, `summary_tiny`, `summary_far` e `summary_margin` no ficheiro de definições).
 
 ## 🧩 Papel no EH3D
 
@@ -132,7 +133,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testes
 
-`cargo test --features gui` executa 38 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
+`cargo test --features gui` executa 72 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
 
 ## 🏗️ Compilação e publicação
 
@@ -154,12 +155,19 @@ EH3D-MOTIONCNC/
 │   ├── gui.rs                                   a janela: posição, jog, programa, trajetória, comandos e registo
 │   ├── session.rs                               o que se faz com um controlador: jog, zero, referência, um programa linha a linha, pausa, paragem, alarmes
 │   ├── gcode.rs                                 os movimentos retos de um programa G-code, para desenhar a sua trajetória
+│   ├── view.rs                                  o plano que se arrasta e amplia e a vista 3D que se roda, como números
+│   ├── plan.rs                                  a verificação antes do arranque: tempo, alcance e curso dos movimentos
 │   ├── cli.rs                                   a linha de comandos: o ficheiro, o idioma, o tema e as opções de imagem
 │   ├── bin/motioncnc.rs                         o programa que abre a janela
 │   ├── server.rs                                a ligação ao servidor EH3D: enviar, acompanhar, pausar, parar
 │   ├── settings.rs                              o que se recorda entre execuções
 │   ├── gui/dialogs.rs                           menus, definições, Abrir, Guardar, editor
-│   └── gui/remote.rs                            o programa no servidor: Iniciar, Pausa, Parar e retomar
+│   ├── gui/remote.rs                            o programa no servidor: Iniciar, Pausa, Parar e retomar
+│   ├── gui/views.rs                             o centro da janela: a trajetória vista de cima ou em 3D, com a ferramenta
+│   ├── gui/summary.rs                           a janela de resumo antes do arranque e a lista de teclas
+│   ├── gui/numfield.rs                          um número definido com os botões menos e mais ou escrevendo-o
+│   ├── gui/keys.rs                              as teclas do teclado e a tabela que os menus e a lista de teclas leem
+│   └── gui/icons.rs                             os desenhos dos botões, traçados com linhas, e o botão da barra de ferramentas
 ├── examples/                                    três programas G-code de exemplo, de um quadrado a uma espiral longa
 ├── tools/                                       verificação de CI, do README e ferramentas de imagens
 ├── docs/                                        as fontes das imagens de Arquitetura e Estrutura do repositório
