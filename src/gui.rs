@@ -21,10 +21,17 @@ use crate::settings::{settings_path, Settings};
 
 mod clipmenu;
 mod dialogs;
+mod icons;
+mod keys;
+mod numfield;
 mod remote;
+mod summary;
+mod views;
 use crate::gcode::{self, Segment};
 use crate::session::{Session, STEPS};
+use crate::view::{Orbit, Plan2d};
 use dialogs::{lang_name, Win};
+use keys::Shortcut;
 
 fn col(c: Rgb) -> Color32 {
     Color32::from_rgb(c.0, c.1, c.2)
@@ -152,6 +159,11 @@ pub struct App {
     server_snap: crate::server::Snapshot,
     server_key: Option<(String, String)>,
     server_err: Option<String>,
+    /// How the path is looked at: the zoom and shift of the plan, the turn and zoom of the 3D view.
+    plan2d: Plan2d,
+    orbit: Orbit,
+    /// The file the Open window shows a picture of, and the picture (None: it cannot be drawn).
+    preview: Option<(PathBuf, Option<gcode::Preview>)>,
 }
 
 impl App {
@@ -168,6 +180,9 @@ impl App {
         }
         if let Some(th) = o.theme {
             settings.theme = th;
+        }
+        if let Some(v) = o.view_3d {
+            settings.view_3d = v;
         }
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;
@@ -196,6 +211,9 @@ impl App {
             server_snap: crate::server::Snapshot::default(),
             server_key: None,
             server_err: None,
+            plan2d: Plan2d::default(),
+            orbit: Orbit::default(),
+            preview: None,
             shot: o.shot.clone().map(|file| Shot {
                 file,
                 wait: o.wait,
@@ -265,7 +283,11 @@ impl App {
                 self.path = path.display().to_string();
                 self.remember(path);
             }
-            Err(e) => self.session.log.push(format!("{}: {e}", path.display())),
+            Err(e) => {
+                let why = format!("{}: {e}", path.display());
+                let said = self.t(Text::McOpenFailed).replacen("{}", &why, 1);
+                self.session.log.push(said);
+            }
         }
     }
 
@@ -370,6 +392,102 @@ impl App {
                             .color(color),
                     );
                 });
+            });
+        });
+    }
+
+    /// The toolbar: the pictures with their names for what is done most (open, save, edit, start, pause, stop, rewind, settings).
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
+        if !self.settings.show_toolbar {
+            return;
+        }
+        let t = self.theme.clone();
+        egui::Panel::top("toolbar").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                use icons::{tool_button, Glyph};
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Open,
+                    self.t(Text::OpenFile),
+                    self.t(Text::McOpenGcode),
+                    true,
+                ) {
+                    self.open_window("open");
+                }
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Save,
+                    self.t(Text::Save),
+                    self.t(Text::McSaveGcode),
+                    true,
+                ) {
+                    self.open_window("save");
+                }
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Edit,
+                    self.t(Text::McEditProgram),
+                    self.t(Text::McEditProgram),
+                    true,
+                ) {
+                    self.open_window("edit");
+                }
+                ui.separator();
+                let can = self.can_start() && !self.session.program.is_empty();
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Play,
+                    self.t(Text::Start),
+                    self.t(Text::Start),
+                    can,
+                ) {
+                    self.request_start();
+                }
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Pause,
+                    self.t(Text::Pause),
+                    self.t(Text::Pause),
+                    self.can_pause(),
+                ) {
+                    self.program_pause();
+                }
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Stop,
+                    self.t(Text::Stop),
+                    self.t(Text::Stop),
+                    self.can_stop(),
+                ) {
+                    self.program_stop();
+                }
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Rewind,
+                    self.t(Text::McRewind),
+                    self.t(Text::McRewind),
+                    true,
+                ) {
+                    self.session.rewind();
+                }
+                ui.separator();
+                if tool_button(
+                    ui,
+                    &t,
+                    Glyph::Settings,
+                    self.t(Text::SettingsTitle),
+                    self.t(Text::SettingsTitle),
+                    true,
+                ) {
+                    self.open_window("settings");
+                }
             });
         });
     }
@@ -747,7 +865,7 @@ impl App {
                         .add_enabled(self.can_start(), egui::Button::new(self.t(Text::Start)))
                         .clicked()
                     {
-                        self.program_start();
+                        self.request_start();
                     }
                     if ui
                         .add_enabled(self.can_pause(), egui::Button::new(self.t(Text::Pause)))
@@ -768,7 +886,7 @@ impl App {
                         )
                         .clicked()
                     {
-                        self.send_to_server(0);
+                        self.request_send();
                     }
                 });
                 ui.label(format!(
@@ -848,103 +966,6 @@ impl App {
                     });
             });
     }
-
-    /// The path of the program on the table, what is done, and where the tool is.
-    fn center(&mut self, ui: &mut egui::Ui) {
-        let t = self.theme.clone();
-        egui::CentralPanel::default().show(ui, |ui| {
-            ui.label(RichText::new(self.t(Text::McToolpath).to_uppercase()).color(col(t.accent)));
-            let (rect, _) = ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
-            let p = ui.painter_at(rect);
-            p.rect_filled(rect, 8.0, col(t.panel));
-            let ((tx0, tx1), (ty0, ty1)) = (
-                (self.settings.travel[0].0, self.settings.travel[0].1),
-                (self.settings.travel[1].0, self.settings.travel[1].1),
-            );
-            // the view: the table, or the table and the program when it goes beyond it, or only the program
-            let (mut minx, mut miny, mut maxx, mut maxy) = (tx0, ty0, tx1, ty1);
-            if self.fit_program && !self.path_toolpath.is_empty() {
-                (minx, miny, maxx, maxy) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
-            }
-            for s in &self.path_toolpath {
-                for pt in [s.from, s.to] {
-                    minx = minx.min(pt.0);
-                    miny = miny.min(pt.1);
-                    maxx = maxx.max(pt.0);
-                    maxy = maxy.max(pt.1);
-                }
-            }
-            let (w, h) = ((maxx - minx).max(1.0), (maxy - miny).max(1.0));
-            let inner = rect.shrink(18.0);
-            let k = ((inner.width() as f64) / w).min((inner.height() as f64) / h);
-            let at = |x: f64, y: f64| {
-                Pos2::new(
-                    inner.left() + ((x - minx) * k) as f32,
-                    inner.bottom() - ((y - miny) * k) as f32,
-                )
-            };
-            // the table and its grid every 50 mm
-            let table = Rect::from_two_pos(at(tx0, ty0), at(tx1, ty1));
-            p.rect_filled(table, 2.0, col(t.table));
-            let mut x = (tx0 / 50.0).ceil() * 50.0;
-            while x <= tx1 {
-                p.line_segment(
-                    [at(x, ty0), at(x, ty1)],
-                    Stroke::new(1.0, alpha(col(t.grid), 90)),
-                );
-                x += 50.0;
-            }
-            let mut y = (ty0 / 50.0).ceil() * 50.0;
-            while y <= ty1 {
-                p.line_segment(
-                    [at(tx0, y), at(tx1, y)],
-                    Stroke::new(1.0, alpha(col(t.grid), 90)),
-                );
-                y += 50.0;
-            }
-            p.rect_stroke(
-                table,
-                2.0,
-                Stroke::new(1.5, col(t.line)),
-                StrokeKind::Inside,
-            );
-            let next = self.session.next;
-            for s in &self.path_toolpath {
-                if s.rapid && !self.settings.show_rapids {
-                    continue;
-                }
-                let done = s.line < next;
-                let color = match (s.rapid, done) {
-                    (true, _) => alpha(col(t.dim), 140),
-                    (false, true) => col(t.ok),
-                    (false, false) => col(t.accent),
-                };
-                p.line_segment(
-                    [at(s.from.0, s.from.1), at(s.to.0, s.to.1)],
-                    Stroke::new(if s.rapid { 1.0 } else { 2.0 }, color),
-                );
-            }
-            // the tool, where the machine is
-            let m = self.session.status.machine_mm;
-            let c = at(m[0], m[1]);
-            p.circle_stroke(c, 9.0, Stroke::new(2.0, col(t.accent2)));
-            p.line_segment(
-                [c - Vec2::new(14.0, 0.0), c + Vec2::new(14.0, 0.0)],
-                Stroke::new(1.0, col(t.accent2)),
-            );
-            p.line_segment(
-                [c - Vec2::new(0.0, 14.0), c + Vec2::new(0.0, 14.0)],
-                Stroke::new(1.0, col(t.accent2)),
-            );
-            p.text(
-                rect.right_bottom() - Vec2::new(10.0, 8.0),
-                Align2::RIGHT_BOTTOM,
-                format!("{:.0} x {:.0} mm", w, h),
-                egui::FontId::proportional(12.0),
-                col(t.dim),
-            );
-        });
-    }
 }
 
 impl eframe::App for App {
@@ -981,7 +1002,9 @@ impl eframe::App for App {
         }
         self.track_recovery();
         self.server_tick(&ctx);
+        self.keys(&ctx);
         self.menu_bar(ui);
+        self.toolbar(ui);
         self.top(ui);
         self.bottom(ui);
         self.left(ui);

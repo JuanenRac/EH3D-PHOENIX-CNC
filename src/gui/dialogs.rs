@@ -24,6 +24,10 @@ pub(super) enum Win {
     About,
     /// A program was left in the middle: go on from its line or leave it.
     Resume(crate::recovery::Recovery),
+    /// The summary of a program that is about to start: start it or leave it.
+    Summary(Box<summary::PendingStart>),
+    /// The list of the keys.
+    Shortcuts,
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -78,6 +82,11 @@ impl App {
 ",
             ))),
             "about" => Some(Win::About),
+            "summary" => Some(Win::Summary(Box::new(summary::PendingStart {
+                report: self.report(),
+                server: false,
+            }))),
+            "keys" => Some(Win::Shortcuts),
             _ => None,
         };
     }
@@ -131,7 +140,7 @@ impl App {
 
     fn menu_file(&mut self, ui: &mut egui::Ui) {
         ui.menu_button(self.t(Text::MenuFile), |ui| {
-            if ui.button(self.t(Text::McOpenGcode)).clicked() {
+            if self.menu_item(ui, self.t(Text::McOpenGcode), Shortcut::Open, true) {
                 self.win = Some(Win::Open(self.browser(Mode::Open)));
                 ui.close();
             }
@@ -156,19 +165,21 @@ impl App {
                     }
                 });
             });
-            if ui.button(self.t(Text::McSaveGcode)).clicked() {
+            if self.menu_item(ui, self.t(Text::McSaveGcode), Shortcut::Save, true) {
                 self.win = Some(Win::Save(self.browser(Mode::Save)));
                 ui.close();
             }
-            if ui.button(self.t(Text::McEditProgram)).clicked() {
+            if self.menu_item(ui, self.t(Text::McEditProgram), Shortcut::Edit, true) {
                 self.win = Some(Win::Edit(self.session.program.join("\n")));
                 ui.close();
             }
             ui.separator();
-            if ui
-                .button(format!("{} ...", self.t(Text::SettingsTitle)))
-                .clicked()
-            {
+            if self.menu_item(
+                ui,
+                &format!("{} ...", self.t(Text::SettingsTitle)),
+                Shortcut::Settings,
+                true,
+            ) {
                 self.win = Some(Win::Settings(Box::new(Draft {
                     s: self.settings.clone(),
                     section: 0,
@@ -176,7 +187,7 @@ impl App {
                 ui.close();
             }
             ui.separator();
-            if ui.button(self.t(Text::MenuExit)).clicked() {
+            if self.menu_item(ui, self.t(Text::MenuExit), Shortcut::Quit, true) {
                 self.quit = true;
             }
         });
@@ -184,13 +195,17 @@ impl App {
 
     fn menu_view(&mut self, ui: &mut egui::Ui) {
         ui.menu_button(self.t(Text::MenuView), |ui| {
-            let (buttons, program, log, rapids) = (
+            let (toolbar, buttons, program, log, rapids) = (
+                self.t(Text::McShowToolbar),
                 self.t(Text::McShowButtons),
                 self.t(Text::McShowProgram),
                 self.t(Text::McShowLog),
                 self.t(Text::McShowRapids),
             );
             let mut changed = false;
+            changed |= ui
+                .checkbox(&mut self.settings.show_toolbar, toolbar)
+                .changed();
             changed |= ui
                 .checkbox(&mut self.settings.show_buttons, buttons)
                 .changed();
@@ -201,6 +216,15 @@ impl App {
             changed |= ui
                 .checkbox(&mut self.settings.show_rapids, rapids)
                 .changed();
+            ui.separator();
+            if self.menu_item(ui, self.t(Text::ViewMachine), Shortcut::ToggleView, true) {
+                self.toggle_view();
+                ui.close();
+            }
+            if self.menu_item(ui, self.t(Text::ResetView), Shortcut::ResetView, true) {
+                self.reset_view();
+                ui.close();
+            }
             ui.separator();
             if ui
                 .radio(!self.fit_program, self.t(Text::McFitTable))
@@ -222,24 +246,15 @@ impl App {
 
     fn menu_program(&mut self, ui: &mut egui::Ui) {
         ui.menu_button(self.t(Text::McProgram), |ui| {
-            if ui
-                .add_enabled(self.can_start(), egui::Button::new(self.t(Text::Start)))
-                .clicked()
-            {
-                self.program_start();
+            if self.menu_item(ui, self.t(Text::Start), Shortcut::Start, self.can_start()) {
+                self.request_start();
                 ui.close();
             }
-            if ui
-                .add_enabled(self.can_pause(), egui::Button::new(self.t(Text::Pause)))
-                .clicked()
-            {
+            if self.menu_item(ui, self.t(Text::Pause), Shortcut::Pause, self.can_pause()) {
                 self.program_pause();
                 ui.close();
             }
-            if ui
-                .add_enabled(self.can_stop(), egui::Button::new(self.t(Text::Stop)))
-                .clicked()
-            {
+            if self.menu_item(ui, self.t(Text::Stop), Shortcut::Stop, self.can_stop()) {
                 self.program_stop();
                 ui.close();
             }
@@ -250,7 +265,7 @@ impl App {
                 )
                 .clicked()
             {
-                self.send_to_server(0);
+                self.request_send();
                 ui.close();
             }
             ui.separator();
@@ -336,6 +351,10 @@ impl App {
 
     fn menu_help(&mut self, ui: &mut egui::Ui) {
         ui.menu_button(self.t(Text::MenuHelp), |ui| {
+            if self.menu_item(ui, self.t(Text::McShortcuts), Shortcut::Help, true) {
+                self.win = Some(Win::Shortcuts);
+                ui.close();
+            }
             if ui.button(self.t(Text::About)).clicked() {
                 self.win = Some(Win::About);
                 ui.close();
@@ -356,10 +375,12 @@ impl App {
             Win::Edit(t) => self.edit_window(ctx, t),
             Win::About => self.about_window(ctx),
             Win::Resume(r) => self.resume_window(ctx, r),
+            Win::Summary(p) => self.summary_window(ctx, p),
+            Win::Shortcuts => self.shortcuts_window(ctx),
         };
     }
 
-    fn window(&self, title: &str) -> egui::Window<'static> {
+    pub(super) fn window(&self, title: &str) -> egui::Window<'static> {
         egui::Window::new(title.to_string())
             .collapsible(false)
             .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
@@ -539,8 +560,12 @@ impl App {
         let mut done: Option<Chosen> = None;
         let mut cancel = false;
         let mut error: Option<&'static str> = None;
+        let previewing = mode == Mode::Open && self.settings.open_preview;
+        if previewing {
+            self.update_preview(&b);
+        }
         self.window(title)
-            .default_size([780.0, 500.0])
+            .default_size([if previewing { 1030.0 } else { 780.0 }, 500.0])
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if ui
@@ -604,6 +629,13 @@ impl App {
                         }
                     });
                     ui.add_space(8.0);
+                    if previewing {
+                        ui.vertical(|ui| {
+                            ui.set_width(240.0);
+                            self.paint_file_preview(ui);
+                        });
+                        ui.add_space(8.0);
+                    }
                     ui.vertical(|ui| {
                         let headings = [Text::ColName, Text::ColDate, Text::ColType, Text::ColSize];
                         egui::Grid::new("fileheads")
@@ -721,6 +753,14 @@ impl App {
                     if filter != b.filter {
                         b.set_filter(filter);
                     }
+                    let preview_label = self.t(Text::PreviewShow);
+                    if mode == Mode::Open
+                        && ui
+                            .checkbox(&mut self.settings.open_preview, preview_label)
+                            .changed()
+                    {
+                        self.save_settings();
+                    }
                     let label = if mode == Mode::Open {
                         self.t(Text::OpenFile)
                     } else {
@@ -777,6 +817,89 @@ impl App {
         }
     }
 
+    /// The file the Open window points at (the name typed below the list, in the folder being looked at), when it is a file.
+    fn previewed_path(b: &Browser) -> Option<PathBuf> {
+        let name = b.name_text.trim();
+        if name.is_empty() {
+            return None;
+        }
+        let typed = Path::new(name);
+        let full = if typed.is_absolute() {
+            typed.to_path_buf()
+        } else {
+            b.dir.as_ref()?.join(typed)
+        };
+        full.is_file().then_some(full)
+    }
+
+    /// Reads the picture of the file pointed at, once for each file (not on every frame).
+    fn update_preview(&mut self, b: &Browser) {
+        match Self::previewed_path(b) {
+            None => self.preview = None,
+            Some(p) => {
+                if self.preview.as_ref().map(|(q, _)| q) != Some(&p) {
+                    let pv = gcode::read_preview(&p);
+                    self.preview = Some((p, pv));
+                }
+            }
+        }
+    }
+
+    /// The path of the file pointed at in the Open window, fitted in a box, with its size and how many moves it has.
+    fn paint_file_preview(&self, ui: &mut egui::Ui) {
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(240.0, 220.0), egui::Sense::hover());
+        let p = ui.painter_at(rect);
+        p.rect_filled(rect, 6.0, col(self.theme.panel));
+        let shown = match &self.preview {
+            Some((_, Some(pv))) => pv.bounds.map(|b| (pv, b)),
+            _ => None,
+        };
+        let Some((pv, [x0, y0, x1, y1])) = shown else {
+            p.text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                self.t(Text::PreviewNone),
+                egui::FontId::proportional(13.0),
+                col(self.theme.dim),
+            );
+            return;
+        };
+        let inner = rect.shrink(12.0);
+        let (w, h) = ((x1 - x0).max(1.0), (y1 - y0).max(1.0));
+        let k = ((inner.width() as f64) / w).min((inner.height() as f64) / h);
+        let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+        let at = |x: f64, y: f64| {
+            Pos2::new(
+                inner.center().x + ((x - cx) * k) as f32,
+                inner.center().y - ((y - cy) * k) as f32,
+            )
+        };
+        for s in &pv.segments {
+            let (color, width) = if s.rapid {
+                (alpha(col(self.theme.dim), 120), 1.0)
+            } else {
+                (col(self.theme.accent), 1.6)
+            };
+            p.line_segment(
+                [at(s.from.0, s.from.1), at(s.to.0, s.to.1)],
+                Stroke::new(width, color),
+            );
+        }
+        ui.label(format!(
+            "{}: {:.1} x {:.1}",
+            self.t(Text::SummarySize),
+            x1 - x0,
+            y1 - y0
+        ));
+        let rapid = pv.segments.iter().filter(|s| s.rapid).count();
+        ui.label(format!(
+            "{}: {} / {}",
+            self.t(Text::McSumMoves),
+            rapid,
+            pv.moves - rapid
+        ));
+    }
+
     /// The settings: the sections on the left like the tree of PlanetCNC, the section on the right, Ok and Cancel.
     fn settings_window(&mut self, ctx: &egui::Context, mut d: Box<Draft>) -> Option<Win> {
         let mut ok = false;
@@ -793,6 +916,7 @@ impl App {
                             Text::McSecAxes,
                             Text::McSecJog,
                             Text::McSecServer,
+                            Text::McSecSafety,
                         ]
                         .into_iter()
                         .enumerate()
@@ -816,11 +940,13 @@ impl App {
                                 ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     ui.label(self.t(Text::McSpindle));
-                                    ui.add(
-                                        egui::DragValue::new(&mut d.s.spindle_rpm)
-                                            .range(0.0..=1_000_000.0)
-                                            .speed(100.0)
-                                            .suffix(" rpm"),
+                                    numfield::field(
+                                        ui,
+                                        "set-spindle",
+                                        &mut d.s.spindle_rpm,
+                                        (0.0, 1_000_000.0),
+                                        100.0,
+                                        "rpm",
                                     );
                                 });
                                 ui.checkbox(&mut d.s.show_rapids, self.t(Text::McShowRapids));
@@ -856,9 +982,11 @@ impl App {
                                         }
                                     });
                                 ui.add_space(8.0);
+                                ui.checkbox(&mut d.s.show_toolbar, self.t(Text::McShowToolbar));
                                 ui.checkbox(&mut d.s.show_buttons, self.t(Text::McShowButtons));
                                 ui.checkbox(&mut d.s.show_program, self.t(Text::McShowProgram));
                                 ui.checkbox(&mut d.s.show_log, self.t(Text::McShowLog));
+                                ui.checkbox(&mut d.s.shortcuts, self.t(Text::McShortcuts));
                             }
                             2 => {
                                 ui.label(
@@ -871,15 +999,21 @@ impl App {
                                     .show(ui, |ui| {
                                         for (i, n) in ["X", "Y", "Z"].iter().enumerate() {
                                             ui.label(*n);
-                                            ui.add(
-                                                egui::DragValue::new(&mut d.s.travel[i].0)
-                                                    .speed(1.0)
-                                                    .range(-100_000.0..=100_000.0),
+                                            numfield::field(
+                                                ui,
+                                                ("set-travel-lo", i),
+                                                &mut d.s.travel[i].0,
+                                                (-100_000.0, 100_000.0),
+                                                1.0,
+                                                "mm",
                                             );
-                                            ui.add(
-                                                egui::DragValue::new(&mut d.s.travel[i].1)
-                                                    .speed(1.0)
-                                                    .range(-100_000.0..=100_000.0),
+                                            numfield::field(
+                                                ui,
+                                                ("set-travel-hi", i),
+                                                &mut d.s.travel[i].1,
+                                                (-100_000.0, 100_000.0),
+                                                1.0,
+                                                "mm",
                                             );
                                             ui.end_row();
                                         }
@@ -920,6 +1054,25 @@ impl App {
                                         ui.end_row();
                                     });
                             }
+                            5 => {
+                                ui.checkbox(&mut d.s.confirm_start, self.t(Text::McConfirmStart));
+                                ui.checkbox(
+                                    &mut d.s.reject_out_of_travel,
+                                    self.t(Text::McSumReject),
+                                );
+                                ui.add_space(8.0);
+                                ui.horizontal(|ui| {
+                                    ui.label(self.t(Text::McRapidFeed));
+                                    numfield::field(
+                                        ui,
+                                        "set-rapid",
+                                        &mut d.s.rapid_mm_min,
+                                        (1.0, 1_000_000.0),
+                                        100.0,
+                                        "mm/min",
+                                    );
+                                });
+                            }
                             _ => {
                                 ui.label(self.t(Text::McDefaultStep));
                                 ui.horizontal(|ui| {
@@ -930,10 +1083,13 @@ impl App {
                                 ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     ui.label(self.t(Text::McDefaultFeed));
-                                    ui.add(
-                                        egui::DragValue::new(&mut d.s.feed_mm_min)
-                                            .range(1.0..=100_000.0)
-                                            .speed(10.0),
+                                    numfield::field(
+                                        ui,
+                                        "set-feed",
+                                        &mut d.s.feed_mm_min,
+                                        (1.0, 100_000.0),
+                                        10.0,
+                                        "mm/min",
                                     );
                                 });
                             }
