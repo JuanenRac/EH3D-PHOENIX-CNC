@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.0.8] - Summary before a start, shortcuts, toolbar and a 3D view
+
 - **A summary before a program starts:** the moves, the cutting distance, the time at the rapid speed and the feed of the program, the reach of the axes and a check against the travel of the machine (the zero of the work taken into account), with the warnings the suite shares (a program that is tiny or far from the corner of the travel, bigger than the table, arcs the estimate leaves out, cuts before any feed). **Start anyway** when something looks wrong; a program that leaves the travel is refused (`reject_out_of_travel = no` makes it a warning, `confirm_start = no` turns the summary off). It comes before Start and before sending the program to the server; the measure is `eh3d-summary` of EH3D-COMMON.
 
 - **Keys of the keyboard:** Ctrl+O, Ctrl+S, Ctrl+E, Ctrl+, (settings), F5 start, F6 pause, F8 stop, Ctrl+Q, F1 (the list), F3 (plan or 3D), Ctrl+0 (reset the view) and Esc (closes a window, but never a question that needs an answer); with a window open only Esc, F1 and Ctrl+Q act; they are written beside the menu entries and `shortcuts = no` turns them off.
