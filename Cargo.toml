@@ -14,9 +14,9 @@ gui = ["dep:eframe", "dep:png", "dep:arboard"]
 serial = ["eh3d-controller/serial"]
 
 [dependencies]
-eh3d-view = { path = "../EH3D-COMMON/crates/view" }
-eh3d-controller = { path = "../EH3D-COMMON/crates/controller" }
-eh3d-filedialog = { path = "../EH3D-COMMON/crates/filedialog" }
+eh3d-view = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/view" }
+eh3d-controller = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/controller" }
+eh3d-filedialog = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/filedialog" }
 serde_json = "1"
 sha2 = "0.10"
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "clipboard"], optional = true }

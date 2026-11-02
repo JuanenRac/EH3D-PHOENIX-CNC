@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Each dependency on a sibling by path says the version it needs** (`eh3d-view`, `eh3d-controller`, `eh3d-filedialog`: `>=0.0.1`), so a package built from the repository is not rejected for lacking one.
+
 ## [0.0.7] - Cut, copy and paste, a stop that stops the machine and a program that goes on from a safe state
 
 - **Cut, copy and paste work in every text box:** the window was built without the clipboard, so none of the keys (Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Insert, Shift+Insert, Shift+Delete) did anything. All the boxes (the file and folder names, the server address, token and machine, the command line, the program path and the log) take them, and the right button opens a menu with Cut, Copy, Paste, Select all and Undo, greyed out where they do not apply and named in the 37 languages.
