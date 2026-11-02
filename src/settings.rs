@@ -57,6 +57,9 @@ pub struct Settings {
     pub open_preview: bool,
     /// The centre of the window shows the path in 3D instead of from above.
     pub view_3d: bool,
+    /// On connecting to a GRBL controller, read its longest travel of X, Y and Z (`$130` to `$132`) and take the smaller of that and the
+    /// travel above for the summary and the refusal (off: only the travel above counts).
+    pub read_controller_travel: bool,
 }
 
 impl Default for Settings {
@@ -91,6 +94,7 @@ impl Default for Settings {
             show_toolbar: true,
             open_preview: true,
             view_3d: false,
+            read_controller_travel: true,
         }
     }
 }
@@ -188,6 +192,7 @@ impl Settings {
                 "show_toolbar" => s.show_toolbar = on(v),
                 "open_preview" => s.open_preview = on(v),
                 "view_3d" => s.view_3d = on(v),
+                "read_controller_travel" => s.read_controller_travel = on(v),
                 "recent" => {
                     s.recent = v
                         .split('|')
@@ -216,7 +221,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -250,7 +255,8 @@ impl Settings {
             yes(self.shortcuts),
             yes(self.show_toolbar),
             yes(self.open_preview),
-            yes(self.view_3d)
+            yes(self.view_3d),
+            yes(self.read_controller_travel)
         )
     }
 
@@ -333,6 +339,7 @@ mod tests {
             show_toolbar: false,
             open_preview: false,
             view_3d: true,
+            read_controller_travel: false,
         };
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
@@ -413,6 +420,7 @@ mod tests {
     {
         let d = Settings::default();
         assert!(d.confirm_start && d.reject_out_of_travel && d.shortcuts);
+        assert!(d.read_controller_travel);
         let s = Settings::parse(
             "rapid = 0\nsummary_far = -3\nsummary_margin = lots\nconfirm_start = no\n",
         );

@@ -122,6 +122,9 @@ impl App {
         }
         let travel = self.settings.travel;
         self.session.set_travel(travel);
+        if self.settings.read_controller_travel && !self.session.travel_asked {
+            self.session.read_controller_travel();
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------ the menu bar
@@ -558,6 +561,10 @@ impl App {
             self.t(Text::McSaveTitle)
         };
         let mut done: Option<Chosen> = None;
+        // the files picked with Ctrl+click to run one after the other (the Open window only)
+        let mut multi: Vec<PathBuf> = std::mem::take(&mut self.open_multi);
+        let mut ctrl_click = false;
+        let mut queue_chosen: Option<Vec<PathBuf>> = None;
         let mut cancel = false;
         let mut error: Option<&'static str> = None;
         let previewing = mode == Mode::Open && self.settings.open_preview;
@@ -684,9 +691,15 @@ impl App {
                                             } else {
                                                 e.name.clone()
                                             };
-                                            let r = ui.selectable_label(b.sel == Some(i), name);
+                                            let picked = !e.is_dir
+                                                && b.dir.as_ref().is_some_and(|d| {
+                                                    multi.contains(&d.join(&e.name))
+                                                });
+                                            let r = ui
+                                                .selectable_label(b.sel == Some(i) || picked, name);
                                             if r.clicked() {
                                                 clicked = Some(i);
+                                                ctrl_click = ui.input(|i| i.modifiers.command);
                                             }
                                             if r.double_clicked() {
                                                 activated = Some(i);
@@ -713,7 +726,31 @@ impl App {
                                     });
                             });
                         if let Some(i) = clicked {
-                            b.select(i);
+                            let file = b
+                                .entries
+                                .get(i)
+                                .filter(|e| !e.is_dir)
+                                .and_then(|e| b.dir.as_ref().map(|d| d.join(&e.name)));
+                            match file {
+                                Some(path) if ctrl_click && mode == Mode::Open => {
+                                    // the file already chosen with a plain click is the first of the queue
+                                    if multi.is_empty() {
+                                        if let Some(prev) = Self::previewed_path(&b) {
+                                            multi.push(prev);
+                                        }
+                                    }
+                                    if let Some(at) = multi.iter().position(|p| *p == path) {
+                                        multi.remove(at);
+                                    } else {
+                                        multi.push(path);
+                                    }
+                                    b.select(i);
+                                }
+                                _ => {
+                                    multi.clear();
+                                    b.select(i);
+                                }
+                            }
                         }
                         if let Some(i) = activated {
                             match b.activate(i) {
@@ -766,16 +803,25 @@ impl App {
                     } else {
                         self.t(Text::Save)
                     };
+                    if mode == Mode::Open && multi.len() >= 2 {
+                        ui.label(format!("{}: {}", self.t(Text::McQueue), multi.len()));
+                    }
                     if ui.button(label).clicked() || enter {
-                        match b.confirm() {
-                            Ok(c) => done = Some(c),
-                            Err(Problem::NoName) => error = Some(self.t(Text::McTypeName)),
-                            Err(Problem::Missing(_)) => error = Some(self.t(Text::McNoSuchFile)),
-                            Err(Problem::IsFolder(p)) => {
-                                b.go(Some(p));
-                                b.name_text.clear();
+                        if mode == Mode::Open && multi.len() >= 2 {
+                            queue_chosen = Some(multi.clone());
+                        } else {
+                            match b.confirm() {
+                                Ok(c) => done = Some(c),
+                                Err(Problem::NoName) => error = Some(self.t(Text::McTypeName)),
+                                Err(Problem::Missing(_)) => {
+                                    error = Some(self.t(Text::McNoSuchFile))
+                                }
+                                Err(Problem::IsFolder(p)) => {
+                                    b.go(Some(p));
+                                    b.name_text.clear();
+                                }
+                                Err(Problem::NoFolder) => error = Some(self.t(Text::McTypeName)),
                             }
-                            Err(Problem::NoFolder) => error = Some(self.t(Text::McTypeName)),
                         }
                     }
                     if ui.button(self.t(Text::McCancel)).clicked() {
@@ -791,6 +837,12 @@ impl App {
             self.dialog_error = None;
             return None;
         }
+        if let Some(paths) = queue_chosen {
+            self.dialog_error = None;
+            self.start_queue(paths);
+            return None;
+        }
+        self.open_multi = multi;
         match done {
             Some(Chosen::File(p)) => {
                 self.dialog_error = None;
@@ -1059,6 +1111,10 @@ impl App {
                                 ui.checkbox(
                                     &mut d.s.reject_out_of_travel,
                                     self.t(Text::McSumReject),
+                                );
+                                ui.checkbox(
+                                    &mut d.s.read_controller_travel,
+                                    self.t(Text::McGrblTravel),
                                 );
                                 ui.add_space(8.0);
                                 ui.horizontal(|ui| {

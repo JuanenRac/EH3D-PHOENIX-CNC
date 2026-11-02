@@ -72,6 +72,19 @@
           }
         },
         {
+          "name": "queue.rs",
+          "desc": {
+            "en": "the queue of programs: order, state, skip, remove, reorder, stop on failure",
+            "es": "la cola de programas: orden, estado, saltar, quitar, reordenar, parada si falla",
+            "de": "die Programm-Warteschlange: Reihenfolge, Zustand, überspringen, entfernen, Halt bei Fehler",
+            "fr": "la file de programmes : ordre, état, ignorer, retirer, réordonner, arrêt si échec",
+            "it": "la coda dei programmi: ordine, stato, salta, rimuovi, riordina, stop se fallisce",
+            "ja": "プログラムのキュー：順序、状態、スキップ、削除、並べ替え、失敗時の停止",
+            "zh": "程序队列：顺序、状态、跳过、移除、重排，失败时停止",
+            "pt": "a fila de programas: ordem, estado, ignorar, retirar, reordenar, paragem se falha"
+          }
+        },
+        {
           "name": "gcode.rs",
           "desc": {
             "en": "the straight moves of a G-code program, to draw its path",
@@ -238,6 +251,19 @@
             "ja": "キーボードのキーと、メニューとキー一覧が読む表",
             "zh": "键盘按键以及菜单和按键列表所读取的表",
             "pt": "as teclas do teclado e a tabela que os menus e a lista de teclas leem"
+          }
+        },
+        {
+          "name": "gui/queue.rs",
+          "desc": {
+            "en": "the queue in the window: files run one after the other, each after its summary",
+            "es": "la cola en la ventana: archivos uno tras otro, cada uno tras su resumen",
+            "de": "die Warteschlange im Fenster: Dateien nacheinander, jede nach ihrer Zusammenfassung",
+            "fr": "la file dans la fenêtre : fichiers l'un après l'autre, chacun après son résumé",
+            "it": "la coda nella finestra: file uno dopo l'altro, ciascuno dopo il suo riepilogo",
+            "ja": "ウィンドウ内のキュー：ファイルを順に実行し、それぞれ概要の後に開始",
+            "zh": "窗口中的队列：文件依次运行，每个先显示摘要",
+            "pt": "a fila na janela: ficheiros um a seguir ao outro, cada um após o seu resumo"
           }
         },
         {

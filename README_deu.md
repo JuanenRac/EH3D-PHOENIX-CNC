@@ -14,12 +14,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.0.8-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-scaffolding-FFB020.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-72-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-91-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`motioncnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 72 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`motioncnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 91 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
 
 ---
 
@@ -31,7 +31,7 @@
 |---|---|
 | Version | `0.0.8` |
 | Reifegrad | Gerüst |
-| Tests | 72 |
+| Tests | 91 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: es steuert nur eine simulierte Maschine |
 
@@ -48,7 +48,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche in 37 Sprachen, im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 72 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 91 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur der Simulator: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt; von hier ist noch keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -66,7 +66,8 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 * **Weitermachen nach einem Ausfall:** Während ein Programm läuft, wird die erreichte Zeile in einer kleinen Datei gespeichert; fällt das Fenster, der Rechner oder die Verbindung aus, fragt der nächste Start, ob ab dieser Zeile weitergemacht oder verworfen wird. Bis der Bediener antwortet, wird nichts an die Steuerung gesendet.
 * **An den EH3D-Server gesendet:** Mit der Adresse des Servers, dem Token dieses Programms und der Kennung der Maschine in den Einstellungen (Abschnitt Server des Einstellungsfensters oder `server_address`, `server_token` und `server_machine` in der Einstellungsdatei) sendet **Programm > An den Server senden** den Text des Programms als G-Code-Auftrag; der Server führt ihn auf seiner Maschine aus (ein GRBL-Controller an seiner seriellen Schnittstelle oder sein Simulator) und das Fenster verfolgt ihn: Zustand, Prozent und erreichte Zeile in der Kopfleiste, im Panel und im Protokoll. Start, Pause und Stopp des Fensters erreichen den Auftrag auf dem Server, das Schließen des Fensters stoppt ihn nicht, und ein angehaltener Auftrag wird ab der Zeile fortgesetzt, die der Server erreicht hat (der nächste Start des Fensters bietet es an, wie bei einem Programm des Controllers): der Server gibt die geltenden Codes zurück und wartet vor der ersten Bewegung auf den Bediener. Spindel und Kühlmittel werden nur mit `server_restore_outputs = yes` wieder gestartet. Gegen einen Stellvertreter-Server geprüft; die eigenen Tests des Servers senden dieselben Anfragen an seinen Simulator. Nie an einer Maschine.
 * **Fortsetzen nach einem Fehler:** Ein halb gelaufenes Programm wird zuerst in seinen Zustand zurückgesetzt: Einheiten und absolute Maße, ein sicheres Z (`resume_safe_z` in der Einstellungsdatei, 5 mm), die Spindel mit der Zeit bis zur Drehzahl (`resume_spindle_wait`, 3 s), das Kühlmittel, der erreichte Punkt und der Modalzustand; die Wiederherstellungsdatei enthält den SHA-256 des Programms und setzt nicht fort, wenn sich das Programm geändert hat.
-* **Die Hilfen des Fensters:** eine **Zusammenfassung vor dem Start eines Programms** (die Bewegungen, der Schnittweg, die Zeit bei den Geschwindigkeiten der Einstellungen, die Reichweite der Achsen und eine Prüfung gegen den Verfahrweg der Maschine, mit den Warnungen, die sich die Suite teilt: ein winziges oder weit von der Ecke entferntes Programm, größer als der Tisch, Bögen, die die Schätzung auslässt, und Schnitte vor jedem Vorschub; **Trotzdem starten**, oder eine Ablehnung, wenn das Programm den Verfahrweg verlässt, die `reject_out_of_travel = no` zur Warnung macht, und `confirm_start = no` schaltet die Zusammenfassung ab); **Tasten der Tastatur** (Strg+O öffnen, Strg+S speichern, Strg+E bearbeiten, F5 Start, F6 Pause, F8 Stopp, Esc schließt ein Fenster, F1 listet sie auf; `shortcuts = no` schaltet sie ab); eine **Werkzeugleiste** mit gezeichneten Bildern und ihren Namen; Zahlen, die mit Minus und Plus gestuft oder **eingetippt** werden; die Bahn **gezogen und gezoomt von oben oder gedreht und gezoomt in 3D** mit dem Werkzeug; eine **Vorschau der G-Code-Datei** im Öffnen-Fenster; die **Aufzeichnung eines Absturzes** (`eh3d-crash.log`); und ein Abschnitt Sicherheit in den Einstellungen (`rapid`, `summary_tiny`, `summary_far` und `summary_margin` in der Einstellungsdatei).
+* **Die Hilfen des Fensters:** eine **Zusammenfassung vor dem Start eines Programms** (die Bewegungen, der Schnittweg, die Zeit bei den Geschwindigkeiten der Einstellungen, die Reichweite der Achsen und eine Prüfung gegen den Verfahrweg der Maschine, mit den Warnungen, die sich die Suite teilt: ein winziges oder weit von der Ecke entferntes Programm, größer als der Tisch, Bögen, die die Schätzung auslässt, und Schnitte vor jedem Vorschub; **Trotzdem starten**, oder eine Ablehnung, wenn das Programm den Verfahrweg verlässt, die `reject_out_of_travel = no` zur Warnung macht, und `confirm_start = no` schaltet die Zusammenfassung ab); **Tasten der Tastatur** (Strg+O öffnen, Strg+S speichern, Strg+E bearbeiten, F5 Start, Leertaste Pause, Esc Stopp (bei offenem Fenster schließt Esc es, und mit der Tastatur in einem Textfeld bleiben Leertaste und Esc dem Feld), F1 listet sie auf; `shortcuts = no` schaltet sie ab); eine **Werkzeugleiste** mit gezeichneten Bildern und ihren Namen; Zahlen, die mit Minus und Plus gestuft oder **eingetippt** werden; die Bahn **gezogen und gezoomt von oben oder gedreht und gezoomt in 3D** mit dem Werkzeug; eine **Vorschau der G-Code-Datei** im Öffnen-Fenster; die **Aufzeichnung eines Absturzes** (`eh3d-crash.log`); und ein Abschnitt Sicherheit in den Einstellungen (`rapid`, `summary_tiny`, `summary_far` und `summary_margin` in der Einstellungsdatei).
+* **Eine Warteschlange von Programmen und der Verfahrweg der Steuerung:** mehrere im Öffnen-Fenster mit Strg+Klick gewählte, zusammen abgelegte oder in der Befehlszeile genannte Dateien (`motioncnc a.nc b.nc`) laufen nacheinander, jede nach ihrer eigenen Zusammenfassung; das Fenster listet sie mit ihrem Zustand auf, erlaubt das Entfernen, Überspringen und Umordnen der wartenden, und die Warteschlange hält an, wenn ein Programm nicht fertig wird. Bei einer GRBL-Steuerung liest das Programm beim Verbinden `$130`, `$131` und `$132` (den größten Verfahrweg von X, Y und Z) und nimmt für Zusammenfassung und Ablehnung den kleineren Wert aus diesem und `travel_x`, `travel_y` und `travel_z`; antwortet die Steuerung nicht oder liefert sie die Werte nicht, gelten die Einstellungen und das Protokoll sagt es (`read_controller_travel = no` schaltet das Lesen ab).
 
 ## 🧩 Rolle in EH3D
 
@@ -133,7 +134,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 72 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 91 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -154,6 +155,7 @@ EH3D-MOTIONCNC/
 │   ├── lib.rs                                   die Module und die Ansicht von eh3d-view unter dem Namen dieses Programms
 │   ├── gui.rs                                   das Fenster: Position, Jog, Programm, Bahn, Befehle und Protokoll
 │   ├── session.rs                               was mit einer Steuerung getan wird: Jog, Nullpunkt, Referenz, ein Programm Zeile für Zeile, Pause, Stopp, Alarme
+│   ├── queue.rs                                 die Programm-Warteschlange: Reihenfolge, Zustand, überspringen, entfernen, Halt bei Fehler
 │   ├── gcode.rs                                 die geraden Bewegungen eines G-Code-Programms, um seine Bahn zu zeichnen
 │   ├── view.rs                                  der Plan, der gezogen und gezoomt wird, und die gedrehte 3D-Ansicht, als Zahlen
 │   ├── plan.rs                                  die Prüfung vor dem Start: Zeit, Reichweite und Verfahrweg der Bewegungen
@@ -167,6 +169,7 @@ EH3D-MOTIONCNC/
 │   ├── gui/summary.rs                           das Zusammenfassungsfenster vor dem Start und die Tastenliste
 │   ├── gui/numfield.rs                          eine Zahl, die mit den Tasten Minus und Plus oder durch Eintippen gesetzt wird
 │   ├── gui/keys.rs                              die Tasten der Tastatur und die Tabelle, die Menüs und Tastenliste lesen
+│   ├── gui/queue.rs                             die Warteschlange im Fenster: Dateien nacheinander, jede nach ihrer Zusammenfassung
 │   └── gui/icons.rs                             die Bilder der Schaltflächen, mit Linien gezeichnet, und die Schaltfläche der Werkzeugleiste
 ├── examples/                                    drei Beispiel-G-Code-Programme, vom Quadrat bis zur langen Spirale
 ├── tools/                                       CI-Prüfung, README-Prüfung und die Bild-Werkzeuge

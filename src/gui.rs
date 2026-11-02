@@ -16,6 +16,7 @@ use eh3d_view::texts::{tr, Lang, Text};
 use eh3d_view::theme::{Rgb, Theme, ThemeId};
 
 use crate::cli::Options;
+use crate::queue::Queue;
 use crate::recovery::{self, Recovery};
 use crate::settings::{settings_path, Settings};
 
@@ -24,6 +25,7 @@ mod dialogs;
 mod icons;
 mod keys;
 mod numfield;
+mod queue;
 mod remote;
 mod summary;
 mod views;
@@ -164,9 +166,32 @@ pub struct App {
     orbit: Orbit,
     /// The file the Open window shows a picture of, and the picture (None: it cannot be drawn).
     preview: Option<(PathBuf, Option<gcode::Preview>)>,
+    /// The programs that run one after the other, and whether the one that is loaded has been seen running.
+    queue: Queue,
+    queue_seen: bool,
+    /// The files picked with Ctrl+click in the Open window.
+    open_multi: Vec<PathBuf>,
+    /// Whether a box of text, or any widget, had the keyboard at the end of the last frame.
+    typing_prev: bool,
+    focus_prev: bool,
 }
 
 impl App {
+    /// A window for the tests that keeps its settings in a file of its own, so that what one test saves (the recent files, a setting it turned
+    /// off) does not reach the others.
+    #[cfg(test)]
+    pub(crate) fn isolated() -> App {
+        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let mut a = App::new(&Options::default());
+        let n = N.fetch_add(1, Ordering::SeqCst);
+        a.settings_path = std::env::temp_dir().join(format!(
+            "eh3d-motioncnc-isolated-{}-{n}.cfg",
+            std::process::id()
+        ));
+        a.settings = Settings::default();
+        a
+    }
+
     pub fn new(o: &Options) -> App {
         App::with_controller(o, Box::new(SimController::new()))
     }
@@ -188,6 +213,9 @@ impl App {
         session.step_mm = settings.step_mm;
         session.feed_mm_min = settings.feed_mm_min;
         session.set_travel(settings.travel);
+        if settings.read_controller_travel {
+            session.read_controller_travel();
+        }
         let mut app = App {
             session,
             lang: settings.lang,
@@ -214,6 +242,11 @@ impl App {
             plan2d: Plan2d::default(),
             orbit: Orbit::default(),
             preview: None,
+            queue: Queue::default(),
+            queue_seen: false,
+            open_multi: Vec::new(),
+            typing_prev: false,
+            focus_prev: false,
             shot: o.shot.clone().map(|file| Shot {
                 file,
                 wait: o.wait,
@@ -221,7 +254,13 @@ impl App {
             }),
         };
         if let Some(f) = &o.file {
-            app.open(f);
+            if o.more.is_empty() {
+                app.open(f);
+            } else {
+                let mut all = vec![f.clone()];
+                all.extend(o.more.iter().cloned());
+                app.start_queue(all);
+            }
         }
         // a program that was left in the middle by a crash or by a link that went down: the operator chooses to go on or to leave it
         if o.file.is_none() && o.window.is_none() && o.shot.is_none() && !cfg!(test) {
@@ -273,8 +312,15 @@ impl App {
         self.recovery_saved = None;
     }
 
-    /// Takes a G-code file as the program.
+    /// Takes a G-code file as the program, by itself: a queue that was there is dropped.
     pub fn open(&mut self, path: &Path) {
+        self.queue = Queue::default();
+        self.queue_seen = false;
+        self.load_file(path);
+    }
+
+    /// Reads the file as the program; says whether it could.
+    fn load_file(&mut self, path: &Path) -> bool {
         match std::fs::read(path) {
             Ok(bytes) => {
                 let text: String = bytes.iter().map(|&b| b as char).collect();
@@ -282,11 +328,13 @@ impl App {
                 self.path_toolpath = gcode::toolpath(&self.session.program);
                 self.path = path.display().to_string();
                 self.remember(path);
+                true
             }
             Err(e) => {
                 let why = format!("{}: {e}", path.display());
                 let said = self.t(Text::McOpenFailed).replacen("{}", &why, 1);
                 self.session.log.push(said);
+                false
             }
         }
     }
@@ -896,6 +944,7 @@ impl App {
                     self.session.program.len()
                 ));
                 ui.separator();
+                self.queue_panel(ui);
                 let next = self.program_line();
                 let running = self.session.running || self.server_busy();
                 egui::ScrollArea::vertical()
@@ -986,20 +1035,21 @@ impl eframe::App for App {
         if self.start_at == Some(self.frame) {
             self.session.start();
         }
-        let dropped: Option<PathBuf> = ctx.input(|i| {
+        let dropped: Vec<PathBuf> = ctx.input(|i| {
             i.raw
                 .dropped_files
-                .first()
+                .iter()
                 .map(|f| f.path().to_path_buf())
                 .filter(|p| !p.as_os_str().is_empty())
+                .collect()
         });
-        if let Some(p) = dropped {
-            self.open(&p);
-        }
+        // several files dropped together are a queue
+        self.start_queue(dropped);
         if self.session.running && !self.session.paused {
             self.session.pump(1);
             ctx.request_repaint_after(std::time::Duration::from_millis(60));
         }
+        self.queue_tick();
         self.track_recovery();
         self.server_tick(&ctx);
         self.keys(&ctx);
@@ -1011,6 +1061,7 @@ impl eframe::App for App {
         self.right(ui);
         self.center(ui);
         self.windows(&ctx);
+        self.note_focus(&ctx);
         if self.quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }

@@ -1,4 +1,5 @@
-//! The keys of the keyboard: open, save, edit, settings, start, pause, stop, quit, the list of the keys, the view and Esc to close a window.
+//! The keys of the keyboard: open, save, edit, settings, start (F5), pause (Space), stop (Esc), quit, the list of the keys and the view. Esc also closes a
+//! window that is open (it never stops the job then), and with the keyboard in a box of text Space and Esc belong to the box.
 //! The table is the one the menus and the list of keys read, so what is written beside a menu entry is what the key does. They can be turned
 //! off in the settings (only the mouse then).
 
@@ -19,7 +20,6 @@ pub(super) enum Shortcut {
     Help,
     ResetView,
     ToggleView,
-    Close,
 }
 
 /// A key, the words it is shown with and the text of what it does.
@@ -34,7 +34,7 @@ pub(super) struct Binding {
 const CMD: egui::Modifiers = egui::Modifiers::COMMAND;
 const NONE: egui::Modifiers = egui::Modifiers::NONE;
 
-pub(super) const BINDINGS: [Binding; 12] = [
+pub(super) const BINDINGS: [Binding; 11] = [
     Binding {
         shortcut: Shortcut::Open,
         modifiers: CMD,
@@ -73,15 +73,15 @@ pub(super) const BINDINGS: [Binding; 12] = [
     Binding {
         shortcut: Shortcut::Pause,
         modifiers: NONE,
-        key: egui::Key::F6,
-        label: "F6",
+        key: egui::Key::Space,
+        label: "Space",
         text: Text::Pause,
     },
     Binding {
         shortcut: Shortcut::Stop,
         modifiers: NONE,
-        key: egui::Key::F8,
-        label: "F8",
+        key: egui::Key::Escape,
+        label: "Esc",
         text: Text::Stop,
     },
     Binding {
@@ -112,13 +112,6 @@ pub(super) const BINDINGS: [Binding; 12] = [
         label: "F3",
         text: Text::ViewMachine,
     },
-    Binding {
-        shortcut: Shortcut::Close,
-        modifiers: NONE,
-        key: egui::Key::Escape,
-        label: "Esc",
-        text: Text::Close,
-    },
 ];
 
 /// The words of the key that does this, for the menus.
@@ -141,12 +134,20 @@ pub(super) fn shortcut_of(key: egui::Key, modifiers: egui::Modifiers) -> Option<
 impl App {
     /// The key pressed this frame that is one of ours (it is taken, so that no box types it).
     fn pressed_shortcut(&self, ctx: &egui::Context) -> Option<Shortcut> {
-        // Esc belongs to a box that has the keyboard (it leaves what is being written)
-        let typing = ctx.memory(|m| m.focused().is_some());
+        // Space and Esc belong to a box of text that has the keyboard (Space is a letter there, Esc leaves what is being written), and Esc does
+        // not close a window while any widget of it has the focus
+        // egui lets go of the focus when Esc is pressed, before this runs: the focus of the frame before counts too
+        let typing_text = ctx.text_edit_focused() || self.typing_prev;
+        let focused = ctx.memory(|m| m.focused().is_some()) || self.focus_prev;
+        let window = self.win.is_some();
         ctx.input_mut(|i| {
             BINDINGS
                 .iter()
-                .filter(|b| !(typing && b.shortcut == Shortcut::Close))
+                .filter(|b| {
+                    let job_key = matches!(b.shortcut, Shortcut::Pause | Shortcut::Stop);
+                    !(typing_text && job_key)
+                        && !(focused && window && b.shortcut == Shortcut::Stop)
+                })
                 .find(|b| i.consume_key(b.modifiers, b.key))
                 .map(|b| b.shortcut)
         })
@@ -167,6 +168,12 @@ impl App {
         ui.add_enabled(enabled, b).clicked()
     }
 
+    /// Called at the end of each frame: whether a box of text, or any widget, had the keyboard (see `pressed_shortcut`).
+    pub(super) fn note_focus(&mut self, ctx: &egui::Context) {
+        self.typing_prev = ctx.text_edit_focused();
+        self.focus_prev = ctx.memory(|m| m.focused().is_some());
+    }
+
     /// Reads the keyboard and does what it asked for.
     pub(super) fn keys(&mut self, ctx: &egui::Context) {
         if !self.settings.shortcuts {
@@ -182,7 +189,8 @@ impl App {
     pub(super) fn shortcut(&mut self, s: Shortcut) {
         if let Some(win) = &self.win {
             match s {
-                Shortcut::Close => {
+                // Esc is Stop without a window; with one it closes it
+                Shortcut::Stop => {
                     // the questions that need an answer are not closed by accident
                     if !matches!(win, Win::Resume(_) | Win::Replace(..)) {
                         self.dialog_error = None;
@@ -224,7 +232,6 @@ impl App {
             Shortcut::Help => self.win = Some(Win::Shortcuts),
             Shortcut::ResetView => self.reset_view(),
             Shortcut::ToggleView => self.toggle_view(),
-            Shortcut::Close => {}
         }
     }
 }
@@ -234,7 +241,7 @@ mod tests {
     use super::*;
 
     fn app() -> App {
-        App::new(&Options::default())
+        App::isolated()
     }
 
     #[test]
@@ -260,7 +267,19 @@ mod tests {
             Some(Shortcut::Start)
         );
         assert_eq!(shortcut_of(egui::Key::O, egui::Modifiers::NONE), None);
-        assert_eq!(label_of(Shortcut::Stop), "F8");
+        assert_eq!(label_of(Shortcut::Stop), "Esc");
+        assert_eq!(label_of(Shortcut::Pause), "Space");
+        assert_eq!(label_of(Shortcut::Start), "F5");
+        assert_eq!(
+            shortcut_of(egui::Key::Space, egui::Modifiers::NONE),
+            Some(Shortcut::Pause)
+        );
+        assert_eq!(
+            shortcut_of(egui::Key::Escape, egui::Modifiers::NONE),
+            Some(Shortcut::Stop)
+        );
+        assert_eq!(shortcut_of(egui::Key::F6, egui::Modifiers::NONE), None);
+        assert_eq!(shortcut_of(egui::Key::F8, egui::Modifiers::NONE), None);
     }
 
     #[test]
@@ -272,11 +291,11 @@ mod tests {
         a.session.load("G1 X10 F100");
         a.shortcut(Shortcut::Start);
         assert!(!a.session.running);
-        a.shortcut(Shortcut::Close);
+        a.shortcut(Shortcut::Stop);
         assert!(a.win.is_none());
         a.shortcut(Shortcut::Help);
         assert!(matches!(a.win, Some(Win::Shortcuts)));
-        a.shortcut(Shortcut::Close);
+        a.shortcut(Shortcut::Stop);
         a.shortcut(Shortcut::Start);
         assert!(
             matches!(a.win, Some(Win::Summary(_))),
@@ -295,7 +314,7 @@ mod tests {
             job: String::new(),
             sha256: String::new(),
         }));
-        a.shortcut(Shortcut::Close);
+        a.shortcut(Shortcut::Stop);
         assert!(matches!(a.win, Some(Win::Resume(_))));
     }
 
@@ -329,5 +348,100 @@ mod tests {
             .textures_delta
             .clear();
         assert!(matches!(a.win, Some(Win::Shortcuts)));
+    }
+
+    /// One frame of the window with a key pressed; `text_box` shows a box of text that keeps the keyboard.
+    fn frame(a: &mut App, ctx: &egui::Context, key: Option<egui::Key>, text_box: bool) {
+        let mut input = egui::RawInput::default();
+        if let Some(key) = key {
+            input.events.push(egui::Event::Key {
+                key,
+                physical_key: Some(key),
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        let mut text = String::new();
+        ctx.run_pass(input, |ctx| {
+            a.keys(ctx);
+            if text_box {
+                egui::Area::new(egui::Id::NULL.with("box")).show(ctx, |ui| {
+                    let r =
+                        ui.add(egui::TextEdit::singleline(&mut text).id(egui::Id::NULL.with("t")));
+                    if !r.has_focus() {
+                        r.request_focus();
+                    }
+                });
+            }
+            a.note_focus(ctx);
+        })
+        .textures_delta
+        .clear();
+    }
+
+    fn running_app() -> App {
+        let mut a = app();
+        a.settings.confirm_start = false;
+        a.session.load("G1 X10 F100\nG1 X20\nG1 X30\n");
+        a.request_start();
+        assert!(a.session.running);
+        a
+    }
+
+    #[test]
+    fn space_pauses_and_escape_stops_the_job() {
+        let mut a = running_app();
+        let ctx = egui::Context::default();
+        frame(&mut a, &ctx, Some(egui::Key::Space), false);
+        assert!(a.session.paused, "Space pauses");
+        frame(&mut a, &ctx, Some(egui::Key::Escape), false);
+        assert!(!a.session.running && !a.session.paused, "Esc stops");
+        // F6 and F8 no longer do anything
+        let mut a = running_app();
+        frame(&mut a, &ctx, Some(egui::Key::F6), false);
+        frame(&mut a, &ctx, Some(egui::Key::F8), false);
+        assert!(a.session.running && !a.session.paused);
+        // F5 starts
+        let mut a = app();
+        a.session.load("G1 X1 F100");
+        frame(&mut a, &ctx, Some(egui::Key::F5), false);
+        assert!(matches!(a.win, Some(Win::Summary(_))));
+    }
+
+    #[test]
+    fn with_the_keyboard_in_a_box_of_text_space_and_escape_do_not_touch_the_job() {
+        let mut a = running_app();
+        let ctx = egui::Context::default();
+        // first frame gives the box the keyboard, the next ones press the keys
+        frame(&mut a, &ctx, None, true);
+        frame(&mut a, &ctx, None, true);
+        assert!(ctx.text_edit_focused(), "the box has the keyboard");
+        frame(&mut a, &ctx, Some(egui::Key::Space), true);
+        assert!(!a.session.paused, "Space is a letter in the box");
+        frame(&mut a, &ctx, Some(egui::Key::Escape), true);
+        assert!(
+            a.session.running,
+            "Esc leaves the box, it does not stop the job"
+        );
+    }
+
+    #[test]
+    fn with_a_window_open_escape_closes_it_and_the_job_goes_on() {
+        let mut a = running_app();
+        let ctx = egui::Context::default();
+        a.win = Some(Win::About);
+        frame(&mut a, &ctx, Some(egui::Key::Escape), false);
+        assert!(a.win.is_none(), "Esc closes the window");
+        assert!(a.session.running, "and it does not stop the job");
+        a.win = Some(Win::About);
+        frame(&mut a, &ctx, Some(egui::Key::Space), false);
+        assert!(
+            !a.session.paused,
+            "Space does not pause the job behind a window"
+        );
+        frame(&mut a, &ctx, Some(egui::Key::Escape), false);
+        frame(&mut a, &ctx, Some(egui::Key::Escape), false);
+        assert!(!a.session.running, "with no window Esc stops");
     }
 }

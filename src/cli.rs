@@ -11,6 +11,8 @@ pub struct Options {
     pub theme: Option<ThemeId>,
     /// The G-code file to open (the first one given without an option).
     pub file: Option<PathBuf>,
+    /// More files given after the first: with it they make a queue of programs that run one after the other.
+    pub more: Vec<PathBuf>,
     /// A picture of the window to save and leave (`--shot FILE`, after `--wait` frames).
     pub shot: Option<PathBuf>,
     pub wait: u32,
@@ -63,8 +65,12 @@ impl Options {
                 }
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
-                other if !other.starts_with("--") && o.file.is_none() => {
-                    o.file = Some(PathBuf::from(other))
+                other if !other.starts_with("--") => {
+                    if o.file.is_none() {
+                        o.file = Some(PathBuf::from(other));
+                    } else {
+                        o.more.push(PathBuf::from(other));
+                    }
                 }
                 other => return Err(format!("unknown option '{other}'")),
             }
@@ -101,6 +107,14 @@ mod tests {
         assert_eq!(parse("--view plan").unwrap().view_3d, Some(false));
         assert_eq!(parse("").unwrap().view_3d, None);
         assert!(parse("--view side").is_err());
+    }
+
+    #[test]
+    fn several_files_make_a_queue_in_the_order_given() {
+        let o = parse("a.nc b.nc c.nc").unwrap();
+        assert_eq!(o.file, Some(PathBuf::from("a.nc")));
+        assert_eq!(o.more, vec![PathBuf::from("b.nc"), PathBuf::from("c.nc")]);
+        assert!(parse("a.nc").unwrap().more.is_empty());
     }
 
     #[test]

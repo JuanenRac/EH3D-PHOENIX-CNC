@@ -30,6 +30,27 @@ pub struct Session {
     pub operator_zero: [f64; AXES],
     /// The lines that put the controller back in the state the program had reached; they go out when a program that was left in the middle is resumed.
     pub resume_preamble: Vec<String>,
+    /// The longest travel of X, Y and Z (mm) the controller said it has (GRBL `$130` to `$132`); `None` when it was not asked or did not say.
+    pub controller_travel: Option<[f64; 3]>,
+    /// The controller was asked for its travel already.
+    pub travel_asked: bool,
+}
+
+/// The travel the summary and the refusal use: where the settings put it, shortened to the longest travel the controller reports when that is
+/// smaller (the start of each axis stays as the settings have it).
+pub fn effective_travel(
+    configured: [(f64, f64); 3],
+    controller: Option<[f64; 3]>,
+) -> [(f64, f64); 3] {
+    let mut out = configured;
+    if let Some(c) = controller {
+        for (i, (lo, hi)) in out.iter_mut().enumerate() {
+            if c[i].is_finite() && c[i] > 0.0 {
+                *hi = (*hi).min(*lo + c[i]);
+            }
+        }
+    }
+    out
 }
 
 impl Session {
@@ -47,6 +68,8 @@ impl Session {
             modal: Modal::default(),
             operator_zero: [0.0; AXES],
             resume_preamble: Vec::new(),
+            controller_travel: None,
+            travel_asked: false,
         };
         s.refresh();
         s
@@ -164,6 +187,29 @@ impl Session {
             self.say("travel: the controller keeps its own limits");
         }
         ok
+    }
+
+    /// Asks the controller for its longest travel and keeps the answer; it says in the log what it took: the smaller of this and the settings,
+    /// or the settings alone when the controller does not give it or does not answer.
+    pub fn read_controller_travel(&mut self) -> Option<[f64; 3]> {
+        self.travel_asked = true;
+        self.controller_travel = None;
+        match self.controller.max_travel() {
+            Ok(Some(t)) => {
+                self.say(format!(
+                    "travel: the controller allows X {:.1}, Y {:.1}, Z {:.1} mm; the smaller of that and the settings is used",
+                    t[0], t[1], t[2]
+                ));
+                self.controller_travel = Some(t);
+            }
+            Ok(None) => self.say(
+                "travel: the controller does not give its travel ($130 to $132); the settings are used",
+            ),
+            Err(e) => self.say(format!(
+                "travel: the controller did not answer ({e}); the settings are used"
+            )),
+        }
+        self.controller_travel
     }
 
     /// Stores the place where the machine is as `G28` or `G30`.
@@ -598,5 +644,51 @@ G0 X2",
         assert_eq!(s.status.machine_mm[0], 0.0);
         s.mdi("G0 X9000");
         assert!(s.alarm());
+    }
+
+    fn grbl_session(replies: &[&str]) -> Session {
+        use eh3d_controller::grbl::GrblController;
+        use eh3d_controller::mock::MockTransport;
+        let mut all = vec!["<Idle|MPos:0.000,0.000,0.000|FS:0,0>"];
+        all.extend_from_slice(replies);
+        Session::new(Box::new(GrblController::new(MockTransport::with_replies(
+            &all,
+        ))))
+    }
+
+    #[test]
+    fn the_travel_of_the_controller_shortens_the_travel_of_the_settings_and_never_lengthens_it() {
+        let cfg = [(0.0, 500.0), (0.0, 300.0), (-100.0, 50.0)];
+        assert_eq!(effective_travel(cfg, None), cfg);
+        // X and Z are shorter in the controller, Y is longer in it: the smaller span wins on each axis
+        let t = effective_travel(cfg, Some([300.0, 400.0, 45.0]));
+        assert_eq!(t, [(0.0, 300.0), (0.0, 300.0), (-100.0, -55.0)]);
+        // a value that makes no sense is ignored
+        assert_eq!(effective_travel(cfg, Some([0.0, f64::NAN, -5.0])), cfg);
+    }
+
+    #[test]
+    fn the_travel_is_read_from_grbl_and_said_in_the_log() {
+        let mut s = grbl_session(&["$130=300.000", "$131=200.000", "$132=45.000", "ok"]);
+        assert_eq!(s.read_controller_travel(), Some([300.0, 200.0, 45.0]));
+        assert_eq!(s.controller_travel, Some([300.0, 200.0, 45.0]));
+        assert!(s.travel_asked);
+        assert!(s.log.last().unwrap().contains("smaller"), "{:?}", s.log);
+    }
+
+    #[test]
+    fn without_an_answer_or_without_the_values_the_settings_stay_and_the_log_says_so() {
+        // it answers with no travel settings
+        let mut s = grbl_session(&["$100=250.000", "ok"]);
+        assert_eq!(s.read_controller_travel(), None);
+        assert!(s.log.last().unwrap().contains("settings are used"));
+        // it does not answer at all
+        let mut s = grbl_session(&[]);
+        assert_eq!(s.read_controller_travel(), None);
+        assert!(s.log.last().unwrap().contains("did not answer"));
+        // the simulator keeps no such settings
+        let mut s = session();
+        assert_eq!(s.read_controller_travel(), None);
+        assert!(s.controller_travel.is_none() && s.travel_asked);
     }
 }

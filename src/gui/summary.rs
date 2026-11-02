@@ -16,7 +16,13 @@ impl App {
     /// What the check needs, from the settings and from where the work zero is now.
     pub(super) fn checks(&self) -> Checks {
         Checks {
-            travel: self.settings.travel,
+            travel: crate::session::effective_travel(
+                self.settings.travel,
+                self.settings
+                    .read_controller_travel
+                    .then_some(self.session.controller_travel)
+                    .flatten(),
+            ),
             offset: self.work_offset(),
             default_feed: self.settings.feed_mm_min,
             rapid_mm_min: self.settings.rapid_mm_min,
@@ -132,6 +138,16 @@ impl App {
                         );
                         ui.label(self.t(b.text));
                         ui.end_row();
+                        if b.shortcut == keys::Shortcut::Stop {
+                            // the same key closes a window that is open
+                            ui.label(
+                                RichText::new(b.label)
+                                    .monospace()
+                                    .color(col(self.theme.accent)),
+                            );
+                            ui.label(self.t(Text::Close));
+                            ui.end_row();
+                        }
                     }
                 });
             ui.separator();
