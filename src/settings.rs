@@ -100,7 +100,10 @@ impl Default for Settings {
 }
 
 fn on(v: &str) -> bool {
-    !matches!(v.trim(), "no" | "off" | "false" | "0")
+    let v = v.trim();
+    !["no", "off", "false", "0"]
+        .iter()
+        .any(|off| v.eq_ignore_ascii_case(off))
 }
 
 /// A value on one line: a line break in it could add keys to the file.
@@ -120,7 +123,8 @@ impl Settings {
     /// The text of the file: `key = value` lines; what is not known or not valid keeps its default.
     pub fn parse(text: &str) -> Settings {
         let mut s = Settings::default();
-        for line in text.lines() {
+        // a file saved by an editor that writes a byte order mark still has its first line read
+        for line in text.trim_start_matches('\u{feff}').lines() {
             let Some((k, v)) = line.split_once('=') else {
                 continue;
             };
@@ -238,8 +242,12 @@ impl Settings {
             t[1].1,
             t[2].0,
             t[2].1,
-            self.last_dir,
-            self.recent.join("|"),
+            one_line(&self.last_dir),
+            self.recent
+                .iter()
+                .map(|p| one_line(p))
+                .collect::<Vec<_>>()
+                .join("|"),
             one_line(&self.server_address),
             one_line(&self.server_token),
             one_line(&self.server_machine),
