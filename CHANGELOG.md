@@ -3,6 +3,8 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **More tests:** how a G-code program is read (forms of numbers, comments, modal moves, units), what is saved to go on after a crash, the settings file as an operator may edit it, the queue of programs, the movements of the views and the command line.
+- **The settings file is safer to edit and to write:** a line break in a folder or in a recent file name can no longer add a line to it, a switch written as No, OFF or False is read as off, and a file saved with a byte order mark is read from its first line.
 
 ## [0.0.9] - Queue of programs, Esc, Space and F5 keys, and the travel of GRBL
 - **A queue of programs:** several files chosen in the Open window with Ctrl+click, dropped together or given on the command line run one after the other; each one shows its summary before it starts, the window lists them with their state and lets you remove, skip and reorder the ones that wait, and the queue stops when a program does not finish.
