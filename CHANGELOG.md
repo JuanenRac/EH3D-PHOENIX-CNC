@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **Shared checks updated:** the validator also compares the badge and the Version row of the README with the manifest, fails when one of its checks cannot run, and the CHANGELOG step of the workflow reads the base branch from the environment.
 - **More tests:** how a G-code program is read (forms of numbers, comments, modal moves, units), what is saved to go on after a crash, the settings file as an operator may edit it, the queue of programs, the movements of the views and the command line.
 - **The settings file is safer to edit and to write:** a line break in a folder or in a recent file name can no longer add a line to it, a switch written as No, OFF or False is read as off, and a file saved with a byte order mark is read from its first line.
 - **The workflows are hardened:** every action is pinned by its commit with its version in a comment, the checkouts keep no credentials, and the release workflow runs only for the owner on main, with no cache and the values of the matrix passed by environment.
