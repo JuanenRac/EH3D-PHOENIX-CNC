@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **Release builds are checked and attested:** `release-binaries.yml` takes the owner's go-ahead only (a manual start from main, the commit must be part of main), builds the same packages as before, writes `SHA256SUMS` and a build manifest, attests their provenance, verifies the artifact as a stranger would, prepares a draft release of unsigned files only after the owner approves it (a dry run is the default) and opens an issue `build-failed` when anything does not finish.
 - **Shared checks updated:** the validator also compares the badge and the Version row of the README with the manifest, fails when one of its checks cannot run, and the CHANGELOG step of the workflow reads the base branch from the environment.
 - **More tests:** how a G-code program is read (forms of numbers, comments, modal moves, units), what is saved to go on after a crash, the settings file as an operator may edit it, the queue of programs, the movements of the views and the command line.
 - **The settings file is safer to edit and to write:** a line break in a folder or in a recent file name can no longer add a line to it, a switch written as No, OFF or False is read as off, and a file saved with a byte order mark is read from its first line.
