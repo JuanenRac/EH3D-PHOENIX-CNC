@@ -172,6 +172,7 @@ EH3D-MOTIONCNC/
 │   ├── gui/queue.rs                             die Warteschlange im Fenster: Dateien nacheinander, jede nach ihrer Zusammenfassung
 │   └── gui/icons.rs                             die Bilder der Schaltflächen, mit Linien gezeichnet, und die Schaltfläche der Werkzeugleiste
 ├── examples/                                    drei Beispiel-G-Code-Programme, vom Quadrat bis zur langen Spirale
+├── tests/                                       weitere Tests zu G-Code und Einstellungen
 ├── tools/                                       CI-Prüfung, README-Prüfung und die Bild-Werkzeuge
 ├── docs/                                        die Quellen der Bilder von Architektur und Repository-Struktur
 ├── .github/                                     CI-Workflow, Vorlagen für Issues und Pull Requests

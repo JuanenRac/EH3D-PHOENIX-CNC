@@ -172,6 +172,7 @@ EH3D-MOTIONCNC/
 │   ├── gui/queue.rs                             the queue in the window: files run one after the other, each after its summary
 │   └── gui/icons.rs                             the pictures of the buttons, drawn with lines, and the toolbar button
 ├── examples/                                    three sample G-code programs, from a square to a long spiral
+├── tests/                                       more tests of the G-code and the settings
 ├── tools/                                       CI check, README check and the picture tools
 ├── docs/                                        the sources of the Architecture and Repository Structure pictures
 ├── .github/                                     CI workflow, issue and pull-request templates

@@ -309,6 +309,19 @@
           }
         },
         {
+          "name": "tests/",
+          "desc": {
+            "en": "more tests of the G-code and the settings",
+            "es": "más pruebas del G-code y los ajustes",
+            "de": "weitere Tests zu G-Code und Einstellungen",
+            "fr": "d'autres tests du G-code et des réglages",
+            "it": "altri test del G-code e delle impostazioni",
+            "ja": "G コードと設定の追加テスト",
+            "zh": "更多 G 代码与设置测试",
+            "pt": "mais testes do G-code e das definições"
+          }
+        },
+        {
           "name": "tools/",
           "desc": {
             "en": "CI check, README check and the picture tools",

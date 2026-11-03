@@ -172,6 +172,7 @@ EH3D-MOTIONCNC/
 │   ├── gui/queue.rs                             la cola en la ventana: archivos uno tras otro, cada uno tras su resumen
 │   └── gui/icons.rs                             los dibujos de los botones, trazados con líneas, y el botón de la barra de herramientas
 ├── examples/                                    tres programas G-code de ejemplo, de un cuadrado a una espiral larga
+├── tests/                                       más pruebas del G-code y los ajustes
 ├── tools/                                       comprobación de CI, del README y las herramientas de imágenes
 ├── docs/                                        las fuentes de las imágenes de Arquitectura y Estructura del repositorio
 ├── .github/                                     flujo de CI, plantillas de issues y pull requests

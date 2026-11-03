@@ -172,6 +172,7 @@ EH3D-MOTIONCNC/
 │   ├── gui/queue.rs                             窗口中的队列：文件依次运行，每个先显示摘要
 │   └── gui/icons.rs                             用线条绘制的按钮图标和工具栏按钮
 ├── examples/                                    三个示例 G 代码程序，从正方形到长螺旋
+├── tests/                                       更多 G 代码与设置测试
 ├── tools/                                       CI 检查、README 检查和图片工具
 ├── docs/                                        架构图和仓库结构图的源文件
 ├── .github/                                     CI 工作流、Issue 和 PR 模板
