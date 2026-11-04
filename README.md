@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="images/EH3D_BANNER.svg" alt="EH3D-MOTIONCNC banner" width="100%">
+  <img src="images/EH3D_PHOENIX_CNC_BANNER.svg" alt="EH3D-PHOENIX-CNC banner" width="100%">
 </p>
 
-# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-MOTIONCNC
+# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-PHOENIX-CNC
 <p align="center">🇺🇸 <b>English</b> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### The shared base of the EH3D machine-control programs: the view of a job, the themes and the words of the interface in eight languages
@@ -18,7 +18,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`motioncnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 126 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 126 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -54,28 +54,28 @@ Each line is one part of this repository and the light says how far it is today.
 
 ## 🎯 Overview
 
-* The **window** (`src/gui.rs`, `motioncnc`): the position of the machine (work and machine), a jog pad with its steps and feed, home, zero and unlock, the emergency stop, a line of commands with its log, and the program with its path on the table.
+* The **window** (`src/gui.rs`, `phoenix-cnc`): the position of the machine (work and machine), a jog pad with its steps and feed, home, zero and unlock, the emergency stop, a line of commands with its log, and the program with its path on the table.
 * The **session** (`src/session.rs`): what the program does with any controller of `eh3d-controller`: jog, zero, home, send a line, run a program line by line, pause, stop and the alarms; it is tested on the simulated controller.
 * The **path of a program** (`src/gcode.rs`): the straight moves (`G0`, `G1`, absolute or relative, in mm or inches) drawn before the program runs; arcs are not drawn.
 * The **simulated controller** (`eh3d_controller::sim`, in EH3D-COMMON): a machine in memory with travel limits that raise an alarm; the controller families of the market are listed in `eh3d-controller`, GRBL is the first one written and the others show as not driven yet.
 * The **themes and the words** of `eh3d-view`: Forge (the default), Neon Arcade, Glass Pro, the classic Windows grey and one that follows Windows, and the interface in English, Spanish, Italian, German, French, Portuguese, Chinese and Japanese. What it will be: one program to drill, to route and to do 2D and 3D CNC work on the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO; that part does not exist yet.
 * The **menus, the settings and the files**: the menus File, View, Program, Machine and Help with what PlanetCNC has in them (open, recent files, save, edit, the zeros, the stored positions, the spindle and the coolant); a settings window (units, language, eleven themes, travel limits, jog) that is kept between runs; and the Open and Save windows of the suite (`eh3d-filedialog`: places, sorting, filters, the extension of a saved file and the question before a file is replaced).
-* **GRBL on a serial port:** built with `--features serial`, `motioncnc --grbl PORT[@BAUD]` drives a GRBL controller (115200 baud by default) instead of the simulator and `motioncnc --ports` lists the serial ports; a build without the feature, or a port that does not open, says so and leaves. It has been tried only against a scripted controller, never against a real one.
+* **GRBL on a serial port:** built with `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` drives a GRBL controller (115200 baud by default) instead of the simulator and `phoenix-cnc --ports` lists the serial ports; a build without the feature, or a port that does not open, says so and leaves. It has been tried only against a scripted controller, never against a real one.
 * **A window that follows the screen:** it opens maximized, and from 720p to 1080p and on to larger and wider screens everything grows or shrinks with it.
 * **Going on after a failure:** while a program runs, the line it has reached is saved to a small file; if the window, the computer or the link goes down, the next start asks whether to go on from that line or to leave it. Nothing is sent to the controller until the operator answers.
 * **Sent to the EH3D server:** with the address of the server, the token of this program and the id of the machine in the settings (section Server of the settings window, or `server_address`, `server_token` and `server_machine` in the settings file), **Program > Send to the server** sends the text of the program as a G-code job; the server runs it on its machine (a GRBL controller on its serial port, or its simulator) and the window follows it: the state, the percentage and the line it has reached in the top bar, the panel and the log. Start, Pause and Stop of the window reach the job on the server, closing the window does not stop it, and a job that stopped is taken up again from the line the server reached (the next start of the window offers it, as it does for a program of the controller): the server gives the codes in force back and waits for the operator before the first move. The spindle and the coolant are started again only with `server_restore_outputs = yes`. Tested against a stand-in server; the server's own tests send the same requests to its simulator. Never run on a machine.
 * **Resuming after a failure:** a program left in the middle is first put back in its state: units and absolute distances, a safe Z (`resume_safe_z` in the settings file, 5 mm), the spindle with the time to reach its speed (`resume_spindle_wait`, 3 s), the coolant, the point it had reached and the modal state; the recovery file keeps the SHA-256 of the program and refuses to go on if the program changed.
 * **The helpers of the window:** a **summary before a program starts** (the moves, the cutting distance, the time at the speeds of the settings, the reach of the axes and a check against the travel of the machine, with the warnings the suite shares: a program that is tiny or far from the corner, bigger than the table, arcs the estimate leaves out and cuts before any feed; **Start anyway**, or a refusal when the program leaves the travel, which `reject_out_of_travel = no` turns into a warning, and `confirm_start = no` turns the summary off); **keys of the keyboard** (Ctrl+O open, Ctrl+S save, Ctrl+E edit, F5 start, Space pause, Esc stop (with a window open Esc closes it, and with the keyboard in a box of text Space and Esc are left to the box), F1 lists them; `shortcuts = no` turns them off); a **toolbar** with drawn pictures and their names; numbers that are stepped with minus and plus or **written**; the path **dragged and zoomed from above or turned and zoomed in 3D** with the tool; a **picture of the G-code file** in the Open window; the **record of a crash** (`eh3d-crash.log`); and a Safety section in the settings (`rapid`, `summary_tiny`, `summary_far` and `summary_margin` in the settings file).
-* **A queue of programs and the travel of the controller:** several files chosen in the Open window with Ctrl+click, dropped together or given on the command line (`motioncnc a.nc b.nc`) run one after the other, each after its own summary; the window lists them with their state, lets you remove, skip and reorder the ones that wait, and the queue stops when a program does not finish. With a GRBL controller the program reads `$130`, `$131` and `$132` (the longest travel of X, Y and Z) when it connects and uses the smaller of that and `travel_x`, `travel_y` and `travel_z` for the summary and the refusal; if the controller does not answer or does not give them, the settings are used and the log says so (`read_controller_travel = no` turns the reading off).
+* **A queue of programs and the travel of the controller:** several files chosen in the Open window with Ctrl+click, dropped together or given on the command line (`phoenix-cnc a.nc b.nc`) run one after the other, each after its own summary; the window lists them with their state, lets you remove, skip and reorder the ones that wait, and the queue stops when a program does not finish. With a GRBL controller the program reads `$130`, `$131` and `$132` (the longest travel of X, Y and Z) when it connects and uses the smaller of that and `travel_x`, `travel_y` and `travel_z` for the summary and the refusal; if the controller does not answer or does not give them, the settings are used and the log says so (`read_controller_travel = no` turns the reading off).
 
 ## 🧩 Role in EH3D
 
-EH3D-MOTIONCNC is the machine-control program of EH3D, today working on a simulated machine. It depends by path on EH3D-COMMON (the folder `EH3D-COMMON` must sit next to this one: the view, the themes, the words and the controllers) and on no other EH3D repository yet.
+EH3D-PHOENIX-CNC is the machine-control program of EH3D, today working on a simulated machine. It depends by path on EH3D-COMMON (the folder `EH3D-COMMON` must sit next to this one: the view, the themes, the words and the controllers) and on no other EH3D repository yet.
 
 ## 🏛️ Architecture
 
 <p align="center">
-  <img src="images/architecture.svg" alt="EH3D-MOTIONCNC architecture: who will use it, what it holds and what it relies on" width="100%">
+  <img src="images/architecture.svg" alt="EH3D-PHOENIX-CNC architecture: who will use it, what it holds and what it relies on" width="100%">
 </p>
 
 How the parts fit together: who will use it, what this repository holds and what it relies on. The picture is drawn from `docs/architecture.json`, is checked against the code and marks what is future as future.
@@ -142,24 +142,24 @@ The version lives in `Cargo.toml` and in `eh3d.project.json`, and each version h
 ## 📂 Repository Structure
 
 <p align="center">
-  <img src="images/repository-structure.svg" alt="Repository structure of EH3D-MOTIONCNC" width="100%">
+  <img src="images/repository-structure.svg" alt="Repository structure of EH3D-PHOENIX-CNC" width="100%">
 </p>
 
 <details>
 <summary>Text version of the tree</summary>
 
 ```text
-EH3D-MOTIONCNC/
+EH3D-PHOENIX-CNC/
 ├── src/
 │   ├── lib.rs                                   the modules, and the view of eh3d-view re-exported under this program's name
 │   ├── gui.rs                                   the window: position, jog, program, path, commands and log
-│   ├── session.rs                               what is done with a controller: jog, zero, home, a program line by line, pause, stop, alarms
+│   ├── session.rs                               what is done with a controller: jog, zero, home, a program, pause, stop, alarms
 │   ├── queue.rs                                 the queue of programs: order, state, skip, remove, reorder, stop on failure
 │   ├── gcode.rs                                 the straight moves of a G-code program, to draw its path
 │   ├── view.rs                                  the plan that is dragged and zoomed and the 3D view that is turned, as numbers
 │   ├── plan.rs                                  the check before a start: time, reach and travel of the moves
 │   ├── cli.rs                                   the command line: the file, the language, the theme and the picture options
-│   ├── bin/motioncnc.rs                         the program that opens the window
+│   ├── bin/phoenix-cnc.rs                       the program that opens the window
 │   ├── server.rs                                the link to the EH3D server: send, follow, hold, stop
 │   ├── settings.rs                              what is kept between runs
 │   ├── gui/dialogs.rs                           menus, settings, Open, Save, editor

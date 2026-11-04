@@ -185,7 +185,7 @@ impl App {
         let mut a = App::new(&Options::default());
         let n = N.fetch_add(1, Ordering::SeqCst);
         a.settings_path = std::env::temp_dir().join(format!(
-            "eh3d-motioncnc-isolated-{}-{n}.cfg",
+            "eh3d-phoenix-cnc-isolated-{}-{n}.cfg",
             std::process::id()
         ));
         a.settings = Settings::default();
@@ -365,7 +365,7 @@ impl App {
         egui::Panel::top("top").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading(RichText::new("EH3D").color(col(self.theme.text)));
-                ui.heading(RichText::new("MOTIONCNC").color(accent));
+                ui.heading(RichText::new("PHOENIX-CNC").color(accent));
                 ui.separator();
                 ui.label(self.t(Text::McController));
                 egui::ComboBox::from_id_salt("controller")
@@ -1098,7 +1098,7 @@ pub fn run(o: &Options) -> eframe::Result {
     let controller = match crate::link::controller_for(o) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("motioncnc: {e}");
+            eprintln!("phoenix-cnc: {e}");
             std::process::exit(2);
         }
     };
@@ -1113,11 +1113,11 @@ pub fn run(o: &Options) -> eframe::Result {
             .with_inner_size(size)
             .with_min_inner_size([1000.0, 600.0])
             .with_maximized(o.shot.is_none())
-            .with_title("EH3D-MOTIONCNC"),
+            .with_title("EH3D-PHOENIX-CNC"),
         ..Default::default()
     };
     eframe::run_native(
-        "EH3D-MOTIONCNC",
+        "EH3D-PHOENIX-CNC",
         options,
         Box::new(move |cc| {
             install_fonts(&cc.egui_ctx);

@@ -294,7 +294,7 @@ pub fn settings_path() -> PathBuf {
     // the tests never touch the settings of the user
     if cfg!(test) {
         return std::env::temp_dir()
-            .join(format!("eh3d-motioncnc-test-{}.cfg", std::process::id()));
+            .join(format!("eh3d-phoenix-cnc-test-{}.cfg", std::process::id()));
     }
     let base = if cfg!(windows) {
         std::env::var_os("APPDATA")
@@ -308,7 +308,7 @@ pub fn settings_path() -> PathBuf {
             .unwrap_or_else(|| PathBuf::from("."))
             .join("eh3d")
     };
-    base.join("motioncnc.cfg")
+    base.join("phoenix-cnc.cfg")
 }
 
 #[cfg(test)]
@@ -352,7 +352,7 @@ mod tests {
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
         let path = std::env::temp_dir().join(format!(
-            "eh3d-motioncnc-settings-{}.cfg",
+            "eh3d-phoenix-cnc-settings-{}.cfg",
             std::process::id()
         ));
         s.save(&path).unwrap();

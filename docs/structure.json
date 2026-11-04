@@ -1,5 +1,5 @@
 {
-  "repo": "EH3D-MOTIONCNC",
+  "repo": "EH3D-PHOENIX-CNC",
   "exempt": [
     "test.bat",
     "test.sh"
@@ -61,7 +61,7 @@
         {
           "name": "session.rs",
           "desc": {
-            "en": "what is done with a controller: jog, zero, home, a program line by line, pause, stop, alarms",
+            "en": "what is done with a controller: jog, zero, home, a program, pause, stop, alarms",
             "es": "lo que se hace con un controlador: jog, cero, referencia, un programa línea a línea, pausa, parada, alarmas",
             "de": "was mit einer Steuerung getan wird: Jog, Nullpunkt, Referenz, ein Programm Zeile für Zeile, Pause, Stopp, Alarme",
             "fr": "ce qu'on fait avec un contrôleur : jog, zéro, prise d'origine, un programme ligne par ligne, pause, arrêt, alarmes",
@@ -137,7 +137,7 @@
           }
         },
         {
-          "name": "bin/motioncnc.rs",
+          "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
             "es": "el programa que abre la ventana",

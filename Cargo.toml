@@ -1,10 +1,10 @@
 [package]
-name = "eh3d-motioncnc"
+name = "eh3d-phoenix-cnc"
 version = "0.0.9"
 edition = "2021"
 description = "The EH3D machine-control program: a window over a controller, a simulated one so far"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/JuanenRac/EH3D-MOTIONCNC"
+repository = "https://github.com/JuanenRac/EH3D-PHOENIX-CNC"
 readme = "README.md"
 
 [features]
@@ -30,8 +30,8 @@ arboard = { version = "3", default-features = false, optional = true }
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "clipboard", "x11", "wayland"], optional = true }
 
 [[bin]]
-name = "motioncnc"
-path = "src/bin/motioncnc.rs"
+name = "phoenix-cnc"
+path = "src/bin/phoenix-cnc.rs"
 required-features = ["gui"]
 
 [profile.dev]

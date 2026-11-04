@@ -1,8 +1,9 @@
 {
   "schema_version": "1.1",
   "ecosystem": "EH3D",
-  "name": "EH3D-MOTIONCNC",
+  "name": "EH3D-PHOENIX-CNC",
   "version": "0.0.9",
+  "former_name": "EH3D-MOTIONCNC",
   "role": "ui",
   "stack": "rust",
   "technologies": [
@@ -17,7 +18,7 @@
     "EH3D-COMMON"
   ],
   "build": "cargo build --release --features gui; cargo test --features gui",
-  "notes": "Scaffolding v0.0.9: the EH3D machine-control program. A window (motioncnc, feature gui) over the controller interface of eh3d-controller in EH3D-COMMON (a sibling folder is needed), working on a simulated machine only: position, jog, zero, home, a line of commands, a G-code program run line by line with pause, stop and the emergency stop, and its path drawn on the table; five themes and eight languages. Nothing has run on a real machine, and no serial port or network connection is opened.",
+  "notes": "EH3D-PHOENIX-CNC is the machine-control program of the PHOENIX family (violet phoenix), formerly EH3D-MOTIONCNC. Scaffolding v0.0.9: the EH3D machine-control program. A window (phoenix-cnc, feature gui) over the controller interface of eh3d-controller in EH3D-COMMON (a sibling folder is needed), working on a simulated machine only: position, jog, zero, home, a line of commands, a G-code program run line by line with pause, stop and the emergency stop, and its path drawn on the table; five themes and eight languages. Nothing has run on a real machine, and no serial port or network connection is opened.",
   "native_version": {
     "file": "Cargo.toml",
     "pattern": "^version\\s*=\\s*\"(\\d+\\.\\d+\\.\\d+)\""

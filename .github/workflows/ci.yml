@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-          path: EH3D-MOTIONCNC
+          path: EH3D-PHOENIX-CNC
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
@@ -77,13 +77,13 @@ jobs:
         run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - name: Format
         run: cargo fmt --all --check
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
       - name: Lints
         run: cargo clippy --all-targets --features gui -- -D warnings
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
       - name: Tests
         run: cargo test --all-targets --features gui
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
 
   main-against-main:
     name: Siblings at main
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-          path: EH3D-MOTIONCNC
+          path: EH3D-PHOENIX-CNC
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
@@ -130,4 +130,4 @@ jobs:
         run: rustup toolchain install stable --profile minimal
       - name: Build against the sibling main branches
         run: cargo check --all-targets --features gui
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC

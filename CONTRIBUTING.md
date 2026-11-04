@@ -1,4 +1,4 @@
-# Contributing to EH3D-MOTIONCNC
+# Contributing to EH3D-PHOENIX-CNC
 
 Thank you for looking. This repository is the base of a future machine-control program, so changes are small and carefully tested.
 

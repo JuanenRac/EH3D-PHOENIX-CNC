@@ -95,7 +95,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.plan.outputs.sha }}
-          path: EH3D-MOTIONCNC
+          path: EH3D-PHOENIX-CNC
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
@@ -133,22 +133,22 @@ jobs:
           MATRIX_TARGET: ${{ matrix.target }}
       - name: Tests
         run: cargo test --all-targets
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
       - name: Build
         run: cargo build --release --features gui --target ${MATRIX_TARGET}
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
         shell: bash
         env:
           MATRIX_TARGET: ${{ matrix.target }}
       - name: Package
         shell: bash
-        working-directory: EH3D-MOTIONCNC
+        working-directory: EH3D-PHOENIX-CNC
         run: |
           set -euo pipefail
           version=$(python3 -c "import json;print(json.load(open('eh3d.project.json'))['version'])")
-          name="motioncnc-${version}-${MATRIX_LABEL}"
+          name="phoenix-cnc-${version}-${MATRIX_LABEL}"
           mkdir "$name"
-          cp "target/${MATRIX_TARGET}/release/motioncnc${MATRIX_EXT}" "$name/"
+          cp "target/${MATRIX_TARGET}/release/phoenix-cnc${MATRIX_EXT}" "$name/"
           cp LICENSE README.md CHANGELOG.md "$name/"
           # sample G-code programs, from the simplest to a long one
           cp -r examples "$name/examples"
@@ -170,7 +170,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: parts-${{ matrix.label }}
-          path: EH3D-MOTIONCNC/dist/*
+          path: EH3D-PHOENIX-CNC/dist/*
           if-no-files-found: error
           retention-days: 7
 
@@ -208,7 +208,7 @@ jobs:
               digest, name = line.strip().split("  ", 1)
               files.append({"name": name, "sha256": digest, "bytes": os.path.getsize(name)})
           json.dump({
-              "schema": "eh3d-build/1", "repository": os.environ["GITHUB_REPOSITORY"], "project": "EH3D-MOTIONCNC", "version": os.environ["VERSION"],
+              "schema": "eh3d-build/1", "repository": os.environ["GITHUB_REPOSITORY"], "project": "EH3D-PHOENIX-CNC", "version": os.environ["VERSION"],
               "commit": os.environ["SHA"], "built_on": "github-actions", "run_id": os.environ["GITHUB_RUN_ID"],
               "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "signed": False, "files": files,
@@ -224,7 +224,7 @@ jobs:
       - name: Upload the build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-motioncnc-${{ needs.plan.outputs.version }}
+          name: release-phoenix-cnc-${{ needs.plan.outputs.version }}
           path: files/*
           if-no-files-found: error
           retention-days: 30
@@ -243,7 +243,7 @@ jobs:
       - name: Download the build
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: release-motioncnc-${{ needs.plan.outputs.version }}
+          name: release-phoenix-cnc-${{ needs.plan.outputs.version }}
           path: build
 
       - name: Check hashes, manifest and attestation
@@ -284,7 +284,7 @@ jobs:
       - name: Download the build
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: release-motioncnc-${{ needs.plan.outputs.version }}
+          name: release-phoenix-cnc-${{ needs.plan.outputs.version }}
           path: files
 
       - name: Prepare the draft release with the unsigned files

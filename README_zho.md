@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="images/EH3D_BANNER.svg" alt="EH3D-MOTIONCNC 横幅" width="100%">
+  <img src="images/EH3D_PHOENIX_CNC_BANNER.svg" alt="EH3D-PHOENIX-CNC 横幅" width="100%">
 </p>
 
-# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-MOTIONCNC
+# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-PHOENIX-CNC
 <p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### EH3D 机床控制程序的共享基础：作业视图、主题以及八种语言的界面文本
@@ -18,7 +18,7 @@
 
 ---
 
-**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`motioncnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。126 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
+**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。126 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
 
 ---
 
@@ -54,28 +54,28 @@
 
 ## 🎯 概述
 
-* **窗口**（`src/gui.rs`，`motioncnc`）：机床位置（工件和机床坐标）、带步长和进给的点动面板、回零、清零和解锁、急停、带日志的命令行，以及在工作台上显示路径的程序。
+* **窗口**（`src/gui.rs`，`phoenix-cnc`）：机床位置（工件和机床坐标）、带步长和进给的点动面板、回零、清零和解锁、急停、带日志的命令行，以及在工作台上显示路径的程序。
 * **会话**（`src/session.rs`）：程序对 `eh3d-controller` 中任何控制器所做的事：点动、清零、回零、发送一行、逐行运行程序、暂停、停止和报警；在模拟控制器上测试。
 * **程序路径**（`src/gcode.rs`）：直线移动（`G0`、`G1`，绝对或相对，毫米或英寸），在程序运行前绘制；圆弧不绘制。
 * **模拟控制器**（`eh3d_controller::sim`，在 EH3D-COMMON 中）：内存中的机床，超出行程会报警；市场上的控制器系列列在 `eh3d-controller` 中，GRBL 是第一个编写的，其余显示为尚未支持。
 * `eh3d-view` 的**主题和文字**：Forge（默认）、Neon Arcade、Glass Pro、经典 Windows 灰色和一个跟随 Windows 的主题，以及英语、西班牙语、意大利语、德语、法语、葡萄牙语、中文和日语界面。它将成为：基于 EH3D-DRILLPRO 和 EH3D-ROUTEPRO 引擎的、用于钻孔、铣削以及 2D 和 3D CNC 加工的一个程序；这部分尚不存在。
 * **菜单、设置和文件**：文件、视图、程序、机床和帮助菜单，包含 PlanetCNC 中有的功能（打开、最近文件、保存、编辑、各零点、已存位置、主轴和冷却液）；两次运行之间会记住的设置窗口（单位、语言、十一种主题、行程限位、点动）；以及套件共用的打开和保存窗口（`eh3d-filedialog`：位置、排序、过滤、保存文件的扩展名和替换前的询问）。
-* **串口上的 GRBL：** 使用 `--features serial` 构建后，`motioncnc --grbl 端口[@波特率]` 驱动 GRBL 控制器（默认 115200 波特）而不是模拟器，`motioncnc --ports` 列出串口；没有该功能的构建或打不开的端口会给出提示并退出。只对脚本化的控制器试过，从未对真实控制器试过。
+* **串口上的 GRBL：** 使用 `--features serial` 构建后，`phoenix-cnc --grbl 端口[@波特率]` 驱动 GRBL 控制器（默认 115200 波特）而不是模拟器，`phoenix-cnc --ports` 列出串口；没有该功能的构建或打不开的端口会给出提示并退出。只对脚本化的控制器试过，从未对真实控制器试过。
 * **随屏幕变化的窗口：** 窗口以最大化打开，从 720p 到 1080p 乃至更大更宽的屏幕，所有内容随之放大或缩小。
 * **故障后继续：** 程序运行时，已到达的行会保存到一个小文件中；如果窗口、电脑或连接中断，下次启动时会询问是从该行继续还是放弃。操作员回答之前不会向控制器发送任何内容。
 * **发送到 EH3D 服务器：** 在设置中填写服务器地址、本程序的令牌和机器 ID（设置窗口的“服务器”部分，或设置文件中的 `server_address`、`server_token`、`server_machine`）后，**程序 > 发送到服务器** 会把程序文本作为 G 代码作业发送；服务器在它的机器上运行（其串口上的 GRBL 控制器，或它的模拟器），窗口跟踪作业：状态、百分比和已到达的行显示在顶部栏、面板和日志中。窗口的开始、暂停和停止会传到服务器上的作业，关闭窗口不会停止它；已停止的作业从服务器到达的行继续（窗口下次启动时会提示，与控制器上的程序相同）：服务器会恢复生效的代码，并在第一次移动前等待操作员。只有设置 `server_restore_outputs = yes` 时才会重新启动主轴和冷却。已用替身服务器试过；服务器自己的测试会向其模拟器发送相同的请求。从未在实机上试过。
 * **故障后继续：** 中途停下的程序会先恢复到原来的状态：单位和绝对距离、安全 Z（设置文件中的 `resume_safe_z`，5 mm）、主轴及其达到转速所需的时间（`resume_spindle_wait`，3 秒）、冷却液、已到达的位置和模态状态；恢复文件保存程序的 SHA-256，程序改变后不会继续。
 * **窗口的辅助功能：**程序开始前的**摘要**（移动次数、切削距离、按设置中的速度估算的时间、各轴的行程范围，以及与机器行程的核对，并带有套件共用的警告：程序过小或离角落太远、超过工作台、估算未计入的圆弧、在设定进给之前的切削；**仍然开始**，或在程序超出行程时拒绝，`reject_out_of_travel = no` 可将拒绝改为警告，`confirm_start = no` 关闭摘要）；**键盘快捷键**（Ctrl+O 打开、Ctrl+S 保存、Ctrl+E 编辑、F5 开始、空格 暂停、Esc 停止（窗口打开时 Esc 关闭窗口；键盘在文本框中时，空格和 Esc 留给文本框）、F1 列出全部；`shortcuts = no` 关闭）；带有绘制图标和名称的**工具栏**；用减号和加号调整或**直接输入**的数值；路径可在俯视图中**拖动和缩放**，或在 3D 中**旋转和缩放**并显示刀具；打开窗口中的 **G 代码文件预览**；**崩溃记录**（`eh3d-crash.log`）；以及设置中的安全部分（设置文件中的 `rapid`、`summary_tiny`、`summary_far` 和 `summary_margin`）。
-* **程序队列与控制器行程：** 在“打开”窗口中用 Ctrl+点击选择的多个文件、一起拖入的文件或在命令行中给出的文件（`motioncnc a.nc b.nc`）会依次运行，每个文件先显示自己的摘要；窗口列出它们及其状态，可移除、跳过和重新排序等待中的程序，当某个程序未完成时队列停止。使用 GRBL 控制器时，程序在连接时读取 `$130`、`$131` 和 `$132`（X、Y、Z 的最大行程），并取其与 `travel_x`、`travel_y`、`travel_z` 中较小的值用于摘要和拒绝判断；如果控制器没有应答或不提供这些值，则使用设置，日志会说明（`read_controller_travel = no` 关闭读取）。
+* **程序队列与控制器行程：** 在“打开”窗口中用 Ctrl+点击选择的多个文件、一起拖入的文件或在命令行中给出的文件（`phoenix-cnc a.nc b.nc`）会依次运行，每个文件先显示自己的摘要；窗口列出它们及其状态，可移除、跳过和重新排序等待中的程序，当某个程序未完成时队列停止。使用 GRBL 控制器时，程序在连接时读取 `$130`、`$131` 和 `$132`（X、Y、Z 的最大行程），并取其与 `travel_x`、`travel_y`、`travel_z` 中较小的值用于摘要和拒绝判断；如果控制器没有应答或不提供这些值，则使用设置，日志会说明（`read_controller_travel = no` 关闭读取）。
 
 ## 🧩 在 EH3D 中的角色
 
-EH3D-MOTIONCNC 是 EH3D 的机床控制程序，目前运行在模拟机床上。它通过路径依赖 EH3D-COMMON（文件夹 `EH3D-COMMON` 必须与本文件夹相邻：视图、主题、文字和控制器），目前不依赖任何其他 EH3D 仓库。
+EH3D-PHOENIX-CNC 是 EH3D 的机床控制程序，目前运行在模拟机床上。它通过路径依赖 EH3D-COMMON（文件夹 `EH3D-COMMON` 必须与本文件夹相邻：视图、主题、文字和控制器），目前不依赖任何其他 EH3D 仓库。
 
 ## 🏛️ 架构
 
 <p align="center">
-  <img src="images/architecture.svg" alt="EH3D-MOTIONCNC 架构：谁将使用它、包含什么、依赖什么" width="100%">
+  <img src="images/architecture.svg" alt="EH3D-PHOENIX-CNC 架构：谁将使用它、包含什么、依赖什么" width="100%">
 </p>
 
 各部分如何配合：谁将使用它、本仓库包含什么、它依赖什么。图片由 `docs/architecture.json` 绘制，并与代码核对，未来的内容标为未来。
@@ -142,14 +142,14 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 ## 📂 仓库结构
 
 <p align="center">
-  <img src="images/repository-structure.svg" alt="EH3D-MOTIONCNC 仓库结构" width="100%">
+  <img src="images/repository-structure.svg" alt="EH3D-PHOENIX-CNC 仓库结构" width="100%">
 </p>
 
 <details>
 <summary>目录树的文本版</summary>
 
 ```text
-EH3D-MOTIONCNC/
+EH3D-PHOENIX-CNC/
 ├── src/
 │   ├── lib.rs                                   各模块，以及以本程序名称重新导出的 eh3d-view 视图
 │   ├── gui.rs                                   窗口：位置、点动、程序、路径、命令和日志
@@ -159,7 +159,7 @@ EH3D-MOTIONCNC/
 │   ├── view.rs                                  可拖动缩放的平面图和可旋转的 3D 视图（仅数值）
 │   ├── plan.rs                                  开始前的检查：移动的时间、范围和行程
 │   ├── cli.rs                                   命令行：文件、语言、主题和截图选项
-│   ├── bin/motioncnc.rs                         打开窗口的程序
+│   ├── bin/phoenix-cnc.rs                       打开窗口的程序
 │   ├── server.rs                                与 EH3D 服务器的连接：发送、跟踪、暂停、停止
 │   ├── settings.rs                              两次运行间记住的设置
 │   ├── gui/dialogs.rs                           菜单、设置、打开、保存、编辑器

@@ -642,7 +642,7 @@ version = "0.0.1"
 
 [[package]]
 name = "eh3d-common"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "chrono",
  "eh3d-container",
@@ -687,7 +687,7 @@ name = "eh3d-filedialog"
 version = "0.0.1"
 
 [[package]]
-name = "eh3d-motioncnc"
+name = "eh3d-phoenix-cnc"
 version = "0.0.9"
 dependencies = [
  "arboard",

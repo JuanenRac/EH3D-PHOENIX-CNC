@@ -1,14 +1,14 @@
 //! More checks of the pure parts of the program: how a G-code program is read, what is saved to go on after a crash, the settings file as an operator may edit it, the queue of
 //! programs, the movements of the views and the command line.
 
-use eh3d_motioncnc::cli::Options;
-use eh3d_motioncnc::gcode::{arc_moves, read_preview, toolpath, words, Modal, PREVIEW_MAX_BYTES};
-use eh3d_motioncnc::link::{parse_port, GRBL_BAUD};
-use eh3d_motioncnc::queue::{Queue, State};
-use eh3d_motioncnc::recovery::{due, program_hash, recovery_path, Recovery};
-use eh3d_motioncnc::settings::{Settings, RECENT_MAX};
-use eh3d_motioncnc::texts::Lang;
-use eh3d_motioncnc::view::{Orbit, Plan2d, ORBIT_HOME, ZOOM_MAX, ZOOM_MIN};
+use eh3d_phoenix_cnc::cli::Options;
+use eh3d_phoenix_cnc::gcode::{arc_moves, read_preview, toolpath, words, Modal, PREVIEW_MAX_BYTES};
+use eh3d_phoenix_cnc::link::{parse_port, GRBL_BAUD};
+use eh3d_phoenix_cnc::queue::{Queue, State};
+use eh3d_phoenix_cnc::recovery::{due, program_hash, recovery_path, Recovery};
+use eh3d_phoenix_cnc::settings::{Settings, RECENT_MAX};
+use eh3d_phoenix_cnc::texts::Lang;
+use eh3d_phoenix_cnc::view::{Orbit, Plan2d, ORBIT_HOME, ZOOM_MAX, ZOOM_MIN};
 use std::path::{Path, PathBuf};
 
 fn lines(s: &str) -> Vec<String> {
@@ -210,7 +210,7 @@ fn what_is_saved_is_what_is_read_back_whatever_the_name_of_the_file_is() {
         assert_eq!(Recovery::parse(&r.to_text()), Some(r), "{file}");
     }
     let d = dir("recovery");
-    let path = recovery_path(&d.join("motioncnc.cfg"));
+    let path = recovery_path(&d.join("phoenix-cnc.cfg"));
     assert_eq!(path.file_name().unwrap(), "recovery.cfg");
     recovery().save(&path).unwrap();
     assert_eq!(Recovery::load(&path), Some(recovery()));
@@ -490,7 +490,7 @@ fn a_missing_or_unreadable_file_gives_the_defaults_and_saving_makes_the_folder()
     let bad = d.join("bad.cfg");
     std::fs::write(&bad, [0xFFu8, 0xFE, 0x00, 0x80]).unwrap();
     assert_eq!(Settings::load(&bad), Settings::default());
-    let nested = d.join("a").join("b").join("motioncnc.cfg");
+    let nested = d.join("a").join("b").join("phoenix-cnc.cfg");
     let s = Settings {
         feed_mm_min: 1234.0,
         ..Settings::default()

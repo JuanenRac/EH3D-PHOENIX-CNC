@@ -149,7 +149,7 @@ mod tests {
         assert!(due(None, 0, 20));
         assert!(!due(Some(10), 25, 20));
         assert!(due(Some(10), 30, 20));
-        let dir = std::env::temp_dir().join(format!("eh3d-motioncnc-rec-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("eh3d-phoenix-cnc-rec-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let p = recovery_path(&dir.join("settings.cfg"));
         let r = Recovery {

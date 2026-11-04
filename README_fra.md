@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="images/EH3D_BANNER.svg" alt="EH3D-MOTIONCNC bannière" width="100%">
+  <img src="images/EH3D_PHOENIX_CNC_BANNER.svg" alt="EH3D-PHOENIX-CNC bannière" width="100%">
 </p>
 
-# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-MOTIONCNC
+# <img src="images/brand/icon-64.png" alt="" width="40" height="40" align="absmiddle"> EH3D-PHOENIX-CNC
 <p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | 🇫🇷 <b>Français</b> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### La base commune des programmes de commande de machine EH3D : la vue d'un travail, les thèmes et les textes de l'interface en huit langues
@@ -18,7 +18,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`motioncnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 126 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
+**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 126 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
 
 ---
 
@@ -54,28 +54,28 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 
 ## 🎯 Présentation
 
-* La **fenêtre** (`src/gui.rs`, `motioncnc`) : la position de la machine (pièce et machine), un pavé de jog avec ses pas et son avance, prise d'origine, zéro et déverrouillage, l'arrêt d'urgence, une ligne de commandes avec son journal, et le programme avec sa trajectoire sur la table.
+* La **fenêtre** (`src/gui.rs`, `phoenix-cnc`) : la position de la machine (pièce et machine), un pavé de jog avec ses pas et son avance, prise d'origine, zéro et déverrouillage, l'arrêt d'urgence, une ligne de commandes avec son journal, et le programme avec sa trajectoire sur la table.
 * La **session** (`src/session.rs`) : ce que le programme fait avec n'importe quel contrôleur de `eh3d-controller` : jog, zéro, prise d'origine, envoyer une ligne, exécuter un programme ligne par ligne, pause, arrêt et les alarmes ; elle est testée sur le contrôleur simulé.
 * La **trajectoire d'un programme** (`src/gcode.rs`) : les déplacements droits (`G0`, `G1`, absolus ou relatifs, en mm ou en pouces) dessinés avant l'exécution ; les arcs ne sont pas dessinés.
 * Le **contrôleur simulé** (`eh3d_controller::sim`, dans EH3D-COMMON) : une machine en mémoire avec des limites de course qui déclenchent une alarme ; les familles de contrôleurs du marché sont listées dans `eh3d-controller`, GRBL est la première écrite et les autres apparaissent comme pas encore pilotées.
 * Les **thèmes et les mots** de `eh3d-view` : Forge (par défaut), Neon Arcade, Glass Pro, le gris classique de Windows et un qui suit Windows, et l'interface en anglais, espagnol, italien, allemand, français, portugais, chinois et japonais. Ce qu'il sera : un programme pour percer, fraiser et faire de la CNC 2D et 3D sur les moteurs d'EH3D-DRILLPRO et EH3D-ROUTEPRO ; cette partie n'existe pas encore.
 * Les **menus, les réglages et les fichiers** : les menus Fichier, Affichage, Programme, Machine et Aide avec ce que PlanetCNC y met (ouvrir, récents, enregistrer, modifier, les zéros, les positions mémorisées, la broche et l'arrosage) ; une fenêtre de réglages (unités, langue, onze thèmes, limites de course, jog) mémorisée entre les exécutions ; et les fenêtres Ouvrir et Enregistrer de la suite (`eh3d-filedialog` : lieux, tri, filtres, l'extension d'un fichier enregistré et la question avant de remplacer).
-* **GRBL sur un port série :** compilé avec `--features serial`, `motioncnc --grbl PORT[@BAUD]` pilote un contrôleur GRBL (115200 bauds par défaut) à la place du simulateur et `motioncnc --ports` liste les ports série ; une version sans la fonctionnalité, ou un port qui ne s'ouvre pas, le dit et quitte. Essayé seulement contre un contrôleur scénarisé, jamais contre un vrai.
+* **GRBL sur un port série :** compilé avec `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` pilote un contrôleur GRBL (115200 bauds par défaut) à la place du simulateur et `phoenix-cnc --ports` liste les ports série ; une version sans la fonctionnalité, ou un port qui ne s'ouvre pas, le dit et quitte. Essayé seulement contre un contrôleur scénarisé, jamais contre un vrai.
 * **Une fenêtre qui suit l'écran :** elle s'ouvre agrandie et, de 720p à 1080p et jusqu'aux écrans plus grands et plus larges, tout grandit ou rétrécit avec elle.
 * **Reprendre après une panne :** pendant qu'un programme tourne, la ligne atteinte est enregistrée dans un petit fichier ; si la fenêtre, l'ordinateur ou la liaison tombe, le démarrage suivant demande s'il faut reprendre à cette ligne ou abandonner. Rien n'est envoyé au contrôleur tant que l'opérateur n'a pas répondu.
 * **Envoyé au serveur EH3D :** avec l'adresse du serveur, le jeton de ce programme et l'identifiant de la machine dans les réglages (section Serveur de la fenêtre des réglages, ou `server_address`, `server_token` et `server_machine` dans le fichier de réglages), **Programme > Envoyer au serveur** envoie le texte du programme comme un travail G-code ; le serveur l'exécute sur sa machine (un contrôleur GRBL sur son port série, ou son simulateur) et la fenêtre le suit : l'état, le pourcentage et la ligne atteinte dans la barre du haut, le panneau et le journal. Démarrer, Pause et Arrêter de la fenêtre atteignent le travail sur le serveur, fermer la fenêtre ne l'arrête pas, et un travail arrêté est repris à la ligne atteinte par le serveur (le démarrage suivant de la fenêtre le propose, comme pour un programme du contrôleur) : le serveur rend les codes en vigueur et attend l'opérateur avant le premier mouvement. La broche et l'arrosage ne sont relancés qu'avec `server_restore_outputs = yes`. Essayé avec un faux serveur ; les tests du serveur lui-même envoient les mêmes requêtes à son simulateur. Jamais sur une machine.
 * **Reprise après une panne :** un programme resté en cours est d'abord remis dans son état : unités et distances absolues, un Z sûr (`resume_safe_z` dans le fichier de réglages, 5 mm), la broche avec le temps d'atteindre sa vitesse (`resume_spindle_wait`, 3 s), le liquide de refroidissement, le point atteint et l'état modal ; le fichier de reprise garde le SHA-256 du programme et refuse de continuer si le programme a changé.
 * **Les aides de la fenêtre :** un **résumé avant le démarrage d'un programme** (les mouvements, la distance de coupe, la durée aux vitesses des réglages, la portée des axes et une vérification par rapport à la course de la machine, avec les avertissements que la suite partage : un programme minuscule ou loin du coin, plus grand que la table, des arcs que l'estimation laisse de côté et des coupes avant toute avance ; **Démarrer quand même**, ou un refus quand le programme sort de la course, que `reject_out_of_travel = no` transforme en avertissement, et `confirm_start = no` désactive le résumé) ; des **touches du clavier** (Ctrl+O ouvrir, Ctrl+S enregistrer, Ctrl+E modifier, F5 démarrer, Espace pause, Échap arrêter (avec une fenêtre ouverte Échap la ferme, et avec le clavier dans une zone de texte Espace et Échap restent à la zone), F1 les liste ; `shortcuts = no` les désactive) ; une **barre d'outils** avec des dessins et leurs noms ; des nombres qu'on règle avec moins et plus ou qu'on **écrit** ; la trajectoire **déplacée et zoomée de dessus ou tournée et zoomée en 3D** avec l'outil ; un **aperçu du fichier G-code** dans la fenêtre Ouvrir ; le **journal d'un plantage** (`eh3d-crash.log`) ; et une section Sécurité dans les réglages (`rapid`, `summary_tiny`, `summary_far` et `summary_margin` dans le fichier des réglages).
-* **Une file de programmes et la course du contrôleur :** plusieurs fichiers choisis dans la fenêtre Ouvrir avec Ctrl+clic, déposés ensemble ou donnés sur la ligne de commande (`motioncnc a.nc b.nc`) s'exécutent l'un après l'autre, chacun après son propre résumé ; la fenêtre les liste avec leur état, permet de retirer, ignorer et réordonner ceux qui attendent, et la file s'arrête quand un programme ne se termine pas. Avec un contrôleur GRBL, le programme lit `$130`, `$131` et `$132` (la plus grande course de X, Y et Z) à la connexion et prend la plus petite entre cela et `travel_x`, `travel_y` et `travel_z` pour le résumé et le refus ; si le contrôleur ne répond pas ou ne les donne pas, les réglages sont utilisés et le journal le dit (`read_controller_travel = no` désactive la lecture).
+* **Une file de programmes et la course du contrôleur :** plusieurs fichiers choisis dans la fenêtre Ouvrir avec Ctrl+clic, déposés ensemble ou donnés sur la ligne de commande (`phoenix-cnc a.nc b.nc`) s'exécutent l'un après l'autre, chacun après son propre résumé ; la fenêtre les liste avec leur état, permet de retirer, ignorer et réordonner ceux qui attendent, et la file s'arrête quand un programme ne se termine pas. Avec un contrôleur GRBL, le programme lit `$130`, `$131` et `$132` (la plus grande course de X, Y et Z) à la connexion et prend la plus petite entre cela et `travel_x`, `travel_y` et `travel_z` pour le résumé et le refus ; si le contrôleur ne répond pas ou ne les donne pas, les réglages sont utilisés et le journal le dit (`read_controller_travel = no` désactive la lecture).
 
 ## 🧩 Rôle dans EH3D
 
-EH3D-MOTIONCNC est le programme de commande de machine d'EH3D, qui fonctionne aujourd'hui sur une machine simulée. Il dépend par chemin d'EH3D-COMMON (le dossier `EH3D-COMMON` doit se trouver à côté de celui-ci : la vue, les thèmes, les mots et les contrôleurs) et d'aucun autre dépôt EH3D pour l'instant.
+EH3D-PHOENIX-CNC est le programme de commande de machine d'EH3D, qui fonctionne aujourd'hui sur une machine simulée. Il dépend par chemin d'EH3D-COMMON (le dossier `EH3D-COMMON` doit se trouver à côté de celui-ci : la vue, les thèmes, les mots et les contrôleurs) et d'aucun autre dépôt EH3D pour l'instant.
 
 ## 🏛️ Architecture
 
 <p align="center">
-  <img src="images/architecture.svg" alt="Architecture d'EH3D-MOTIONCNC : qui l'utilisera, ce qu'il contient et sur quoi il s'appuie" width="100%">
+  <img src="images/architecture.svg" alt="Architecture d'EH3D-PHOENIX-CNC : qui l'utilisera, ce qu'il contient et sur quoi il s'appuie" width="100%">
 </p>
 
 Comment les parties s'assemblent : qui l'utilisera, ce que contient ce dépôt et sur quoi il s'appuie. L'image est dessinée à partir de `docs/architecture.json`, vérifiée par rapport au code, et marque comme futur ce qui est futur.
@@ -142,14 +142,14 @@ La version se trouve dans `Cargo.toml` et dans `eh3d.project.json`, et chaque ve
 ## 📂 Structure du dépôt
 
 <p align="center">
-  <img src="images/repository-structure.svg" alt="Structure du dépôt EH3D-MOTIONCNC" width="100%">
+  <img src="images/repository-structure.svg" alt="Structure du dépôt EH3D-PHOENIX-CNC" width="100%">
 </p>
 
 <details>
 <summary>Version texte de l'arborescence</summary>
 
 ```text
-EH3D-MOTIONCNC/
+EH3D-PHOENIX-CNC/
 ├── src/
 │   ├── lib.rs                                   les modules et la vue d'eh3d-view réexportée sous le nom de ce programme
 │   ├── gui.rs                                   la fenêtre : position, jog, programme, trajectoire, commandes et journal
@@ -159,7 +159,7 @@ EH3D-MOTIONCNC/
 │   ├── view.rs                                  le plan qu'on déplace et zoome et la vue 3D qu'on tourne, en nombres
 │   ├── plan.rs                                  la vérification avant le démarrage : durée, portée et course des mouvements
 │   ├── cli.rs                                   la ligne de commande : le fichier, la langue, le thème et les options d'image
-│   ├── bin/motioncnc.rs                         le programme qui ouvre la fenêtre
+│   ├── bin/phoenix-cnc.rs                       le programme qui ouvre la fenêtre
 │   ├── server.rs                                la liaison au serveur EH3D : envoyer, suivre, mettre en pause, arrêter
 │   ├── settings.rs                              ce qui est mémorisé entre exécutions
 │   ├── gui/dialogs.rs                           menus, réglages, Ouvrir, Enregistrer

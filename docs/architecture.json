@@ -1,8 +1,8 @@
 {
-  "repo": "EH3D-MOTIONCNC",
+  "repo": "EH3D-PHOENIX-CNC",
   "ecosystem": "eh3d",
   "tagline": "The base of the future EH3D machine-control program: today the view of a job, shared.",
-  "description": "EH3D-MOTIONCNC will be the machine-control program of EH3D for drilling, routing and 2D and 3D CNC work. Today it is only a Rust library that re-exports the scene, the themes and the texts of eh3d-view of EH3D-COMMON; the window, the machine control, the ZIP of jobs and the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO are still to be joined.",
+  "description": "EH3D-PHOENIX-CNC will be the machine-control program of EH3D for drilling, routing and 2D and 3D CNC work. Today it is only a Rust library that re-exports the scene, the themes and the texts of eh3d-view of EH3D-COMMON; the window, the machine control, the ZIP of jobs and the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO are still to be joined.",
   "columns": [
     "WHO WILL USE IT",
     "THIS REPOSITORY",

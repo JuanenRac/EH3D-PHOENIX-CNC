@@ -453,7 +453,7 @@ impl App {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.heading(RichText::new("EH3D MOTIONCNC").color(col(self.theme.accent)));
+                ui.heading(RichText::new("EH3D-PHOENIX-CNC").color(col(self.theme.accent)));
                 ui.label(format!(
                     "{} {}",
                     self.t(Text::Version),
@@ -462,7 +462,7 @@ impl App {
                 ui.label(format!("{}: GPL-3.0-or-later", self.t(Text::Licence)));
                 ui.add_space(6.0);
                 ui.label(self.t(Text::McAboutBody));
-                ui.hyperlink("https://github.com/JuanenRac/EH3D-MOTIONCNC");
+                ui.hyperlink("https://github.com/JuanenRac/EH3D-PHOENIX-CNC");
             });
         open.then_some(Win::About)
     }
@@ -1198,7 +1198,7 @@ mod tests {
 
     fn work_folder(tag: &str) -> PathBuf {
         let d =
-            std::env::temp_dir().join(format!("motioncnc-dialogs-{tag}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("phoenix-cnc-dialogs-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
