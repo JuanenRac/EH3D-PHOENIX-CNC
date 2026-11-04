@@ -101,6 +101,26 @@ fn install_fonts(ctx: &egui::Context) {
     }
 }
 
+/// The icon of the program, for the title bar, the task bar and the About window.
+const ICON_PNG: &[u8] = include_bytes!("../images/brand/icon-256.png");
+
+/// Decodes the icon (a PNG of 8 bits per channel with alpha); `None` when it is anything else.
+fn decode_icon() -> Option<egui::IconData> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(ICON_PNG));
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).ok()?;
+    if info.color_type != png::ColorType::Rgba || info.bit_depth != png::BitDepth::Eight {
+        return None;
+    }
+    buf.truncate(info.buffer_size());
+    Some(egui::IconData {
+        rgba: buf,
+        width: info.width,
+        height: info.height,
+    })
+}
+
 fn save_png(img: &egui::ColorImage, path: &Path) -> std::io::Result<()> {
     let file = std::io::BufWriter::new(std::fs::File::create(path)?);
     let mut enc = png::Encoder::new(file, img.size[0] as u32, img.size[1] as u32);
@@ -1108,12 +1128,16 @@ pub fn run(o: &Options) -> eframe::Result {
     } else {
         Vec2::new(1300.0, 780.0)
     };
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size(size)
+        .with_min_inner_size([1000.0, 600.0])
+        .with_maximized(o.shot.is_none())
+        .with_title("EH3D-PHOENIX-CNC");
+    if let Some(icon) = decode_icon() {
+        viewport = viewport.with_icon(icon);
+    }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size(size)
-            .with_min_inner_size([1000.0, 600.0])
-            .with_maximized(o.shot.is_none())
-            .with_title("EH3D-PHOENIX-CNC"),
+        viewport,
         ..Default::default()
     };
     eframe::run_native(
