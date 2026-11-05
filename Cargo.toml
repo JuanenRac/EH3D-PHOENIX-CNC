@@ -1,6 +1,6 @@
 [package]
 name = "eh3d-phoenix-cnc"
-version = "0.0.9"
+version = "0.1.0"
 edition = "2021"
 description = "The EH3D machine-control program: a window over a controller, a simulated one so far"
 license = "GPL-3.0-or-later"
