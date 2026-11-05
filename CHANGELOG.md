@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **The Windows executable carries the icon of the program:** the file shows it in the explorer and the taskbar, together with the name, the description and the version, embedded by `build.rs`; other systems are not affected.
 - **The window carries the icon of the program:** the title bar and the task bar show the icon, and the About window shows it above the name.
 
 - **Renamed:** The project is now called EH3D-PHOENIX-CNC (it was EH3D-MOTIONCNC); it joins the PHOENIX family of programs.
