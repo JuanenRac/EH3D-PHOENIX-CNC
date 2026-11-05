@@ -1191,6 +1191,22 @@ pub(super) fn lang_name(l: Lang) -> &'static str {
     l.native_name()
 }
 
+/// The icon of the program as a texture for the About window; it is made once and kept in the context.
+fn about_logo(ctx: &egui::Context) -> Option<egui::TextureHandle> {
+    let id = egui::Id::unique("about-logo");
+    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return Some(t);
+    }
+    let icon = super::decode_icon()?;
+    let image = egui::ColorImage::from_rgba_unmultiplied(
+        [icon.width as usize, icon.height as usize],
+        &icon.rgba,
+    );
+    let texture = ctx.load_texture("about-logo", image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, texture.clone()));
+    Some(texture)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1260,20 +1276,4 @@ mod tests {
             assert_eq!(a.win.is_some(), ok, "{name}");
         }
     }
-}
-
-/// The icon of the program as a texture for the About window; it is made once and kept in the context.
-fn about_logo(ctx: &egui::Context) -> Option<egui::TextureHandle> {
-    let id = egui::Id::new("about-logo");
-    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
-        return Some(t);
-    }
-    let icon = super::decode_icon()?;
-    let image = egui::ColorImage::from_rgba_unmultiplied(
-        [icon.width as usize, icon.height as usize],
-        &icon.rgba,
-    );
-    let texture = ctx.load_texture("about-logo", image, egui::TextureOptions::LINEAR);
-    ctx.data_mut(|d| d.insert_temp(id, texture.clone()));
-    Some(texture)
 }
