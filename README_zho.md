@@ -83,31 +83,31 @@ EH3D-PHOENIX-CNC 是 EH3D 的机床控制程序，目前运行在模拟机床上
 ## 🖼️ 屏幕截图
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="在模拟机器上运行的程序" width="100%">
 </p>
 
 <p align="center"><em>程序在模拟机床上运行：已完成的行为绿色，当前行高亮，路径绘制在工作台上，刀具位于机床所在位置。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="显示已完成程序的 Midnight 主题" width="100%">
 </p>
 
 <p align="center"><em>午夜主题，一个已运行完的长程序。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="使用浅色 Paper 主题的德语界面" width="100%">
 </p>
 
 <p align="center"><em>使用浅色纸张主题的德语界面：窗口中的每个词都跟随语言。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="设置窗口" width="100%">
 </p>
 
 <p align="center"><em>设置窗口，左侧的分区如同 PlanetCNC 的目录树：语言、十一种主题和显示内容。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="打开窗口，含位置、最近文件和文件夹列表" width="100%">
 </p>
 
 <p align="center"><em>套件共用的打开窗口：位置、最近文件、带日期和大小的文件夹列表、文件名和类型。</em></p>

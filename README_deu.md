@@ -83,31 +83,31 @@ Wie die Teile zusammenpassen: wer es nutzen wird, was dieses Repository enthält
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="Ein Programm läuft auf der simulierten Maschine" width="100%">
 </p>
 
 <p align="center"><em>Ein Programm läuft auf der simulierten Maschine: die erledigten Zeilen sind grün, die aktuelle Zeile hell, die Bahn ist auf den Tisch gezeichnet und das Werkzeug steht, wo die Maschine ist.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="Thema Midnight mit einem beendeten Programm" width="100%">
 </p>
 
 <p align="center"><em>Das Thema Mitternacht mit einem langen, beendeten Programm.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="Deutsche Oberfläche mit dem hellen Thema Paper" width="100%">
 </p>
 
 <p align="center"><em>Die Oberfläche auf Deutsch mit dem hellen Thema Papier: jedes Wort des Fensters folgt der Sprache.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="Einstellungsfenster" width="100%">
 </p>
 
 <p align="center"><em>Das Einstellungsfenster, mit den Abschnitten links wie der Baum von PlanetCNC: die Sprache, die elf Themen und was gezeigt wird.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="Fenster Öffnen mit Orten, zuletzt verwendeten Dateien und der Ordnerliste" width="100%">
 </p>
 
 <p align="center"><em>Das Fenster Öffnen der Suite: Orte, zuletzt geöffnet, die Liste des Ordners mit Datum und Größe, der Name und der Typ.</em></p>

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Screenshots of the application in the README.
+
 ## [0.1.0] - The project joins the PHOENIX family, with the icon of the program in the window and the executable
 
 - **The Windows executable carries the icon of the program:** the file shows it in the explorer and the taskbar, together with the name, the description and the version, embedded by `build.rs`; other systems are not affected.

@@ -83,31 +83,31 @@ Como as partes se encaixam: quem o vai usar, o que este repositório contém e e
 ## 🖼️ Capturas de ecrã
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="Um programa a correr na máquina simulada" width="100%">
 </p>
 
 <p align="center"><em>Um programa em curso na máquina simulada: as linhas feitas a verde, a linha atual realçada, a trajetória desenhada na mesa e a ferramenta onde está a máquina.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="Tema Midnight com um programa terminado" width="100%">
 </p>
 
 <p align="center"><em>O tema Meia-noite, com um programa longo já terminado.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="Interface em alemão com o tema claro Paper" width="100%">
 </p>
 
 <p align="center"><em>A interface em alemão com o tema claro Papel: cada palavra da janela segue o idioma.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="Janela das definições" width="100%">
 </p>
 
 <p align="center"><em>A janela de definições, com as secções à esquerda como a árvore do PlanetCNC: o idioma, os onze temas e o que se mostra.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="Janela Abrir com os locais, os ficheiros recentes e a lista da pasta" width="100%">
 </p>
 
 <p align="center"><em>A janela Abrir da suite: locais, recentes, a lista da pasta com datas e tamanhos, o nome e o tipo.</em></p>

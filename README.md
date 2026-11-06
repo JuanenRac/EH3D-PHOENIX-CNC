@@ -83,31 +83,31 @@ How the parts fit together: who will use it, what this repository holds and what
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="A program running on the simulated machine" width="100%">
 </p>
 
 <p align="center"><em>A program running on the simulated machine: the lines done are green, the line that goes now is bright, the path is drawn on the table and the tool is where the machine is.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="Midnight theme with a finished program" width="100%">
 </p>
 
 <p align="center"><em>The Midnight theme, with a long program that has finished.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="German interface with the light Paper theme" width="100%">
 </p>
 
 <p align="center"><em>The interface in German with the light Paper theme: every word of the window follows the language.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="Settings window" width="100%">
 </p>
 
 <p align="center"><em>The settings window, with the sections on the left like the tree of PlanetCNC: the language, the eleven themes and what is shown.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="Open window with the places, recent files and the folder list" width="100%">
 </p>
 
 <p align="center"><em>The Open window of the suite: places, recent files, the list of the folder with its dates and sizes, the file name and the type.</em></p>

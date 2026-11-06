@@ -83,31 +83,31 @@ Comment les parties s'assemblent : qui l'utilisera, ce que contient ce dépôt e
 ## 🖼️ Captures d'écran
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="Un programme en cours sur la machine simulée" width="100%">
 </p>
 
 <p align="center"><em>Un programme en cours sur la machine simulée : les lignes faites en vert, la ligne en cours en clair, la trajectoire dessinée sur la table et l'outil là où est la machine.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="Thème Midnight avec un programme terminé" width="100%">
 </p>
 
 <p align="center"><em>Le thème Minuit, avec un long programme terminé.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="Interface en allemand avec le thème clair Paper" width="100%">
 </p>
 
 <p align="center"><em>L'interface en allemand avec le thème clair Papier : chaque mot de la fenêtre suit la langue.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="Fenêtre des réglages" width="100%">
 </p>
 
 <p align="center"><em>La fenêtre des réglages, avec les sections à gauche comme l'arbre de PlanetCNC : la langue, les onze thèmes et ce qui est affiché.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="Fenêtre Ouvrir avec les emplacements, les fichiers récents et la liste du dossier" width="100%">
 </p>
 
 <p align="center"><em>La fenêtre Ouvrir de la suite : lieux, récents, la liste du dossier avec ses dates et tailles, le nom et le type.</em></p>

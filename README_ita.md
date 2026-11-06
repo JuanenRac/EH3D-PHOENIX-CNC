@@ -83,31 +83,31 @@ Come si incastrano le parti: chi lo userà, cosa contiene questo repository e su
 ## 🖼️ Schermate
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="Un programma in esecuzione sulla macchina simulata" width="100%">
 </p>
 
 <p align="center"><em>Un programma in corso sulla macchina simulata: le righe eseguite in verde, la riga attuale evidenziata, il percorso disegnato sul piano e l'utensile dove si trova la macchina.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="Tema Midnight con un programma terminato" width="100%">
 </p>
 
 <p align="center"><em>Il tema Mezzanotte, con un programma lungo terminato.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="Interfaccia in tedesco con il tema chiaro Paper" width="100%">
 </p>
 
 <p align="center"><em>L'interfaccia in tedesco con il tema chiaro Carta: ogni parola della finestra segue la lingua.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="Finestra delle impostazioni" width="100%">
 </p>
 
 <p align="center"><em>La finestra delle impostazioni, con le sezioni a sinistra come l'albero di PlanetCNC: la lingua, gli undici temi e ciò che si mostra.</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="Finestra Apri con i luoghi, i file recenti e l'elenco della cartella" width="100%">
 </p>
 
 <p align="center"><em>La finestra Apri della suite: luoghi, recenti, l'elenco della cartella con date e dimensioni, il nome e il tipo.</em></p>

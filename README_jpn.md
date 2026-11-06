@@ -83,31 +83,31 @@ EH3D-PHOENIX-CNC は EH3D のマシン制御プログラムで、現在は模擬
 ## 🖼️ スクリーンショット
 
 <p align="center">
-  <img src="images/screenshots/program-running.png" alt="a program running" width="100%">
+  <img src="images/screens/phoenix-cnc-01-running.png" alt="シミュレートされたマシンで実行中のプログラム" width="100%">
 </p>
 
 <p align="center"><em>模擬マシンで実行中のプログラム：実行済みの行は緑、現在の行は明るく表示され、経路がテーブル上に描かれ、ツールはマシンのある位置にあります。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/spiral-neon.png" alt="Midnight theme" width="100%">
+  <img src="images/screens/phoenix-cnc-02-midnight.png" alt="終了したプログラムを表示した Midnight テーマ" width="100%">
 </p>
 
 <p align="center"><em>ミッドナイトテーマと、実行が終わった長いプログラム。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/square-german.png" alt="German interface, light theme" width="100%">
+  <img src="images/screens/phoenix-cnc-03-german-light.png" alt="明るい Paper テーマのドイツ語インターフェース" width="100%">
 </p>
 
 <p align="center"><em>明るいペーパーテーマのドイツ語インターフェース：ウィンドウのすべての言葉が言語に従います。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/settings-window.png" alt="settings window" width="100%">
+  <img src="images/screens/phoenix-cnc-04-settings.png" alt="設定ウィンドウ" width="100%">
 </p>
 
 <p align="center"><em>設定ウィンドウ。左のセクションは PlanetCNC のツリーのようで、言語、11 のテーマ、表示内容を選べます。</em></p>
 
 <p align="center">
-  <img src="images/screenshots/open-window.png" alt="Open window" width="100%">
+  <img src="images/screens/phoenix-cnc-05-open.png" alt="場所・最近使ったファイル・フォルダ一覧を表示した「開く」ウィンドウ" width="100%">
 </p>
 
 <p align="center"><em>スイート共通の「開く」ウィンドウ：場所、最近のファイル、日付とサイズ付きのフォルダー一覧、ファイル名、種類。</em></p>
