@@ -28,7 +28,7 @@ concurrency:
 
 env:
   # The tag of each sibling repository the release is built from (name=tag, separated by spaces); a sibling that is not listed is taken at main.
-  SIBLING_REFS: "EH3D-COMMON=v0.1.4"
+  SIBLING_REFS: "EH3D-COMMON=v0.1.9"
 
 jobs:
   plan:
