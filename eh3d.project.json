@@ -10,8 +10,8 @@
     "Rust"
   ],
   "deployment_target": "user-pc",
-  "maturity": "scaffolding",
-  "evidence": "host-test",
+  "maturity": "functional",
+  "evidence": "simulator",
   "family": "CNC Workflow Tools",
   "parent": null,
   "depends_on": [
