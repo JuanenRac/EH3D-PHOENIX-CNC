@@ -180,6 +180,7 @@ EH3D-PHOENIX-CNC/
 ├── run.sh run.bat                               indiquent qu'il n'y a pas encore de programme et lancent les tests
 ├── eh3d.project.json                            manifeste : version, rôle, maturité et commande de compilation
 ├── Cargo.toml Cargo.lock                        le paquet Rust et ses dépendances figées
+├── rust-toolchain.toml                          la toolchain Rust épinglée
 ├── CHANGELOG.md                                 ce qui a changé dans chaque version
 ├── SECURITY.md SUPPORT.md                       signaler une vulnérabilité et poser des questions
 └── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   contribuer, code de conduite et licence

@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The Rust toolchain is pinned:** `rust-toolchain.toml` fixes the version of Rust (the same one in every repository of the suite) with `rustfmt` and `clippy`, the workflows install that version and not `stable`, so a new release of Rust cannot turn the CI red by itself.
 - Screenshots of the application in the README.
 - A test that checks what the README and the scripts run.sh and run.bat promise: they show the same sample, the sample file exists, its arguments are accepted by the command line and every example is read into a path.
 
