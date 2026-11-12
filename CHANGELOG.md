@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - Screenshots of the application in the README.
+- A test that checks what the README and the scripts run.sh and run.bat promise: they show the same sample, the sample file exists, its arguments are accepted by the command line and every example is read into a path.
 
 ## [0.1.0] - The project joins the PHOENIX family, with the icon of the program in the window and the executable
 
