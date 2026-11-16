@@ -1,10 +1,22 @@
 //! What a machine-control program does with a controller: show where the machine is, move it by hand, zero it, send a line, and run a
-//! program one line at a time that can be paused, stopped and cut by the emergency stop. It knows nothing of the window, so it is tested
-//! on the simulated controller.
+//! program that can be paused, stopped and cut by the emergency stop. It knows nothing of the window, so it is tested on the simulated
+//! controller.
+//!
+//! The lines of a program are sent by a thread of their own (the emitter), because a controller can take a long time to answer a line
+//! (GRBL answers `ok` only when its buffer has room, which with a long move in front can be minutes). The window never waits for it: it
+//! asks for the next lines with [`Session::pump_async`] and looks at what was done, and the pause, the stop and the emergency stop go
+//! to the controller out of turn through its urgent channel, so they are heard while a line is still waiting for its `ok`. What the
+//! window shows meanwhile is the last status the controller gave.
 
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
+
+use eh3d_controller::urgent::{Urgent, UrgentChannel};
 use eh3d_controller::{Command, Controller, Error, State, Status, AXES};
 
-use crate::gcode::Modal;
+use crate::gcode::{toolpath, words, Modal};
 
 /// The jog steps offered, in mm.
 pub const STEPS: [f64; 5] = [0.01, 0.1, 1.0, 10.0, 100.0];
@@ -12,8 +24,68 @@ pub const STEPS: [f64; 5] = [0.01, 0.1, 1.0, 10.0, 100.0];
 /// The mark of a pause (in seconds) inside the lines that put the controller back in its state.
 const WAIT_MARK: &str = "@wait ";
 
+/// A controller that can be handed to the thread of the emitter.
+pub type BoxedController = Box<dyn Controller + Send>;
+
+/// One thing the emitter does with the controller.
+#[derive(Debug, Clone, PartialEq)]
+enum Step {
+    /// Sends a line and waits for the controller to take it.
+    Line(String),
+    /// An empty line or a comment: it counts as sent and nothing goes out.
+    Skip,
+    /// Waits this many seconds (cut short by a stop).
+    Wait(f64),
+    /// Tells the controller to go on after a hold.
+    Resume,
+}
+
+/// What a batch of steps came to: how many were done and why it stopped early, if it did.
+struct Outcome {
+    done: usize,
+    error: Option<Error>,
+}
+
+/// What follows when a batch ends well.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Then {
+    /// Lines of the program: `ends` is that the program has no more lines after them.
+    Program { ends: bool },
+    /// The controller is back in the state of the program and goes on.
+    Resumed,
+    /// The controller is back in the state of the program and waits for the operator to lower the tool.
+    Positioned,
+}
+
+/// A batch the emitter is working on.
+struct InFlight {
+    rx: Receiver<Outcome>,
+    steps: Vec<Step>,
+    /// How many steps have been taken into account (the codes in force, the next line).
+    applied: usize,
+    /// Each step done is a line of the program.
+    advances: bool,
+    then: Then,
+}
+
+/// The last move of a resumed program: lowering the tool to where the program had it, at a cutting feed, once the operator says so.
+#[derive(Debug, Clone, PartialEq)]
+struct Descent {
+    lines: Vec<String>,
+    text: String,
+}
+
 pub struct Session {
-    pub controller: Box<dyn Controller>,
+    controller: Arc<Mutex<BoxedController>>,
+    /// The way in for the bytes that cannot wait (see `eh3d_controller::urgent`); `None` when the controller has none.
+    urgent: Option<UrgentChannel>,
+    /// The emitter stops before its next step while this is set (a pause, a stop).
+    halt: Arc<AtomicBool>,
+    /// How many steps of the batch in flight are done.
+    progress: Arc<AtomicUsize>,
+    inflight: Option<InFlight>,
+    /// A stop or an emergency stop was asked while a batch was in flight: the line it cuts short is not a failure.
+    aborted: bool,
     pub status: Status,
     pub program: Vec<String>,
     /// The next line of the program to send.
@@ -30,6 +102,10 @@ pub struct Session {
     pub operator_zero: [f64; AXES],
     /// The lines that put the controller back in the state the program had reached; they go out when a program that was left in the middle is resumed.
     pub resume_preamble: Vec<String>,
+    /// The tool is lowered to where the program had it only when the operator presses Start a second time.
+    resume_descent: Option<Descent>,
+    /// The feed (mm/min) of that descent when the program had set none.
+    pub resume_plunge_feed_mm_min: f64,
     /// The longest travel of X, Y and Z (mm) the controller said it has (GRBL `$130` to `$132`); `None` when it was not asked or did not say.
     pub controller_travel: Option<[f64; 3]>,
     /// The controller was asked for its travel already.
@@ -55,10 +131,78 @@ pub fn effective_travel(
     out
 }
 
+/// Waits `seconds`, in short slices, and gives up as soon as `halt` is set. Says whether the wait was completed.
+fn wait_unless_halted(seconds: f64, halt: &AtomicBool) -> bool {
+    let seconds = if seconds.is_finite() {
+        seconds.clamp(0.0, 120.0)
+    } else {
+        0.0
+    };
+    let end = std::time::Instant::now() + Duration::from_secs_f64(seconds);
+    while std::time::Instant::now() < end {
+        if halt.load(Ordering::SeqCst) {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    !halt.load(Ordering::SeqCst)
+}
+
+/// The work of the emitter: the steps one after the other, until they end, one fails or `halt` is set.
+fn run_steps(
+    controller: &Mutex<BoxedController>,
+    steps: &[Step],
+    halt: &AtomicBool,
+    progress: &AtomicUsize,
+) -> Outcome {
+    let mut c = controller.lock().unwrap_or_else(PoisonError::into_inner);
+    for (i, step) in steps.iter().enumerate() {
+        if halt.load(Ordering::SeqCst) {
+            return Outcome {
+                done: i,
+                error: None,
+            };
+        }
+        let result = match step {
+            Step::Skip => Ok(()),
+            Step::Line(line) => c.send_line(line),
+            Step::Wait(seconds) => {
+                if !wait_unless_halted(*seconds, halt) {
+                    return Outcome {
+                        done: i,
+                        error: None,
+                    };
+                }
+                Ok(())
+            }
+            Step::Resume => c.command(Command::Resume),
+        };
+        match result {
+            Ok(()) => progress.store(i + 1, Ordering::SeqCst),
+            Err(e) => {
+                return Outcome {
+                    done: i,
+                    error: Some(e),
+                }
+            }
+        }
+    }
+    Outcome {
+        done: steps.len(),
+        error: None,
+    }
+}
+
 impl Session {
-    pub fn new(controller: Box<dyn Controller>) -> Self {
+    pub fn new(controller: BoxedController) -> Self {
+        let urgent = controller.urgent_channel();
         let mut s = Session {
-            controller,
+            controller: Arc::new(Mutex::new(controller)),
+            urgent,
+            halt: Arc::new(AtomicBool::new(false)),
+            progress: Arc::new(AtomicUsize::new(0)),
+            inflight: None,
+            aborted: false,
             status: Status::default(),
             program: Vec::new(),
             next: 0,
@@ -70,12 +214,20 @@ impl Session {
             modal: Modal::default(),
             operator_zero: [0.0; AXES],
             resume_preamble: Vec::new(),
+            resume_descent: None,
+            resume_plunge_feed_mm_min: 100.0,
             controller_travel: None,
             travel_asked: false,
             allow_system_lines: false,
         };
         s.refresh();
         s
+    }
+
+    fn ctl(&self) -> MutexGuard<'_, BoxedController> {
+        self.controller
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     fn say(&mut self, line: impl Into<String>) {
@@ -92,9 +244,30 @@ impl Session {
         self.paused = false;
     }
 
-    /// Asks the controller how it is.
+    /// The emitter is sending lines: the controller is not free for anything else but the urgent bytes.
+    pub fn busy(&self) -> bool {
+        self.inflight.is_some()
+    }
+
+    /// Says (in the log) that the controller is busy, and tells so.
+    fn refuse_busy(&mut self, what: &str) -> bool {
+        if self.inflight.is_some() {
+            self.say(format!(
+                "{what}: the controller is busy sending the program"
+            ));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Asks the controller how it is. While the emitter works the controller is not asked: the window keeps the last status.
     pub fn refresh(&mut self) {
-        match self.controller.status() {
+        if self.inflight.is_some() {
+            return;
+        }
+        let r = self.ctl().status();
+        match r {
             Ok(s) => self.status = s,
             Err(e) => self.failed("status", e),
         }
@@ -110,19 +283,27 @@ impl Session {
             self.say("jog: a program is running");
             return;
         }
+        if self.refuse_busy("jog") {
+            return;
+        }
         let command = Command::Jog {
             axis,
             distance_mm: dir * self.step_mm,
             feed_mm_min: self.feed_mm_min,
         };
-        if let Err(e) = self.controller.command(command) {
+        let r = self.ctl().command(command);
+        if let Err(e) = r {
             self.failed("jog", e);
         }
         self.refresh();
     }
 
     fn order(&mut self, what: &str, command: Command) {
-        if let Err(e) = self.controller.command(command) {
+        if self.refuse_busy(what) {
+            return;
+        }
+        let r = self.ctl().command(command);
+        if let Err(e) = r {
             self.failed(what, e);
         }
         self.refresh();
@@ -130,7 +311,11 @@ impl Session {
 
     /// Sends a line of the program's own making (a move to a stored position, to the zero) and keeps what it sets.
     fn own_line(&mut self, what: &str, line: &str) {
-        match self.controller.send_line(line) {
+        if self.refuse_busy(what) {
+            return;
+        }
+        let r = self.ctl().send_line(line);
+        match r {
             Ok(()) => self.modal.apply(line),
             Err(e) => self.failed(what, e),
         }
@@ -183,9 +368,12 @@ impl Session {
     /// Tells the controller the limits of the travel of X, Y and Z (mm); the other axes are left as they are. Says whether the controller
     /// took them: one that keeps its own limits does not.
     pub fn set_travel(&mut self, xyz: [(f64, f64); 3]) -> bool {
+        if self.refuse_busy("travel") {
+            return false;
+        }
         let mut all = [(0.0, 0.0); AXES];
         all[..3].copy_from_slice(&xyz);
-        let ok = self.controller.set_travel(all);
+        let ok = self.ctl().set_travel(all);
         if !ok {
             self.say("travel: the controller keeps its own limits");
         }
@@ -195,9 +383,13 @@ impl Session {
     /// Asks the controller for its longest travel and keeps the answer; it says in the log what it took: the smaller of this and the settings,
     /// or the settings alone when the controller does not give it or does not answer.
     pub fn read_controller_travel(&mut self) -> Option<[f64; 3]> {
+        if self.refuse_busy("travel") {
+            return self.controller_travel;
+        }
         self.travel_asked = true;
         self.controller_travel = None;
-        match self.controller.max_travel() {
+        let r = self.ctl().max_travel();
+        match r {
             Ok(Some(t)) => {
                 self.say(format!(
                     "travel: the controller allows X {:.1}, Y {:.1}, Z {:.1} mm; the smaller of that and the settings is used",
@@ -257,11 +449,36 @@ impl Session {
         self.order("unlock", Command::Unlock);
     }
 
-    /// Stops everything at once; the controller stays in alarm until it is unlocked.
+    /// Puts an urgent byte in the way in of the controller, which sends it without waiting for the line in progress. Says whether it could.
+    fn send_urgent(&mut self, what: &str, u: Urgent) -> bool {
+        let channel = self.urgent.clone();
+        match channel {
+            Some(c) => {
+                c.send(u);
+                true
+            }
+            None => {
+                self.say(format!(
+                    "{what}: this controller cannot take it while a line is waiting for its answer"
+                ));
+                false
+            }
+        }
+    }
+
+    /// Stops everything at once; the controller stays in alarm until it is unlocked. It does not wait for the line that is waiting for its `ok`.
     pub fn estop(&mut self) {
         self.running = false;
         self.paused = false;
-        self.order("emergency stop", Command::EmergencyStop);
+        self.resume_preamble.clear();
+        self.resume_descent = None;
+        self.halt.store(true, Ordering::SeqCst);
+        if self.inflight.is_some() {
+            self.aborted = true;
+            self.send_urgent("emergency stop", Urgent::Reset);
+        } else {
+            self.order("emergency stop", Command::EmergencyStop);
+        }
         self.say("EMERGENCY STOP");
     }
 
@@ -272,7 +489,11 @@ impl Session {
             return;
         }
         self.say(format!("> {line}"));
-        match self.controller.send_line(line) {
+        if self.refuse_busy("mdi") {
+            return;
+        }
+        let r = self.ctl().send_line(line);
+        match r {
             Ok(()) => {
                 self.modal.apply(line);
                 self.say("ok")
@@ -290,17 +511,23 @@ impl Session {
         self.next = 0;
     }
 
-    /// Starts the program from its first line, or goes on if it was paused.
-    /// The lines that bring a controller back to the state of the program at line `next`: units and absolute distances, up to a safe Z, the spindle with
-    /// the time to reach its speed, the coolant, over the point the program had reached, and then the modal state of the program (inches, relative
-    /// distances, the feed and the way of moving).
+    /// The lines that bring a controller back to the state of the program at line `next`: units and absolute distances, the plane, the work
+    /// coordinate system and the tool length offset in force, up to a safe Z, the spindle with the time to reach its speed, the coolant, over the
+    /// point the program had reached, and then the modal state of the program (inches, the feed and the way of moving). The program is never in
+    /// relative distances here: [`Session::resume_at_safe`] does not resume one.
     pub fn preamble_for(&self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> Vec<String> {
         let m = &self.modal;
-        let mut out = vec![
-            "G21".to_string(),
-            "G90".to_string(),
-            format!("G0 Z{safe_z_mm}"),
-        ];
+        let mut out = vec!["G21".to_string(), "G90".to_string()];
+        if m.plane != 17 {
+            out.push(format!("G{}", m.plane));
+        }
+        if m.wcs != 54 {
+            out.push(format!("G{}", m.wcs));
+        }
+        if let Some(z) = m.tool_length {
+            out.push(format!("G43.1 Z{z}"));
+        }
+        out.push(format!("G0 Z{safe_z_mm}"));
         if m.spindle != 5 {
             let speed = m.speed.map(|s| format!(" S{s}")).unwrap_or_default();
             out.push(format!("M{}{}", m.spindle, speed));
@@ -311,15 +538,12 @@ impl Session {
         if m.coolant != 9 {
             out.push(format!("M{}", m.coolant));
         }
-        let path = crate::gcode::toolpath(&self.program[..next.min(self.program.len())]);
+        let path = toolpath(&self.program[..next.min(self.program.len())]);
         if let Some(last) = path.last() {
             out.push(format!("G0 X{:.4} Y{:.4}", last.to.0, last.to.1));
         }
         if m.inches {
             out.push("G20".to_string());
-        }
-        if !m.absolute {
-            out.push("G91".to_string());
         }
         if let Some(f) = m.feed {
             out.push(format!("F{f}"));
@@ -330,33 +554,231 @@ impl Session {
         out
     }
 
-    /// Like `resume_at`, and the controller is brought back to the state of the program when the operator resumes.
-    pub fn resume_at_safe(&mut self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) {
-        self.resume_at(next);
-        self.resume_preamble = self.preamble_for(self.next, safe_z_mm, spindle_wait_s);
+    /// The move that takes the tool from the safe height down to where the program had it, at a cutting feed. `None` when the line the
+    /// program goes on with has a Z of its own (it lowers the tool itself), or the program was not below the safe height.
+    fn descent_for(&self, next: usize, safe_z_mm: f64) -> Option<Descent> {
+        let next = next.min(self.program.len());
+        let z = toolpath(&self.program[..next]).last()?.to.2;
+        let line_has_z = self
+            .program
+            .get(next)
+            .is_some_and(|l| words(l).iter().any(|&(c, _)| c == 'Z'));
+        if line_has_z || z >= safe_z_mm - 1e-9 {
+            return None;
+        }
+        let m = &self.modal;
+        // the lines are in the units the preamble puts back
+        let unit = if m.inches { 25.4 } else { 1.0 };
+        let feed = m.feed.unwrap_or(self.resume_plunge_feed_mm_min / unit);
+        let z_cmd = z / unit;
+        let mut lines = vec![format!("G1 Z{z_cmd:.4} F{feed}")];
+        if m.motion == 0 {
+            lines.push("G0".to_string());
+        }
+        Some(Descent {
+            lines,
+            text: format!(
+                "resume: the tool is over the point where the program stopped, at the safe height; press Start again to lower it to Z{z:.3} mm at feed {feed} and go on"
+            ),
+        })
     }
 
+    /// Like `resume_at`, and the controller is brought back to the state of the program when the operator resumes. Says whether the program
+    /// waits to be resumed: a program in relative distances (`G91`) at that line is not resumed, because the point it reached cannot be
+    /// rebuilt from the lines (the controller may have run fewer than were sent).
+    pub fn resume_at_safe(&mut self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> bool {
+        self.resume_preamble.clear();
+        self.resume_descent = None;
+        let mut m = Modal::default();
+        for line in self.program.iter().take(next) {
+            let t = line.trim();
+            if !t.is_empty() && !t.starts_with(';') {
+                m.apply(t);
+            }
+        }
+        if !m.absolute {
+            self.running = false;
+            self.paused = false;
+            self.say(format!(
+                "resume: the program is in relative distances (G91) at line {}, so where it was cannot be rebuilt; it is not resumed",
+                next + 1
+            ));
+            return false;
+        }
+        self.resume_at(next);
+        self.resume_preamble = self.preamble_for(self.next, safe_z_mm, spindle_wait_s);
+        self.resume_descent = self.descent_for(self.next, safe_z_mm);
+        true
+    }
+
+    /// The steps of the lines that put the controller back (a mark of a wait is a wait).
+    fn steps_of(lines: &[String]) -> Vec<Step> {
+        lines
+            .iter()
+            .map(|line| match line.strip_prefix(WAIT_MARK) {
+                // a wait is made here, not by the controller: a simulator or a controller that does not know G4 works the same
+                Some(seconds) => Step::Wait(seconds.parse::<f64>().unwrap_or(0.0)),
+                None => Step::Line(line.clone()),
+            })
+            .collect()
+    }
+
+    /// Hands a batch of steps to the emitter.
+    fn post(&mut self, steps: Vec<Step>, advances: bool, then: Then) {
+        self.halt.store(false, Ordering::SeqCst);
+        self.progress.store(0, Ordering::SeqCst);
+        self.aborted = false;
+        let (tx, rx) = mpsc::channel();
+        let controller = Arc::clone(&self.controller);
+        let halt = Arc::clone(&self.halt);
+        let progress = Arc::clone(&self.progress);
+        let work = steps.clone();
+        std::thread::spawn(move || {
+            let outcome = run_steps(&controller, &work, &halt, &progress);
+            // the controller is free before the answer is given
+            let _ = tx.send(outcome);
+        });
+        self.inflight = Some(InFlight {
+            rx,
+            steps,
+            applied: 0,
+            advances,
+            then,
+        });
+    }
+
+    /// Takes into account the steps of the batch done up to `done`: the codes they set and the line the program is at.
+    fn apply_done(&mut self, f: &mut InFlight, done: usize) {
+        let done = done.min(f.steps.len());
+        while f.applied < done {
+            if let Step::Line(line) = &f.steps[f.applied] {
+                self.modal.apply(line);
+            }
+            if f.advances {
+                self.next += 1;
+            }
+            f.applied += 1;
+        }
+    }
+
+    /// Looks at what the emitter has done since the last look; when its batch ended, the outcome is dealt with and the controller is asked how it is.
+    pub fn collect(&mut self) {
+        let Some(mut f) = self.inflight.take() else {
+            return;
+        };
+        let received = f.rx.try_recv();
+        let (outcome, finished) = match received {
+            Ok(o) => (Some(o), true),
+            Err(TryRecvError::Empty) => (None, false),
+            Err(TryRecvError::Disconnected) => (None, true),
+        };
+        let done = match &outcome {
+            Some(o) => o.done,
+            None => self.progress.load(Ordering::SeqCst),
+        };
+        self.apply_done(&mut f, done);
+        if !finished {
+            self.inflight = Some(f);
+            return;
+        }
+        match outcome {
+            None => {
+                self.say("the thread that sends the lines stopped");
+                self.running = false;
+                self.paused = false;
+            }
+            Some(Outcome { error: Some(e), .. }) => {
+                // what a stop cut short is not a failure
+                if !self.aborted {
+                    let what = match f.then {
+                        Then::Program { .. } => {
+                            let n = self.next + 1;
+                            let line = match f.steps.get(f.applied) {
+                                Some(Step::Line(l)) => l.clone(),
+                                _ => String::new(),
+                            };
+                            format!("line {n} ({line})")
+                        }
+                        Then::Resumed | Then::Positioned => {
+                            let line = match f.steps.get(f.applied) {
+                                Some(Step::Line(l)) => l.clone(),
+                                _ => String::new(),
+                            };
+                            format!("resume ({line})")
+                        }
+                    };
+                    self.failed(&what, e);
+                }
+            }
+            Some(o) => {
+                if o.done == f.steps.len() {
+                    match f.then {
+                        Then::Program { ends } => {
+                            if ends && self.running {
+                                self.running = false;
+                                self.paused = false;
+                                self.say("program done");
+                            }
+                        }
+                        Then::Resumed => self.paused = false,
+                        Then::Positioned => {
+                            if let Some(d) = &self.resume_descent {
+                                let text = d.text.clone();
+                                self.say(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.refresh();
+    }
+
+    /// Waits until the emitter has nothing in hand (for what has to see the outcome now: a script, the tests).
+    pub fn wait_idle(&mut self) {
+        while self.inflight.is_some() {
+            self.collect();
+            if self.inflight.is_some() {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
+
+    /// Starts the program from its first line, or goes on if it was paused.
     pub fn start(&mut self) {
+        self.collect();
         if self.alarm() {
             self.say("start: the controller is in alarm");
             return;
         }
         if self.paused {
+            if self.inflight.is_some() {
+                // the pause came while a line was waiting: the controller is only told to go on (out of turn, it is busy with that line)
+                self.halt.store(false, Ordering::SeqCst);
+                if self.send_urgent("resume", Urgent::Resume) {
+                    self.paused = false;
+                }
+                return;
+            }
             // after a failure the controller may have been reset: its state is put back before anything moves
-            let preamble = std::mem::take(&mut self.resume_preamble);
-            for line in &preamble {
-                // a wait is made here, not by the controller: a simulator or a controller that does not know G4 works the same
-                if let Some(seconds) = line.strip_prefix(WAIT_MARK) {
-                    if let Ok(s) = seconds.parse::<f64>() {
-                        std::thread::sleep(std::time::Duration::from_secs_f64(s.clamp(0.0, 120.0)));
-                    }
-                    continue;
-                }
-                if let Err(e) = self.controller.send_line(line) {
-                    self.failed(&format!("resume ({line})"), e);
-                    return;
-                }
-                self.modal.apply(line);
+            if !self.resume_preamble.is_empty() {
+                let preamble = std::mem::take(&mut self.resume_preamble);
+                let mut steps = Self::steps_of(&preamble);
+                let then = if self.resume_descent.is_some() {
+                    // the tool is not lowered without the operator saying so: it stays paused over the point
+                    Then::Positioned
+                } else {
+                    steps.push(Step::Resume);
+                    Then::Resumed
+                };
+                self.post(steps, false, then);
+                return;
+            }
+            if let Some(d) = self.resume_descent.take() {
+                let mut steps = Self::steps_of(&d.lines);
+                steps.push(Step::Resume);
+                self.post(steps, false, Then::Resumed);
+                return;
             }
             self.order("resume", Command::Resume);
             self.paused = false;
@@ -386,50 +808,85 @@ impl Session {
         self.say(format!("program resumed at line {}", next + 1));
     }
 
+    /// Holds the program. While a line waits for its `ok` the hold goes to the controller out of turn.
     pub fn pause(&mut self) {
         if self.running && !self.paused {
             self.paused = true;
-            self.order("pause", Command::Pause);
+            self.halt.store(true, Ordering::SeqCst);
+            if self.inflight.is_some() {
+                self.send_urgent("pause", Urgent::Hold);
+            } else {
+                self.order("pause", Command::Pause);
+            }
         }
     }
 
+    /// Stops the program. While a line waits for its `ok` the stop goes to the controller out of turn (a hold, and a reset once the machine stands still).
     pub fn stop(&mut self) {
         self.running = false;
         self.paused = false;
-        self.order("stop", Command::Stop);
+        self.resume_preamble.clear();
+        self.resume_descent = None;
+        self.halt.store(true, Ordering::SeqCst);
+        if self.inflight.is_some() {
+            self.aborted = true;
+            self.send_urgent("stop", Urgent::StopJob);
+        } else {
+            self.order("stop", Command::Stop);
+        }
     }
 
-    /// Sends the next lines of the running program (at most `max_lines`), the empty ones and the comments counting as sent. A line the
-    /// controller refuses stops the program at that line.
-    pub fn pump(&mut self, max_lines: usize) {
-        let mut sent = 0;
-        while self.running && !self.paused && sent < max_lines {
-            let Some(line) = self.program.get(self.next).cloned() else {
-                self.running = false;
-                self.say("program done");
+    /// Hands the emitter the next lines of the running program (at most `max_lines`), the empty ones and the comments counting as sent, and
+    /// takes into account what it has done meanwhile. It never waits for the controller. A line the controller refuses stops the program
+    /// at that line; a line that starts with `$` stops it before it is sent unless the settings allow it.
+    pub fn pump_async(&mut self, max_lines: usize) {
+        self.collect();
+        if self.inflight.is_some() || !self.running || self.paused {
+            return;
+        }
+        let mut steps = Vec::new();
+        let mut ends = false;
+        let mut at = self.next;
+        let mut stopped_here = false;
+        while steps.len() < max_lines {
+            let Some(line) = self.program.get(at).cloned() else {
+                ends = true;
                 break;
             };
             let trimmed = line.trim();
             if trimmed.starts_with('$') && !self.allow_system_lines {
-                let n = self.next + 1;
+                let n = at + 1;
                 self.say(format!(
                     "line {n} ({trimmed}): a line that starts with $ would change the controller itself, so the program stops here (program_system_commands in the settings file allows it)"
                 ));
                 self.running = false;
                 self.paused = false;
+                stopped_here = true;
                 break;
             }
-            if !trimmed.is_empty() && !trimmed.starts_with(';') {
-                if let Err(e) = self.controller.send_line(trimmed) {
-                    let n = self.next + 1;
-                    self.failed(&format!("line {n} ({trimmed})"), e);
-                    break;
-                }
-                self.modal.apply(trimmed);
-            }
-            self.next += 1;
-            sent += 1;
+            steps.push(if trimmed.is_empty() || trimmed.starts_with(';') {
+                Step::Skip
+            } else {
+                Step::Line(trimmed.to_string())
+            });
+            at += 1;
         }
+        if steps.is_empty() {
+            if ends && !stopped_here {
+                self.running = false;
+                self.say("program done");
+            }
+            self.refresh();
+            return;
+        }
+        self.post(steps, true, Then::Program { ends });
+    }
+
+    /// Sends the next lines of the running program (at most `max_lines`) and waits until they are sent: like [`Session::pump_async`] for
+    /// whoever has nothing else to do meanwhile (a script, the tests).
+    pub fn pump(&mut self, max_lines: usize) {
+        self.pump_async(max_lines);
+        self.wait_idle();
         self.refresh();
     }
 }
@@ -508,11 +965,17 @@ mod tests {
             "G1",
         ];
         assert_eq!(s.resume_preamble, want);
-        // nothing goes out until the operator resumes; then the preamble goes first and only once
+        // nothing goes out until the operator resumes; then the preamble goes first and only once, and the tool is not lowered yet
         s.pump(10);
         assert_eq!(s.next, 6);
         s.start();
-        assert!(s.resume_preamble.is_empty() && !s.paused);
+        s.wait_idle();
+        assert!(s.resume_preamble.is_empty() && s.paused);
+        assert!(s.log.iter().all(|l| !l.contains("resume (")), "{:?}", s.log);
+        // the second Start lowers the tool to where the program had it and goes on
+        s.start();
+        s.wait_idle();
+        assert!(!s.paused);
         assert!(s.log.iter().all(|l| !l.contains("resume (")), "{:?}", s.log);
     }
 
@@ -727,5 +1190,265 @@ G0 X2",
         let mut s = session();
         assert_eq!(s.read_controller_travel(), None);
         assert!(s.controller_travel.is_none() && s.travel_asked);
+    }
+
+    /// A controller that never answers a line by itself, as GRBL with a long move in front: the line waits until the machine is told to go on
+    /// (resume) or is stopped (reset or stop of the job), and everything it was told out of turn is kept.
+    struct Stalled {
+        urgent: UrgentChannel,
+        seen: Arc<Mutex<Vec<Urgent>>>,
+        /// Set when a line has been handed to the controller and waits for its answer.
+        entered: Arc<AtomicBool>,
+        alarm: bool,
+    }
+
+    impl Stalled {
+        fn new() -> (Stalled, Arc<Mutex<Vec<Urgent>>>, Arc<AtomicBool>) {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let entered = Arc::new(AtomicBool::new(false));
+            (
+                Stalled {
+                    urgent: UrgentChannel::new(),
+                    seen: Arc::clone(&seen),
+                    entered: Arc::clone(&entered),
+                    alarm: false,
+                },
+                seen,
+                entered,
+            )
+        }
+    }
+
+    impl Controller for Stalled {
+        fn family(&self) -> eh3d_controller::Family {
+            eh3d_controller::Family::Grbl
+        }
+        fn capabilities(&self) -> eh3d_controller::Capabilities {
+            SimController::new().capabilities()
+        }
+        fn status(&mut self) -> Result<Status, Error> {
+            Ok(Status {
+                state: if self.alarm { State::Alarm } else { State::Run },
+                ..Status::default()
+            })
+        }
+        fn command(&mut self, _command: Command) -> Result<(), Error> {
+            Ok(())
+        }
+        fn send_line(&mut self, _line: &str) -> Result<(), Error> {
+            self.entered.store(true, Ordering::SeqCst);
+            loop {
+                for u in self.urgent.take() {
+                    self.seen.lock().unwrap().push(u);
+                    if u.ends_job() {
+                        self.alarm = u == Urgent::Reset;
+                        return Err(Error::Refused("interrupted by an urgent stop".into()));
+                    }
+                    if u == Urgent::Resume {
+                        return Ok(());
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
+        fn urgent_channel(&self) -> Option<UrgentChannel> {
+            Some(self.urgent.clone())
+        }
+    }
+
+    fn stalled_session(program: &str) -> (Session, Arc<Mutex<Vec<Urgent>>>) {
+        let (c, seen, entered) = Stalled::new();
+        let mut s = Session::new(Box::new(c));
+        s.load(program);
+        s.start();
+        s.pump_async(1);
+        assert!(s.busy(), "the line is waiting for its answer");
+        // the stop must find the line waiting in the controller, not still on its way there
+        let t0 = std::time::Instant::now();
+        while !entered.load(Ordering::SeqCst) {
+            assert!(
+                t0.elapsed() < Duration::from_secs(5),
+                "the line never arrived"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        (s, seen)
+    }
+
+    fn quickly(t0: std::time::Instant) {
+        assert!(
+            t0.elapsed() < Duration::from_secs(5),
+            "the window waited for the line"
+        );
+    }
+
+    #[test]
+    fn the_emergency_stop_is_heard_while_a_line_waits_for_its_answer() {
+        let (mut s, seen) = stalled_session("G1 X1\nG1 X2");
+        let t0 = std::time::Instant::now();
+        s.estop();
+        quickly(t0);
+        assert!(!s.running && !s.paused);
+        s.wait_idle();
+        assert_eq!(*seen.lock().unwrap(), vec![Urgent::Reset]);
+        assert!(s.alarm(), "the status after the reset says alarm");
+        assert!(s.log.iter().any(|l| l == "EMERGENCY STOP"));
+        assert!(
+            s.log.iter().all(|l| !l.contains("interrupted")),
+            "a line cut short by the stop is not a failure: {:?}",
+            s.log
+        );
+    }
+
+    #[test]
+    fn the_stop_is_heard_while_a_line_waits_for_its_answer() {
+        let (mut s, seen) = stalled_session("G1 X1\nG1 X2");
+        let t0 = std::time::Instant::now();
+        s.stop();
+        quickly(t0);
+        s.wait_idle();
+        assert_eq!(*seen.lock().unwrap(), vec![Urgent::StopJob]);
+        assert!(!s.running && s.log.iter().all(|l| !l.contains("interrupted")));
+    }
+
+    #[test]
+    fn the_pause_is_heard_and_the_program_goes_on_when_the_operator_starts_again() {
+        let (mut s, seen) = stalled_session("G1 X1");
+        let t0 = std::time::Instant::now();
+        s.pause();
+        quickly(t0);
+        assert!(s.paused && s.busy(), "the line is still waiting");
+        // nothing but the urgent bytes is asked of a controller that is busy
+        s.mdi("G0 X9");
+        assert!(s.log.iter().any(|l| l.contains("busy")), "{:?}", s.log);
+        s.start();
+        assert!(!s.paused);
+        s.wait_idle();
+        assert_eq!(*seen.lock().unwrap(), vec![Urgent::Hold, Urgent::Resume]);
+        assert_eq!(s.next, 1, "the line was taken once the machine went on");
+    }
+
+    #[test]
+    fn a_controller_with_no_urgent_channel_says_that_the_stop_cannot_be_given_out_of_turn() {
+        struct Plain(SimController);
+        impl Controller for Plain {
+            fn family(&self) -> eh3d_controller::Family {
+                self.0.family()
+            }
+            fn capabilities(&self) -> eh3d_controller::Capabilities {
+                self.0.capabilities()
+            }
+            fn status(&mut self) -> Result<Status, Error> {
+                self.0.status()
+            }
+            fn command(&mut self, c: Command) -> Result<(), Error> {
+                self.0.command(c)
+            }
+            fn send_line(&mut self, line: &str) -> Result<(), Error> {
+                std::thread::sleep(Duration::from_millis(150));
+                self.0.send_line(line)
+            }
+        }
+        let mut s = Session::new(Box::new(Plain(SimController::new())));
+        s.load("G0 X1");
+        s.start();
+        s.pump_async(1);
+        assert!(s.busy());
+        s.stop();
+        assert!(
+            s.log.iter().any(|l| l.contains("cannot take it")),
+            "{:?}",
+            s.log
+        );
+        s.wait_idle();
+        assert!(!s.running);
+    }
+
+    #[test]
+    fn the_program_goes_to_the_emitter_in_batches_and_the_window_sees_its_progress() {
+        let mut s = session();
+        s.load("G0 X1\nG0 X2\nG0 X3\nG0 X4");
+        s.start();
+        s.pump_async(3);
+        s.wait_idle();
+        assert_eq!((s.next, s.status.machine_mm[0]), (3, 3.0));
+        assert!(s.running);
+        s.pump_async(3);
+        s.wait_idle();
+        assert!(!s.running);
+        assert_eq!(s.status.machine_mm[0], 4.0);
+        assert!(s.log.last().unwrap().contains("program done"));
+    }
+
+    #[test]
+    fn a_program_in_relative_distances_is_not_resumed_and_the_codes_of_the_work_are_put_back() {
+        let mut s = session();
+        s.load("G21 G91\nG1 X5 F100\nG1 X5\nG1 X5\n");
+        assert!(!s.resume_at_safe(2, 4.0, 0.0));
+        assert!(!s.running && !s.paused && s.resume_preamble.is_empty());
+        assert!(s.log.iter().any(|l| l.contains("G91")), "{:?}", s.log);
+        // in absolute distances the work coordinate system, the plane and the tool length come back before the tool moves
+        let mut s = session();
+        s.load("G21 G90 G55 G18\nG43.1 Z-2.5\nG0 X5 Y6 Z6\nG1 X9 F100\nG1 X10");
+        assert!(s.resume_at_safe(4, 4.0, 0.0));
+        let p = s.resume_preamble.clone();
+        let at = |t: &str| {
+            p.iter()
+                .position(|l| l == t)
+                .unwrap_or_else(|| panic!("{t} in {p:?}"))
+        };
+        assert!(at("G90") < at("G55") && at("G55") < at("G0 Z4"));
+        assert!(at("G18") < at("G0 Z4") && at("G43.1 Z-2.5") < at("G0 Z4"));
+        let g = s.modal.g_codes();
+        assert!(g.contains(&"G55".to_string()) && g.contains(&"G18".to_string()));
+        assert!(g.contains(&"G43.1".to_string()));
+    }
+
+    #[test]
+    fn a_resumed_program_lowers_the_tool_only_when_the_operator_says_so() {
+        let mut s = session();
+        s.load("G21 G90\nG0 X5 Y6 Z2\nG1 Z-1.5 F150\nG1 X20 Y6\nG1 X30");
+        assert!(s.resume_at_safe(4, 4.0, 0.0));
+        // first Start: over the point, at the safe height, still paused
+        s.start();
+        s.wait_idle();
+        assert!(s.paused, "the tool waits over the point");
+        assert_eq!(s.status.machine_mm[2], 4.0);
+        assert!(
+            s.log.iter().any(|l| l.contains("press Start again")),
+            "{:?}",
+            s.log
+        );
+        // second Start: down to the Z the program had, at the feed of the program, and on
+        s.start();
+        s.wait_idle();
+        assert!(!s.paused && s.running);
+        assert_eq!(s.status.machine_mm[2], -1.5);
+        assert_eq!(s.modal.feed, Some(150.0));
+        // a line with a Z of its own lowers the tool by itself: no descent
+        let mut s = session();
+        s.load("G21 G90\nG0 X5 Y6 Z2\nG1 Z-1.5 F150\nG1 X20 Y6\nG1 Z-3 X30");
+        assert!(s.resume_at_safe(4, 4.0, 0.0));
+        s.start();
+        s.wait_idle();
+        assert!(!s.paused, "nothing to confirm");
+        assert_eq!(s.status.machine_mm[2], 4.0);
+        // a program that was above the safe height has nothing to lower
+        let mut s = session();
+        s.load("G21 G90\nG0 X5 Y6 Z6\nG1 X20 Y6\nG1 X30");
+        assert!(s.resume_at_safe(3, 4.0, 0.0));
+        s.start();
+        s.wait_idle();
+        assert!(!s.paused);
+    }
+
+    #[test]
+    fn the_descent_uses_the_feed_of_the_settings_when_the_program_had_none() {
+        let mut s = session();
+        s.resume_plunge_feed_mm_min = 80.0;
+        s.load("G21 G90\nG0 X5 Y6 Z2\nG1 Z-1\nG1 X20 Y6\nG1 X30");
+        assert!(s.resume_at_safe(4, 4.0, 0.0));
+        let d = s.resume_descent.clone().expect("a descent");
+        assert_eq!(d.lines[0], "G1 Z-1.0000 F80");
     }
 }

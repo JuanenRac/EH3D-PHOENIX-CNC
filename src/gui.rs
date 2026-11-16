@@ -31,6 +31,9 @@ mod summary;
 mod views;
 use crate::gcode::{self, Segment};
 use crate::session::{Session, STEPS};
+
+/// How many lines of the program are handed to the thread that sends them at a time.
+const PUMP_BATCH: usize = 8;
 use crate::view::{Orbit, Plan2d};
 use dialogs::{lang_name, Win};
 use keys::Shortcut;
@@ -217,7 +220,7 @@ impl App {
     }
 
     /// The window over the controller that is given (the simulator, or the one the options asked for).
-    pub fn with_controller(o: &Options, controller: Box<dyn eh3d_controller::Controller>) -> App {
+    pub fn with_controller(o: &Options, controller: crate::session::BoxedController) -> App {
         let path = settings_path();
         let mut settings = Settings::load(&path);
         if let Some(l) = o.lang {
@@ -232,6 +235,7 @@ impl App {
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;
         session.feed_mm_min = settings.feed_mm_min;
+        session.resume_plunge_feed_mm_min = settings.resume_plunge_feed_mm_min;
         session.set_travel(settings.travel);
         if settings.read_controller_travel {
             session.read_controller_travel();
@@ -310,7 +314,11 @@ impl App {
             if recovery::due(self.recovery_saved, s.next, 20) {
                 let r = Recovery {
                     file: self.path.clone(),
-                    next: s.next,
+                    // the controller may not have run the last lines that were sent (it keeps some in its buffer): the program is
+                    // taken up again a few lines before, which is safe in absolute distances
+                    next: s
+                        .next
+                        .saturating_sub(self.settings.resume_backoff_lines as usize),
                     total: s.program.len(),
                     job: String::new(),
                     sha256: recovery::program_hash(&s.program),
@@ -1065,9 +1073,10 @@ impl eframe::App for App {
         });
         // several files dropped together are a queue
         self.start_queue(dropped);
-        if self.session.running && !self.session.paused {
-            self.session.allow_system_lines = self.settings.program_system_commands;
-            self.session.pump(1);
+        // the lines go out by a thread of their own: the window only hands them over and looks at what was done
+        self.session.allow_system_lines = self.settings.program_system_commands;
+        self.session.pump_async(PUMP_BATCH);
+        if self.session.running || self.session.busy() {
             ctx.request_repaint_after(std::time::Duration::from_millis(60));
         }
         self.queue_tick();
@@ -1116,7 +1125,8 @@ pub fn run(o: &Options) -> eframe::Result {
         print!("{}", crate::link::ports_text());
         return Ok(());
     }
-    let controller = match crate::link::controller_for(o) {
+    let busy = std::time::Duration::from_secs_f64(Settings::load(&settings_path()).busy_wait_s);
+    let controller = match crate::link::controller_for_with(o, busy) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");

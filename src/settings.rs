@@ -62,6 +62,14 @@ pub struct Settings {
     /// On connecting to a GRBL controller, read its longest travel of X, Y and Z (`$130` to `$132`) and take the smaller of that and the
     /// travel above for the summary and the refusal (off: only the travel above counts).
     pub read_controller_travel: bool,
+    /// The most a line of the program waits for its answer while the machine says it is working, in seconds (the controller answers a line only
+    /// when its buffer has room, which behind a long move can take minutes). The stop is heard meanwhile.
+    pub busy_wait_s: f64,
+    /// When a program goes on after a failure and the program had set no feed: the feed (mm/min) the tool is lowered to its depth with.
+    pub resume_plunge_feed_mm_min: f64,
+    /// When a program goes on after a failure it is taken up this many lines before the last one that was sent, because the controller keeps
+    /// some lines in its buffer and may not have run them.
+    pub resume_backoff_lines: u32,
 }
 
 impl Default for Settings {
@@ -98,6 +106,9 @@ impl Default for Settings {
             open_preview: true,
             view_3d: false,
             read_controller_travel: true,
+            busy_wait_s: 4.0 * 3600.0,
+            resume_plunge_feed_mm_min: 100.0,
+            resume_backoff_lines: 16,
         }
     }
 }
@@ -196,6 +207,23 @@ impl Settings {
                         .filter(|x| (0.0..=1000.0).contains(x))
                         .unwrap_or(s.summary_margin_mm)
                 }
+                "busy_wait" => {
+                    s.busy_wait_s = num(v)
+                        .filter(|x| (0.0..=604_800.0).contains(x))
+                        .unwrap_or(s.busy_wait_s)
+                }
+                "resume_plunge_feed" => {
+                    s.resume_plunge_feed_mm_min = num(v)
+                        .filter(|x| (1.0..=100_000.0).contains(x))
+                        .unwrap_or(s.resume_plunge_feed_mm_min)
+                }
+                "resume_backoff" => {
+                    s.resume_backoff_lines = v
+                        .parse::<u32>()
+                        .ok()
+                        .filter(|x| *x <= 1000)
+                        .unwrap_or(s.resume_backoff_lines)
+                }
                 "shortcuts" => s.shortcuts = on(v),
                 "show_toolbar" => s.show_toolbar = on(v),
                 "open_preview" => s.open_preview = on(v),
@@ -229,7 +257,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -269,7 +297,10 @@ impl Settings {
             yes(self.show_toolbar),
             yes(self.open_preview),
             yes(self.view_3d),
-            yes(self.read_controller_travel)
+            yes(self.read_controller_travel),
+            self.busy_wait_s,
+            self.resume_plunge_feed_mm_min,
+            self.resume_backoff_lines
         )
     }
 
@@ -354,6 +385,9 @@ mod tests {
             open_preview: false,
             view_3d: true,
             read_controller_travel: false,
+            busy_wait_s: 600.0,
+            resume_plunge_feed_mm_min: 60.0,
+            resume_backoff_lines: 4,
         };
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
@@ -413,6 +447,45 @@ mod tests {
         );
         assert_eq!((s.travel, s.spindle_rpm), (d.travel, d.spindle_rpm));
         assert!(s.inches);
+    }
+
+    #[test]
+    fn the_wait_for_a_busy_machine_and_the_way_a_program_is_taken_up_again_are_in_the_settings_file(
+    ) {
+        let d = Settings::default();
+        assert_eq!(d.busy_wait_s, 14_400.0);
+        assert_eq!(
+            (d.resume_plunge_feed_mm_min, d.resume_backoff_lines),
+            (100.0, 16)
+        );
+        let s = Settings::parse("busy_wait = 30\nresume_plunge_feed = 45\nresume_backoff = 8\n");
+        assert_eq!(
+            (
+                s.busy_wait_s,
+                s.resume_plunge_feed_mm_min,
+                s.resume_backoff_lines
+            ),
+            (30.0, 45.0, 8)
+        );
+        // what is out of range or not a number keeps the default
+        let s = Settings::parse("busy_wait = -5\nresume_plunge_feed = 0\nresume_backoff = 5000\n");
+        assert_eq!(
+            (
+                s.busy_wait_s,
+                s.resume_plunge_feed_mm_min,
+                s.resume_backoff_lines
+            ),
+            (
+                d.busy_wait_s,
+                d.resume_plunge_feed_mm_min,
+                d.resume_backoff_lines
+            )
+        );
+        let s = Settings::parse("busy_wait = soon\nresume_backoff = many\n");
+        assert_eq!(
+            (s.busy_wait_s, s.resume_backoff_lines),
+            (d.busy_wait_s, d.resume_backoff_lines)
+        );
     }
 
     #[test]

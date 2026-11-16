@@ -427,12 +427,16 @@ impl App {
                     self.attach_to_server(r.job.clone(), r.next);
                 } else if same_program {
                     // it waits paused: the operator checks the machine and presses Resume; the controller is first brought back to the state of the program
-                    self.session.resume_at_safe(
+                    if self.session.resume_at_safe(
                         r.next,
                         self.settings.resume_safe_z_mm,
                         self.settings.resume_spindle_wait_s,
-                    );
-                    self.recovery_saved = Some(r.next);
+                    ) {
+                        self.recovery_saved = Some(r.next);
+                    } else {
+                        // the point it reached cannot be rebuilt (relative distances): nothing is safe to go on from
+                        self.forget_recovery();
+                    }
                 } else {
                     // the file is not the one that was running (it changed): nothing is safe to go on from
                     self.forget_recovery();
