@@ -44,6 +44,8 @@ pub struct Settings {
     pub confirm_start: bool,
     /// A program whose moves leave the travel of the machine cannot be started from the summary (off: it is only said, and can be started anyway).
     pub reject_out_of_travel: bool,
+    /// A line of a program that starts with `$` (a setting or a command of the controller itself) is sent to it. Off: the program stops at that line without sending it.
+    pub program_system_commands: bool,
     /// The speed of the rapid moves in mm per minute, which the estimate of the time uses.
     pub rapid_mm_min: f64,
     /// The checks of the summary: a program smaller than `tiny_mm` on both sides, or that starts farther than `far_mm` from the corner of the travel, looks like a wrong unit or offset; `margin_mm` is how far past the travel a move may go before it counts.
@@ -86,6 +88,7 @@ impl Default for Settings {
             resume_spindle_wait_s: 3.0,
             confirm_start: true,
             reject_out_of_travel: true,
+            program_system_commands: false,
             rapid_mm_min: 3000.0,
             summary_tiny_mm: 5.0,
             summary_far_mm: 1000.0,
@@ -172,6 +175,7 @@ impl Settings {
                 }
                 "confirm_start" => s.confirm_start = on(v),
                 "reject_out_of_travel" => s.reject_out_of_travel = on(v),
+                "program_system_commands" => s.program_system_commands = on(v),
                 "rapid" => {
                     s.rapid_mm_min = num(v)
                         .filter(|x| (1.0..=1_000_000.0).contains(x))
@@ -225,7 +229,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -256,6 +260,7 @@ impl Settings {
             self.resume_spindle_wait_s,
             yes(self.confirm_start),
             yes(self.reject_out_of_travel),
+            yes(self.program_system_commands),
             self.rapid_mm_min,
             self.summary_tiny_mm,
             self.summary_far_mm,
@@ -339,6 +344,7 @@ mod tests {
             resume_spindle_wait_s: 4.0,
             confirm_start: false,
             reject_out_of_travel: false,
+            program_system_commands: true,
             rapid_mm_min: 4500.0,
             summary_tiny_mm: 2.5,
             summary_far_mm: 800.0,
