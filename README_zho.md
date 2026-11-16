@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Stack-Rust-DEA584.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.1-0f6cbd.svg" alt="Version">
-  <img src="https://img.shields.io/badge/Maturity-scaffolding-FFB020.svg" alt="Maturity">
+  <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
   <img src="https://img.shields.io/badge/Tests-130-0f6cbd.svg" alt="Tests">
 </p>
 
@@ -29,7 +29,7 @@
 | | |
 |---|---|
 | 版本 | `0.1.1` |
-| 成熟度 | 脚手架 |
+| 成熟度 | 可用 |
 | 测试 | 130 |
 | 技术栈 | Rust |
 | 真实硬件 | 否：默认驱动模拟机床；真实的 GRBL 控制器（`--grbl`）从未试过 |
