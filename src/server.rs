@@ -95,11 +95,31 @@ pub fn error_text(status: u16, body: &Value) -> String {
     }
 }
 
+/// The most the answer of the server may have: a reply above it is an error, not a reason to keep growing in memory.
+const MAX_ANSWER_BYTES: u64 = 1 << 20;
+
+/// Whether a machine or a job id can go into a path as it is: letters, digits, `_` and `-`, up to 64.
+fn safe_segment(s: &str) -> bool {
+    (1..=64).contains(&s.len())
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+fn checked_id(id: &str) -> Result<&str, String> {
+    if safe_segment(id) {
+        Ok(id)
+    } else {
+        Err(String::from(
+            "the id of the job has characters that cannot go into a request",
+        ))
+    }
+}
+
 impl Client {
     /// The client for these settings; `None` while the address or the machine is missing.
     pub fn new(address: &str, token: &str, machine: &str) -> Option<Client> {
         let (a, m) = (address.trim(), machine.trim());
-        if a.is_empty() || m.is_empty() {
+        if a.is_empty() || m.is_empty() || !safe_segment(m) {
             return None;
         }
         Some(Client {
@@ -147,7 +167,13 @@ impl Client {
             .write_all(request.as_bytes())
             .map_err(|e| e.to_string())?;
         let mut raw = Vec::new();
-        stream.read_to_end(&mut raw).map_err(|e| e.to_string())?;
+        (&stream)
+            .take(MAX_ANSWER_BYTES + 1)
+            .read_to_end(&mut raw)
+            .map_err(|e| e.to_string())?;
+        if raw.len() as u64 > MAX_ANSWER_BYTES {
+            return Err(String::from("the answer of the server is too big"));
+        }
         parse_response(&raw)
     }
 
@@ -169,8 +195,8 @@ impl Client {
         )?;
         let id = made["id"]
             .as_str()
-            .ok_or("the server did not give the job an id")?
-            .to_string();
+            .ok_or("the server did not give the job an id")?;
+        let id = checked_id(id)?.to_string();
         match self.ok("POST", &format!("/api/v1/jobs/{id}/start"), None) {
             Ok(v) => Ok(JobInfo::from_json(&v)),
             Err(why) => {
@@ -181,6 +207,7 @@ impl Client {
     }
 
     pub fn job(&self, id: &str) -> Result<JobInfo, String> {
+        let id = checked_id(id)?;
         Ok(JobInfo::from_json(&self.ok(
             "GET",
             &format!("/api/v1/jobs/{id}"),
@@ -196,6 +223,7 @@ impl Client {
                 return Ok(());
             }
         }
+        let id = checked_id(id)?;
         self.ok("POST", &format!("/api/v1/jobs/{id}/{}", what.word()), None)
             .map(|_| ())
     }
@@ -408,6 +436,19 @@ fn follow(
 mod tests {
     use super::*;
     use std::net::TcpListener;
+
+    #[test]
+    fn a_machine_or_job_id_that_would_change_the_request_is_refused() {
+        assert!(Client::new("10.0.0.2:18200", "t", "../admin").is_none());
+        assert!(Client::new("10.0.0.2:18200", "t", "a b").is_none());
+        assert!(Client::new("10.0.0.2:18200", "t", &"m".repeat(65)).is_none());
+        assert!(Client::new("10.0.0.2:18200", "t", "router_2-b").is_some());
+        let c = Client::new("10.0.0.2:18200", "t", "router").unwrap();
+        for bad in ["", "a/b", "a b", "x?y"] {
+            assert!(c.job(bad).is_err(), "{bad:?}");
+            assert!(c.order(bad, Order::Pause).is_err(), "{bad:?}");
+        }
+    }
 
     #[test]
     fn a_client_needs_an_address_and_a_machine() {
