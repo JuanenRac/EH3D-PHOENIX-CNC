@@ -1197,19 +1197,24 @@ G0 X2",
     struct Stalled {
         urgent: UrgentChannel,
         seen: Arc<Mutex<Vec<Urgent>>>,
+        /// Set when a line has been handed to the controller and waits for its answer.
+        entered: Arc<AtomicBool>,
         alarm: bool,
     }
 
     impl Stalled {
-        fn new() -> (Stalled, Arc<Mutex<Vec<Urgent>>>) {
+        fn new() -> (Stalled, Arc<Mutex<Vec<Urgent>>>, Arc<AtomicBool>) {
             let seen = Arc::new(Mutex::new(Vec::new()));
+            let entered = Arc::new(AtomicBool::new(false));
             (
                 Stalled {
                     urgent: UrgentChannel::new(),
                     seen: Arc::clone(&seen),
+                    entered: Arc::clone(&entered),
                     alarm: false,
                 },
                 seen,
+                entered,
             )
         }
     }
@@ -1231,6 +1236,7 @@ G0 X2",
             Ok(())
         }
         fn send_line(&mut self, _line: &str) -> Result<(), Error> {
+            self.entered.store(true, Ordering::SeqCst);
             loop {
                 for u in self.urgent.take() {
                     self.seen.lock().unwrap().push(u);
@@ -1251,12 +1257,21 @@ G0 X2",
     }
 
     fn stalled_session(program: &str) -> (Session, Arc<Mutex<Vec<Urgent>>>) {
-        let (c, seen) = Stalled::new();
+        let (c, seen, entered) = Stalled::new();
         let mut s = Session::new(Box::new(c));
         s.load(program);
         s.start();
         s.pump_async(1);
         assert!(s.busy(), "the line is waiting for its answer");
+        // the stop must find the line waiting in the controller, not still on its way there
+        let t0 = std::time::Instant::now();
+        while !entered.load(Ordering::SeqCst) {
+            assert!(
+                t0.elapsed() < Duration::from_secs(5),
+                "the line never arrived"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
         (s, seen)
     }
 
