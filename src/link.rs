@@ -1,9 +1,11 @@
 //! The controller the program drives: the simulated one, or GRBL on a serial port (`--grbl PORT[@BAUD]`).
 
+use std::time::Duration;
+
 use eh3d_controller::sim::SimController;
-use eh3d_controller::Controller;
 
 use crate::cli::Options;
+use crate::session::BoxedController;
 
 /// The baud rate of GRBL 1.1 when the option names only the port.
 pub const GRBL_BAUD: u32 = 115_200;
@@ -26,26 +28,34 @@ pub fn parse_port(text: &str) -> Result<(String, u32), String> {
     }
 }
 
-/// The controller the options ask for.
-pub fn controller_for(o: &Options) -> Result<Box<dyn Controller>, String> {
+/// The controller the options ask for, waiting the usual time for a busy machine.
+pub fn controller_for(o: &Options) -> Result<BoxedController, String> {
+    controller_for_with(o, eh3d_controller::grbl::MAX_BUSY_WAIT)
+}
+
+/// The controller the options ask for. `busy` is the most a line waits for its answer while the machine says it is working (the setting
+/// `busy_wait` of the settings file).
+pub fn controller_for_with(o: &Options, busy: Duration) -> Result<BoxedController, String> {
     let Some(text) = &o.grbl else {
         return Ok(Box::new(SimController::new()));
     };
     let (port, baud) = parse_port(text)?;
-    open_grbl(&port, baud)
+    open_grbl(&port, baud, busy)
 }
 
 #[cfg(feature = "serial")]
-fn open_grbl(port: &str, baud: u32) -> Result<Box<dyn Controller>, String> {
+fn open_grbl(port: &str, baud: u32, busy: Duration) -> Result<BoxedController, String> {
     use eh3d_controller::grbl::GrblController;
     use eh3d_controller::serial::SerialTransport;
 
     let transport = SerialTransport::open(port, baud).map_err(|e| format!("{port}: {e}"))?;
-    Ok(Box::new(GrblController::new(transport)))
+    Ok(Box::new(
+        GrblController::new(transport).with_busy_limit(busy),
+    ))
 }
 
 #[cfg(not(feature = "serial"))]
-fn open_grbl(_port: &str, _baud: u32) -> Result<Box<dyn Controller>, String> {
+fn open_grbl(_port: &str, _baud: u32, _busy: Duration) -> Result<BoxedController, String> {
     Err("this build has no serial port support (build with --features serial)".to_string())
 }
 

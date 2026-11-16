@@ -206,6 +206,12 @@ pub struct Modal {
     /// The last `F` and `S` words taken, when there was one.
     pub feed: Option<f64>,
     pub speed: Option<f64>,
+    /// The work coordinate system in force: 54 to 59 (`G54` to `G59`).
+    pub wcs: u8,
+    /// The plane of the arcs: 17, 18 or 19 (`G17` to `G19`).
+    pub plane: u8,
+    /// The dynamic tool length offset (`G43.1 Zn`) in force: the Z it was given; `None` when there is none (`G49`).
+    pub tool_length: Option<f64>,
 }
 
 impl Default for Modal {
@@ -218,6 +224,9 @@ impl Default for Modal {
             coolant: 9,
             feed: None,
             speed: None,
+            wcs: 54,
+            plane: 17,
+            tool_length: None,
         }
     }
 }
@@ -225,7 +234,8 @@ impl Default for Modal {
 impl Modal {
     /// Takes a line that the controller accepted.
     pub fn apply(&mut self, line: &str) {
-        for (l, v) in words(line) {
+        let all = words(line);
+        for &(l, v) in &all {
             // a G code is read in tenths (G91.1 is 911, not G91); an M code is a whole number
             let tenths = (v * 10.0).round() as i32;
             match (l, v as i32) {
@@ -235,6 +245,16 @@ impl Modal {
                 ('G', _) if tenths == 210 => self.inches = false,
                 ('G', _) if tenths == 900 => self.absolute = true,
                 ('G', _) if tenths == 910 => self.absolute = false,
+                ('G', _) if (540..=590).contains(&tenths) && tenths % 10 == 0 => {
+                    self.wcs = (tenths / 10) as u8
+                }
+                ('G', _) if matches!(tenths, 170 | 180 | 190) => self.plane = (tenths / 10) as u8,
+                ('G', _) if tenths == 431 => {
+                    // the offset is the Z of the same line
+                    let z = all.iter().find(|(c, _)| *c == 'Z').map_or(0.0, |&(_, z)| z);
+                    self.tool_length = Some(z);
+                }
+                ('G', _) if tenths == 490 => self.tool_length = None,
                 ('F', _) if v > 0.0 => self.feed = Some(v),
                 ('S', _) if v >= 0.0 => self.speed = Some(v),
                 ('M', n @ (3..=5)) => self.spindle = n as u8,
@@ -253,11 +273,15 @@ impl Modal {
         let g = |n: &str| n.to_string();
         vec![
             format!("G{}", self.motion),
-            g("G17"),
+            format!("G{}", self.plane),
             g(if self.inches { "G20" } else { "G21" }),
             g("G40"),
-            g("G49"),
-            g("G54"),
+            g(if self.tool_length.is_some() {
+                "G43.1"
+            } else {
+                "G49"
+            }),
+            format!("G{}", self.wcs),
             g("G64"),
             g("G80"),
             g(if self.absolute { "G90" } else { "G91" }),

@@ -16,8 +16,11 @@ pub struct Options {
     /// A picture of the window to save and leave (`--shot FILE`, after `--wait` frames).
     pub shot: Option<PathBuf>,
     pub wait: u32,
-    /// Starts the program as soon as the window is open (`--start`): for the pictures of a program in progress.
+    /// Starts the program as soon as the window is open (`--start`): for the pictures of a program in progress. With a real controller
+    /// (`--grbl`) it also needs `--start-real`, because the machine would move as the window opens.
     pub start: bool,
+    /// Says that `--start` with `--grbl` is meant: a real machine starts the program as soon as the window is open.
+    pub start_real: bool,
     /// A window to open at the start (`--window settings|open|save|edit|about|summary|keys`): for the pictures.
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
@@ -54,6 +57,7 @@ impl Options {
                         .map_err(|_| format!("--wait needs a number, not '{v}'"))?;
                 }
                 "--start" => o.start = true,
+                "--start-real" => o.start_real = true,
                 "--window" => o.window = Some(value("--window")?),
                 "--view" => {
                     let v = value("--view")?;
@@ -74,6 +78,15 @@ impl Options {
                 }
                 other => return Err(format!("unknown option '{other}'")),
             }
+        }
+        if o.start_real && !o.start {
+            return Err("--start-real only goes with --start".to_string());
+        }
+        if o.start && o.grbl.is_some() && !o.start_real {
+            return Err(
+                "--start with --grbl would move a real machine as soon as the window opens: add --start-real if that is what is wanted"
+                    .to_string(),
+            );
         }
         Ok(o)
     }
@@ -107,6 +120,21 @@ mod tests {
         assert_eq!(parse("--view plan").unwrap().view_3d, Some(false));
         assert_eq!(parse("").unwrap().view_3d, None);
         assert!(parse("--view side").is_err());
+    }
+
+    #[test]
+    fn a_real_controller_does_not_start_a_program_by_itself_unless_it_is_said_twice() {
+        // the simulator starts as before
+        assert!(parse("--start job.nc").unwrap().start);
+        // a real machine needs the second word
+        assert!(parse("--grbl COM3 --start job.nc").is_err());
+        assert!(parse("--start --grbl COM3").is_err());
+        let o = parse("--grbl COM3 --start --start-real job.nc").unwrap();
+        assert!(o.start && o.start_real && o.grbl.is_some());
+        // the second word alone says nothing, and without a controller it changes nothing
+        assert!(parse("--start-real").is_err());
+        assert!(!parse("--grbl COM3 job.nc").unwrap().start);
+        assert!(parse("--start --start-real").unwrap().start_real);
     }
 
     #[test]
