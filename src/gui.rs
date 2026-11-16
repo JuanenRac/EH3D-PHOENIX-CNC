@@ -1052,7 +1052,7 @@ impl eframe::App for App {
             apply_visuals(&ctx, &self.theme);
             self.visuals_for = Some(self.theme.id);
         }
-        if self.start_at == Some(self.frame) {
+        if self.start_at == Some(self.frame) && !self.start_refused() {
             self.session.start();
         }
         let dropped: Vec<PathBuf> = ctx.input(|i| {

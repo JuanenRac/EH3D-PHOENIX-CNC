@@ -22,7 +22,7 @@
 
 ---
 
-> **Estado de seguridad:** este programa maneja solo una máquina simulada: no abre ningún puerto serie ni conexión de red. Cuando se conecte un controlador real tendrá que demostrarse en un simulador y luego en una máquina real antes de llamarse funcional, y los finales de carrera y una parada de emergencia siguen siendo cosa de la propia unidad de control de la máquina; la parada de emergencia de la ventana no es un circuito de seguridad.
+> **Estado de seguridad:** este programa maneja por defecto una máquina simulada. Con `--grbl` (una compilación con `--features serial`) abre un puerto serie y maneja un controlador GRBL real, nunca probado en una máquina real; con una dirección de servidor en los ajustes abre una conexión de red a ese servidor y envía el token en claro por HTTP. Cuando se conecte un controlador real tendrá que demostrarse en un simulador y luego en una máquina real antes de llamarse funcional, y los finales de carrera y una parada de emergencia siguen siendo cosa de la propia unidad de control de la máquina; la parada de emergencia de la ventana no es un circuito de seguridad.
 
 ## 📋 De un vistazo
 
@@ -32,7 +32,7 @@
 | Madurez | Andamiaje |
 | Pruebas | 130 |
 | Pila tecnológica | Rust |
-| En hardware real | No: maneja solo una máquina simulada |
+| En hardware real | No: por defecto maneja una máquina simulada; un controlador GRBL real (`--grbl`) nunca se ha probado |
 
 **Ir a:** [Resumen](#-resumen) · [Arquitectura](#-arquitectura) · [Inicio rápido](#-inicio-rápido) · [Pruebas](#-pruebas) · [Estructura](#-estructura-del-repositorio) · [Relacionados](#-proyectos-relacionados)
 

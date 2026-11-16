@@ -22,7 +22,7 @@
 
 ---
 
-> **Stato di sicurezza:** questo programma pilota solo una macchina simulata: non apre alcuna porta seriale né connessione di rete. Quando sarà collegato un controllore vero dovrà dimostrarsi su un simulatore e poi su una macchina reale prima di dirsi funzionante, e i finecorsa e un arresto di emergenza restano compito dell'unità di controllo della macchina; l'arresto di emergenza della finestra non è un circuito di sicurezza.
+> **Stato di sicurezza:** questo programma pilota per impostazione predefinita una macchina simulata. Con `--grbl` (una compilazione con `--features serial`) apre una porta seriale e pilota un vero controllore GRBL, mai provato su una macchina reale; con un indirizzo di server nelle impostazioni apre una connessione di rete verso quel server e invia il token in chiaro via HTTP. Quando sarà collegato un controllore vero dovrà dimostrarsi su un simulatore e poi su una macchina reale prima di dirsi funzionante, e i finecorsa e un arresto di emergenza restano compito dell'unità di controllo della macchina; l'arresto di emergenza della finestra non è un circuito di sicurezza.
 
 ## 📋 In breve
 
@@ -32,7 +32,7 @@
 | Maturità | Impalcatura |
 | Test | 130 |
 | Stack tecnologico | Rust |
-| Su hardware reale | No: pilota solo una macchina simulata |
+| Su hardware reale | No: per impostazione predefinita pilota una macchina simulata; un vero controllore GRBL (`--grbl`) non è mai stato provato |
 
 **Vai a:** [Panoramica](#-panoramica) · [Architettura](#-architettura) · [Avvio rapido](#-avvio-rapido) · [Test](#-test) · [Struttura](#-struttura-del-repository) · [Correlati](#-progetti-correlati)
 
