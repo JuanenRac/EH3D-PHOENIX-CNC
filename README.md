@@ -22,7 +22,7 @@
 
 ---
 
-> **Safety and security status:** this program drives only a simulated machine: it opens no serial port and no network connection. When a real controller is connected it will have to prove itself on a simulator and then on a real machine before it is called working, and the limit switches and an emergency stop stay the job of the machine's own control unit; the emergency stop of the window is not a safety circuit.
+> **Safety and security status:** by default this program drives a simulated machine. With `--grbl` (a build with `--features serial`) it opens a serial port and drives a real GRBL controller, never tried on a real machine; with a server address in the settings it opens a network connection to that server and sends the token in clear text over HTTP. When a real controller is connected it will have to prove itself on a simulator and then on a real machine before it is called working, and the limit switches and an emergency stop stay the job of the machine's own control unit; the emergency stop of the window is not a safety circuit.
 
 ## 📋 At a glance
 
@@ -32,7 +32,7 @@
 | Maturity | Scaffolding |
 | Tests | 130 |
 | Stack | Rust |
-| On real hardware | No: it drives only a simulated machine |
+| On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
 **Jump to:** [Overview](#-overview) · [Architecture](#-architecture) · [Quick start](#-quick-start) · [Testing](#-testing) · [Structure](#-repository-structure) · [Related](#-related-projects)
 

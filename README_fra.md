@@ -22,7 +22,7 @@
 
 ---
 
-> **État de sécurité :** ce programme ne pilote qu'une machine simulée : il n'ouvre aucun port série ni connexion réseau. Quand un vrai contrôleur sera connecté, il devra faire ses preuves sur un simulateur puis sur une vraie machine avant d'être dit fonctionnel, et les fins de course et un arrêt d'urgence restent l'affaire de l'unité de commande de la machine ; l'arrêt d'urgence de la fenêtre n'est pas un circuit de sécurité.
+> **État de sécurité :** ce programme pilote par défaut une machine simulée. Avec `--grbl` (une compilation avec `--features serial`) il ouvre un port série et pilote un vrai contrôleur GRBL, jamais essayé sur une vraie machine ; avec une adresse de serveur dans les réglages il ouvre une connexion réseau vers ce serveur et envoie le jeton en clair par HTTP. Quand un vrai contrôleur sera connecté, il devra faire ses preuves sur un simulateur puis sur une vraie machine avant d'être dit fonctionnel, et les fins de course et un arrêt d'urgence restent l'affaire de l'unité de commande de la machine ; l'arrêt d'urgence de la fenêtre n'est pas un circuit de sécurité.
 
 ## 📋 En un coup d'œil
 
@@ -32,7 +32,7 @@
 | Maturité | Échafaudage |
 | Tests | 130 |
 | Pile technique | Rust |
-| Sur du matériel réel | Non : il ne pilote qu'une machine simulée |
+| Sur du matériel réel | Non : par défaut il pilote une machine simulée ; un vrai contrôleur GRBL (`--grbl`) n'a jamais été essayé |
 
 **Aller à :** [Présentation](#-présentation) · [Architecture](#-architecture) · [Démarrage rapide](#-démarrage-rapide) · [Tests](#-tests) · [Structure](#-structure-du-dépôt) · [Liés](#-projets-liés)
 

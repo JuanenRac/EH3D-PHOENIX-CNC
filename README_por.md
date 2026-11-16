@@ -22,7 +22,7 @@
 
 ---
 
-> **Estado de segurança:** este programa comanda apenas uma máquina simulada: não abre nenhuma porta série nem ligação de rede. Quando se ligar um controlador real, terá de se provar num simulador e depois numa máquina real antes de se dizer funcional, e os fins de curso e uma paragem de emergência continuam a ser da própria unidade de controlo da máquina; a paragem de emergência da janela não é um circuito de segurança.
+> **Estado de segurança:** este programa comanda por defeito uma máquina simulada. Com `--grbl` (uma compilação com `--features serial`) abre uma porta série e comanda um controlador GRBL real, nunca experimentado numa máquina real; com um endereço de servidor nas definições abre uma ligação de rede a esse servidor e envia o token em claro por HTTP. Quando se ligar um controlador real, terá de se provar num simulador e depois numa máquina real antes de se dizer funcional, e os fins de curso e uma paragem de emergência continuam a ser da própria unidade de controlo da máquina; a paragem de emergência da janela não é um circuito de segurança.
 
 ## 📋 Num relance
 
@@ -32,7 +32,7 @@
 | Maturidade | Estrutura inicial |
 | Testes | 130 |
 | Tecnologias | Rust |
-| Em hardware real | Não: comanda apenas uma máquina simulada |
+| Em hardware real | Não: por defeito comanda uma máquina simulada; um controlador GRBL real (`--grbl`) nunca foi experimentado |
 
 **Ir para:** [Visão geral](#-visão-geral) · [Arquitetura](#-arquitetura) · [Início rápido](#-início-rápido) · [Testes](#-testes) · [Estrutura](#-estrutura-do-repositório) · [Relacionados](#-projetos-relacionados)
 

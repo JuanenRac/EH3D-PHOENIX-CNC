@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The refusal for a program that leaves the travel no longer depends on the summary window:** with the confirmation of the start turned off, in the queue, when sending to the server and in a `--start` run, a program that leaves the machine's travel is refused (and the reason goes to the log) as long as `reject_out_of_travel` is on, which it is by default.
+- **The README and the manifest say what the program really does:** by default it drives a simulated machine, with `--grbl` it opens a serial port, and with a server address it opens a network connection and sends the token over HTTP.
 - **A program can no longer change the controller's own settings by accident:** a line that starts with `$` (such as `$130=9999`, `$20=0`, `$X` or `$RST=*`) stops the program at that line without sending it and says so in the log, unless the settings file has `program_system_commands = yes`; the lines the operator types are not affected. Tested with and without the setting.
 
 ## [0.1.1] - README screenshots and a check of the run scripts

@@ -48,8 +48,25 @@ impl App {
                 report: self.report(),
                 server: false,
             })));
+        } else if self.start_refused() {
+            // the summary is off: the refusal of the check still applies, and the reason goes to the log
         } else {
             self.program_start();
+        }
+    }
+
+    /// Whether the check refuses the loaded program (it leaves the travel and the settings say to reject that). The reason is put in the log. Used where no summary window is shown
+    /// (the summary turned off, the queue, the start of a screenshot run), so that turning the window off never turns the refusal off.
+    pub(super) fn start_refused(&mut self) -> bool {
+        if self.session.program.is_empty() {
+            return false;
+        }
+        match self.report().refusal(self.lang) {
+            Some(why) => {
+                self.session.log.push(why);
+                true
+            }
+            None => false,
         }
     }
 
@@ -60,6 +77,8 @@ impl App {
                 report: self.report(),
                 server: true,
             })));
+        } else if self.start_refused() {
+            // refused: see the log
         } else {
             self.send_to_server(0);
         }
@@ -192,6 +211,21 @@ mod tests {
         a.session.load("G1 X10 F100");
         a.request_start();
         assert!(a.win.is_none() && a.session.running);
+    }
+
+    #[test]
+    fn with_the_summary_turned_off_a_program_out_of_travel_still_does_not_start() {
+        let mut a = app();
+        a.settings.confirm_start = false;
+        a.settings.travel[0] = (0.0, 300.0);
+        a.session.load("G1 X450 F100");
+        a.request_start();
+        assert!(a.win.is_none() && !a.session.running);
+        assert!(!a.session.log.is_empty());
+        // the same program starts when the setting that rejects it is off
+        a.settings.reject_out_of_travel = false;
+        a.request_start();
+        assert!(a.session.running);
     }
 
     #[test]

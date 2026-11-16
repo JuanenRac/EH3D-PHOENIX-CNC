@@ -22,7 +22,7 @@
 
 ---
 
-> **Sicherheitsstatus:** dieses Programm steuert nur eine simulierte Maschine: es öffnet weder eine serielle Schnittstelle noch eine Netzverbindung. Wenn eine echte Steuerung angeschlossen wird, muss sie sich erst an einem Simulator und dann an einer echten Maschine bewähren, bevor sie als funktionierend gilt; die Endschalter und ein Not-Halt bleiben Aufgabe der eigenen Steuereinheit der Maschine, der Not-Halt des Fensters ist kein Sicherheitskreis.
+> **Sicherheitsstatus:** dieses Programm steuert standardmäßig eine simulierte Maschine. Mit `--grbl` (ein Build mit `--features serial`) öffnet es eine serielle Schnittstelle und steuert eine echte GRBL-Steuerung, nie an einer echten Maschine erprobt; mit einer Serveradresse in den Einstellungen öffnet es eine Netzverbindung zu diesem Server und sendet den Token im Klartext über HTTP. Wenn eine echte Steuerung angeschlossen wird, muss sie sich erst an einem Simulator und dann an einer echten Maschine bewähren, bevor sie als funktionierend gilt; die Endschalter und ein Not-Halt bleiben Aufgabe der eigenen Steuereinheit der Maschine, der Not-Halt des Fensters ist kein Sicherheitskreis.
 
 ## 📋 Auf einen Blick
 
@@ -32,7 +32,7 @@
 | Reifegrad | Gerüst |
 | Tests | 130 |
 | Technologie-Stack | Rust |
-| Auf echter Hardware | Nein: es steuert nur eine simulierte Maschine |
+| Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
 **Springe zu:** [Überblick](#-überblick) · [Architektur](#-architektur) · [Schnellstart](#-schnellstart) · [Tests](#-tests) · [Struktur](#-struktur-des-repositorys) · [Verwandte](#-verwandte-projekte)
 
