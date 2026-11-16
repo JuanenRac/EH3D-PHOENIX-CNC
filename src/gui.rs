@@ -1066,6 +1066,7 @@ impl eframe::App for App {
         // several files dropped together are a queue
         self.start_queue(dropped);
         if self.session.running && !self.session.paused {
+            self.session.allow_system_lines = self.settings.program_system_commands;
             self.session.pump(1);
             ctx.request_repaint_after(std::time::Duration::from_millis(60));
         }

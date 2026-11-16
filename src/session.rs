@@ -34,6 +34,8 @@ pub struct Session {
     pub controller_travel: Option<[f64; 3]>,
     /// The controller was asked for its travel already.
     pub travel_asked: bool,
+    /// Lines that start with `$` (settings and commands of the controller) are sent when the program has them; off by default, and then the program stops at such a line.
+    pub allow_system_lines: bool,
 }
 
 /// The travel the summary and the refusal use: where the settings put it, shortened to the longest travel the controller reports when that is
@@ -70,6 +72,7 @@ impl Session {
             resume_preamble: Vec::new(),
             controller_travel: None,
             travel_asked: false,
+            allow_system_lines: false,
         };
         s.refresh();
         s
@@ -407,6 +410,15 @@ impl Session {
                 break;
             };
             let trimmed = line.trim();
+            if trimmed.starts_with('$') && !self.allow_system_lines {
+                let n = self.next + 1;
+                self.say(format!(
+                    "line {n} ({trimmed}): a line that starts with $ would change the controller itself, so the program stops here (program_system_commands in the settings file allows it)"
+                ));
+                self.running = false;
+                self.paused = false;
+                break;
+            }
             if !trimmed.is_empty() && !trimmed.starts_with(';') {
                 if let Err(e) = self.controller.send_line(trimmed) {
                     let n = self.next + 1;
@@ -452,6 +464,31 @@ mod tests {
 
     fn session() -> Session {
         Session::new(Box::new(SimController::new()))
+    }
+
+    #[test]
+    fn a_program_line_that_starts_with_a_dollar_stops_the_program_unless_it_is_allowed() {
+        let mut s = session();
+        s.load("G21\n$130=9999\nG0 X1\n");
+        s.start();
+        s.pump(10);
+        assert!(!s.running, "the program stops at the line");
+        assert_eq!(s.next, 1, "the line is not sent and not passed");
+        assert!(
+            s.log.iter().any(|l| l.contains("starts with $")),
+            "{:?}",
+            s.log
+        );
+        let mut allowed = session();
+        allowed.allow_system_lines = true;
+        allowed.load("G21\n$130=9999\nG0 X1\n");
+        allowed.start();
+        allowed.pump(10);
+        assert!(
+            !allowed.log.iter().any(|l| l.contains("starts with $")),
+            "{:?}",
+            allowed.log
+        );
     }
 
     #[test]

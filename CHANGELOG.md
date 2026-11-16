@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A program can no longer change the controller's own settings by accident:** a line that starts with `$` (such as `$130=9999`, `$20=0`, `$X` or `$RST=*`) stops the program at that line without sending it and says so in the log, unless the settings file has `program_system_commands = yes`; the lines the operator types are not affected. Tested with and without the setting.
+
 ## [0.1.1] - README screenshots and a check of the run scripts
 
 - **The shared validation tools are updated:** the validator also runs the workflow and lessons checks of the suite with their latest rules, including a check to run before every push.
