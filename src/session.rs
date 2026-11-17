@@ -84,6 +84,8 @@ pub struct Session {
     /// How many steps of the batch in flight are done.
     progress: Arc<AtomicUsize>,
     inflight: Option<InFlight>,
+    /// A status request went out of turn while a line waits for its `ok` and its report has not come yet.
+    live_asked: bool,
     /// A stop or an emergency stop was asked while a batch was in flight: the line it cuts short is not a failure.
     aborted: bool,
     pub status: Status,
@@ -202,6 +204,7 @@ impl Session {
             halt: Arc::new(AtomicBool::new(false)),
             progress: Arc::new(AtomicUsize::new(0)),
             inflight: None,
+            live_asked: false,
             aborted: false,
             status: Status::default(),
             program: Vec::new(),
@@ -261,11 +264,23 @@ impl Session {
         }
     }
 
-    /// Asks the controller how it is. While the emitter works the controller is not asked: the window keeps the last status.
+    /// Asks the controller how it is. While the emitter works the controller is not asked in the usual way: a status request goes out of turn,
+    /// the report that comes back while the line waits for its `ok` replaces the status, and until one comes the window keeps the last status.
     pub fn refresh(&mut self) {
         if self.inflight.is_some() {
+            if let Some(channel) = &self.urgent {
+                if let Some(report) = channel.take_report() {
+                    self.status = report;
+                    self.live_asked = false;
+                }
+                if !self.live_asked {
+                    channel.send(Urgent::Status);
+                    self.live_asked = true;
+                }
+            }
             return;
         }
+        self.live_asked = false;
         let r = self.ctl().status();
         match r {
             Ok(s) => self.status = s,
@@ -1280,6 +1295,39 @@ G0 X2",
             t0.elapsed() < Duration::from_secs(5),
             "the window waited for the line"
         );
+    }
+
+    #[test]
+    fn the_position_follows_the_machine_while_a_line_waits_for_its_answer() {
+        let (mut s, seen) = stalled_session("G1 X1\nG1 X2");
+        let channel = s
+            .urgent
+            .clone()
+            .expect("the controller has an urgent channel");
+        let before = s.status.machine_mm[0];
+        s.refresh();
+        assert_eq!(
+            s.status.machine_mm[0], before,
+            "no report yet: the last status stays"
+        );
+        let mut live = Status::default();
+        live.machine_mm[0] = 12.5;
+        channel.publish_report(live);
+        s.refresh();
+        assert_eq!(
+            s.status.machine_mm[0], 12.5,
+            "the report that arrived is shown"
+        );
+        s.refresh();
+        s.stop();
+        s.wait_idle();
+        let asked = seen
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|u| **u == Urgent::Status)
+            .count();
+        assert!(asked >= 1, "a status request went out of turn");
     }
 
     #[test]
