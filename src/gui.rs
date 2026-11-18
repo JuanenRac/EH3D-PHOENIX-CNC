@@ -30,6 +30,7 @@ mod numfield;
 mod probe;
 mod queue;
 mod remote;
+mod sim;
 mod summary;
 mod views;
 use crate::gcode::{self, Segment};
@@ -200,6 +201,10 @@ pub struct App {
     /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
     focus_line: Option<usize>,
     focus_scroll: bool,
+    /// The estimates of time that are kept, and the line and the point of the path the simulation is at (None: no simulation).
+    estimate: crate::estimate::Cache,
+    sim_line: Option<usize>,
+    sim_pos: Option<gcode::Point>,
     /// Whether a box of text, or any widget, had the keyboard at the end of the last frame.
     typing_prev: bool,
     focus_prev: bool,
@@ -277,6 +282,9 @@ impl App {
             open_multi: Vec::new(),
             focus_line: None,
             focus_scroll: false,
+            estimate: crate::estimate::Cache::new(64),
+            sim_line: None,
+            sim_pos: None,
             typing_prev: false,
             focus_prev: false,
             shot: o.shot.clone().map(|file| Shot {
@@ -980,6 +988,9 @@ impl App {
                     self.program_line(),
                     self.session.program.len()
                 ));
+                if let Some(left) = self.time_left_text() {
+                    ui.label(RichText::new(left).color(col(self.theme.dim)));
+                }
                 ui.separator();
                 self.queue_panel(ui);
                 let next = self.program_line();
@@ -1128,6 +1139,7 @@ impl eframe::App for App {
         self.left(ui);
         self.right(ui);
         self.center(ui);
+        self.sim_guard();
         self.windows(&ctx);
         self.note_focus(&ctx);
         if self.quit {

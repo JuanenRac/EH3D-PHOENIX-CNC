@@ -164,7 +164,7 @@ impl App {
             Stroke::new(1.5, col(t.line)),
             StrokeKind::Inside,
         );
-        let next = self.session.next;
+        let next = self.sim_line.unwrap_or(self.session.next);
         for s in &self.path_toolpath {
             if s.rapid && !self.settings.show_rapids {
                 continue;
@@ -185,6 +185,10 @@ impl App {
         }
         // the tool, where the machine is
         let m = self.session.status.machine_mm;
+        if let Some(sp) = self.sim_pos {
+            // the tool of the simulation, on the path
+            p.circle_filled(at(sp.0 + off[0], sp.1 + off[1]), 5.0, col(t.accent));
+        }
         let c = at(m[0], m[1]);
         p.circle_stroke(c, 9.0, Stroke::new(2.0, col(t.accent2)));
         p.line_segment(
@@ -255,7 +259,7 @@ impl App {
             p.line_segment([floor[i], top[i]], edge);
             p.line_segment([top[i], top[(i + 1) % 4]], edge);
         }
-        let next = self.session.next;
+        let next = self.sim_line.unwrap_or(self.session.next);
         for s in &self.path_toolpath {
             if s.rapid && !self.settings.show_rapids {
                 continue;
@@ -279,6 +283,14 @@ impl App {
         p.line_segment([foot, head], Stroke::new(1.0, alpha(col(t.accent2), 140)));
         p.circle_stroke(foot, 5.0, Stroke::new(1.0, alpha(col(t.accent2), 140)));
         p.circle_filled(head, 5.0, col(t.accent2));
+        if let Some(sp) = self.sim_pos {
+            // the tool of the simulation, on the path
+            p.circle_filled(
+                at(sp.0 + off[0], sp.1 + off[1], sp.2 + off[2]),
+                5.0,
+                col(t.accent),
+            );
+        }
         p.text(
             rect.right_bottom() - Vec2::new(10.0, 8.0),
             Align2::RIGHT_BOTTOM,

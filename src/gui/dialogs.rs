@@ -35,6 +35,8 @@ pub(super) enum Win {
     Check(Box<check::CheckState>),
     /// The editor of the keep-out boxes.
     KeepOut(Box<keepout::KeepState>),
+    /// The statistics of the program and its simulation.
+    Sim(Box<sim::SimState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -96,6 +98,7 @@ impl App {
             "keys" => Some(Win::Shortcuts),
             "check" => Some(Win::Check(Box::new(self.check_state()))),
             "keepout" => Some(Win::KeepOut(Box::default())),
+            "stats" => Some(Win::Sim(Box::new(self.sim_state()))),
             _ => None,
         };
     }
@@ -299,6 +302,10 @@ impl App {
                 self.open_window("keepout");
                 ui.close();
             }
+            if ui.button(self.w(Msg::MenuStats)).clicked() {
+                self.open_window("stats");
+                ui.close();
+            }
         });
     }
 
@@ -402,6 +409,7 @@ impl App {
             Win::Probe(a) => self.probe_window(ctx, a),
             Win::Check(c) => self.check_window(ctx, c),
             Win::KeepOut(k) => self.keepout_window(ctx, k),
+            Win::Sim(s) => self.sim_window(ctx, s),
         };
     }
 
