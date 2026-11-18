@@ -1,8 +1,19 @@
-//! The queue of programs in the window: the programs picked in the Open window (or given on the command line) run one after the other. Each one
-//! is loaded and goes through the same start as any program, so its summary comes first; the queue stops when a program does not finish.
+//! The queue of programs in the window: the programs picked in the Open window (or given on the command line, or kept from the last run) run
+//! one after the other. Each one is loaded and goes through the same start as any program, so its summary comes first; the queue stops when a
+//! program does not finish. A program can run several times: between two runs of it the operator confirms (the work has to be changed) or a
+//! wait of some seconds runs out, as the settings say. The queue is kept in a file between runs, and nothing in it starts by itself.
 
 use super::*;
+use crate::jobs::{After, Rules};
 use crate::queue::{Queue, State};
+use crate::sim::hms;
+use crate::words::Msg;
+use std::time::{Duration, Instant};
+
+/// Where the queue is kept: next to the settings.
+pub(super) fn queue_state_path(settings: &Path) -> PathBuf {
+    settings.with_file_name("queue.state")
+}
 
 impl App {
     /// Takes the files as a queue and loads the first. One file is just opened.
@@ -19,6 +30,7 @@ impl App {
                 }
                 self.queue = Queue::new(paths);
                 self.queue_seen = false;
+                self.queue_gate = None;
                 self.session
                     .log
                     .push(format!("queue: {} programs", self.queue.items.len()));
@@ -37,6 +49,12 @@ impl App {
             }
             return;
         };
+        self.queue_load_and_start(i);
+    }
+
+    /// Loads the program `i` of the queue (the one that is marked as loaded) and asks to start it. A file that cannot be read or is empty
+    /// stops the queue.
+    fn queue_load_and_start(&mut self, i: usize) {
         let path = self.queue.items[i].path.clone();
         if !self.load_file(&path) || self.session.program.iter().all(|l| l.trim().is_empty()) {
             self.queue.finish(false);
@@ -49,17 +67,79 @@ impl App {
         self.request_start();
     }
 
-    /// Watches the program of the queue: when it ends the next one is loaded; when it does not finish, or its start is left, the queue stops.
+    /// The program that is loaded runs once more (its file is read again, so a change is seen).
+    pub(super) fn queue_rerun(&mut self) {
+        self.queue_seen = false;
+        self.queue_gate = None;
+        if let Some(i) = self.queue.current() {
+            self.queue_load_and_start(i);
+        }
+    }
+
+    /// The rules between two runs of a program, from the settings.
+    fn queue_rules(&self) -> Rules {
+        let t = &self.settings.tuning;
+        Rules {
+            confirm_between: t.confirm_between,
+            pause_s: t.pause_s,
+            repeat_max: t.repeat_max,
+        }
+    }
+
+    /// A run of the program `i` ended and it has more: the operator confirms, a wait runs out, or the next run begins at once.
+    fn queue_between(&mut self, i: usize) {
+        self.queue_seen = false;
+        match self.queue_rules().between() {
+            After::Confirm => self.win = Some(Win::Between(i)),
+            After::Wait(s) => {
+                self.queue_gate = Some(Instant::now() + Duration::from_secs_f64(s));
+                let said = self.ws(Msg::WaitJob, &[format!("{s}"), self.queue_run_text(i)]);
+                self.session.log.push(said);
+            }
+            After::Nothing => self.queue_rerun(),
+        }
+    }
+
+    /// `name (run 2 of 5)` for the program `i` of the queue.
+    fn queue_run_text(&self, i: usize) -> String {
+        let it = &self.queue.items[i];
+        if it.repeat > 1 {
+            format!(
+                "{} ({})",
+                self.queue.name_of(i),
+                self.ws(
+                    Msg::QueueRun,
+                    &[it.round.to_string(), it.repeat.to_string()]
+                )
+            )
+        } else {
+            self.queue.name_of(i)
+        }
+    }
+
+    /// Watches the program of the queue: when it ends the next one is loaded (or the same one again if it has runs left); when it does not
+    /// finish, or its start is left, the queue stops.
     pub(super) fn queue_tick(&mut self) {
         let Some(i) = self.queue.current() else {
             return;
         };
+        // a wait between two runs: nothing else happens until it runs out
+        if let Some(until) = self.queue_gate {
+            if Instant::now() >= until {
+                self.queue_rerun();
+            }
+            return;
+        }
         if self.session.running {
             self.queue_seen = true;
             return;
         }
         if self.queue_seen {
             let ok = self.session.next >= self.session.program.len();
+            if ok && self.queue.next_round() {
+                self.queue_between(i);
+                return;
+            }
             self.queue.finish(ok);
             if ok {
                 self.queue_next();
@@ -69,7 +149,7 @@ impl App {
                     self.queue.name_of(i)
                 ));
             }
-        } else if !matches!(self.win, Some(Win::Summary(_))) {
+        } else if !matches!(self.win, Some(Win::Summary(_) | Win::Between(_))) {
             // the start did not happen: a controller in alarm is a failure, a summary that was closed is the operator's choice
             if self.session.alarm() {
                 self.queue.finish(false);
@@ -96,9 +176,10 @@ impl App {
             if self.session.running || self.session.paused {
                 self.program_stop();
             }
-            if matches!(self.win, Some(Win::Summary(_))) {
+            if matches!(self.win, Some(Win::Summary(_) | Win::Between(_))) {
                 self.win = None;
             }
+            self.queue_gate = None;
             self.queue_seen = false;
             if self.queue.active {
                 self.queue_next();
@@ -112,6 +193,96 @@ impl App {
         self.queue_next();
     }
 
+    /// The runs still to do and the time they take, from the estimates that are kept: each run of each program that is left, plus the waits
+    /// between the runs of a program when the settings say to wait. A program that cannot be measured counts no time.
+    pub(super) fn queue_total(&mut self) -> (u32, f64) {
+        let rates = self.sim_rates();
+        let wait = match self.queue_rules().between() {
+            After::Wait(s) => s,
+            _ => 0.0,
+        };
+        let (mut runs, mut seconds) = (0u32, 0.0f64);
+        for (i, n) in self.queue.remaining_runs() {
+            let path = self.queue.items[i].path.clone();
+            let one = self.estimate.file_seconds(&path, rates).unwrap_or(0.0);
+            runs += n;
+            seconds += one * f64::from(n) + wait * f64::from(n.saturating_sub(1));
+        }
+        (runs, seconds)
+    }
+
+    /// Keeps the queue in its file when it changed (and takes the file away when nothing is left to run or the settings say not to keep it).
+    pub(super) fn queue_persist(&mut self) {
+        let want = if self.settings.tuning.queue_remember {
+            self.queue.to_state()
+        } else {
+            String::new()
+        };
+        if want == self.queue_saved {
+            return;
+        }
+        let file = queue_state_path(&self.settings_path);
+        let written = if want.is_empty() {
+            Queue::default().save_state(&file)
+        } else {
+            self.queue.save_state(&file)
+        };
+        if written.is_ok() {
+            self.queue_saved = want;
+        }
+    }
+
+    /// Takes the queue of the last run back: every program waits, and nothing starts until the operator says so.
+    pub(super) fn restore_queue(&mut self) {
+        if !self.settings.tuning.queue_remember || !self.queue.is_empty() {
+            return;
+        }
+        let file = queue_state_path(&self.settings_path);
+        if let Some(q) = Queue::load_state(&file, self.settings.tuning.repeat_max) {
+            let said = self.ws(Msg::QueueRestored, &[q.items.len().to_string()]);
+            self.queue = q;
+            self.queue_saved = self.queue.to_state();
+            self.session.log.push(said);
+        }
+    }
+
+    /// The question between two runs of a program: place the work and confirm, or leave the queue.
+    pub(super) fn between_window(&mut self, ctx: &egui::Context, i: usize) -> Option<Win> {
+        if i >= self.queue.items.len() {
+            return None;
+        }
+        let mut answer: Option<bool> = None;
+        self.window(self.t(Text::McQueue))
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label(self.ws(Msg::NextJob, &[self.queue_run_text(i)]));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if ui.button(self.w(Msg::QueueAgainBtn)).clicked() {
+                        answer = Some(true);
+                    }
+                    if ui.button(self.t(Text::McCancel)).clicked() {
+                        answer = Some(false);
+                    }
+                });
+            });
+        match answer {
+            Some(true) => {
+                self.queue_rerun();
+                None
+            }
+            Some(false) => {
+                // the run waits: going on with the queue begins it again
+                self.queue.unstart();
+                self.session
+                    .log
+                    .push("queue: stopped before the next run".into());
+                None
+            }
+            None => Some(Win::Between(i)),
+        }
+    }
+
     /// The list of the queue in the program panel: the state of each program and the buttons to take it out, skip it and move it.
     pub(super) fn queue_panel(&mut self, ui: &mut egui::Ui) {
         if self.queue.is_empty() {
@@ -120,7 +291,9 @@ impl App {
         ui.add_space(4.0);
         ui.label(RichText::new(self.t(Text::McQueue).to_uppercase()).color(col(self.theme.accent)));
         let (mut remove, mut skip, mut up, mut down) = (None, None, None, None);
+        let mut repeat: Option<(usize, u32)> = None;
         let count = self.queue.items.len();
+        let repeat_max = f64::from(self.settings.tuning.repeat_max);
         egui::ScrollArea::vertical()
             .id_salt("queue")
             .max_height(110.0)
@@ -139,6 +312,28 @@ impl App {
                         ui.label(RichText::new(word).color(col(color)));
                         ui.label(self.queue.name_of(i))
                             .on_hover_text(self.queue.items[i].path.display().to_string());
+                        let item = &self.queue.items[i];
+                        if state == State::Waiting {
+                            let mut runs = f64::from(item.repeat);
+                            if numfield::field(
+                                ui,
+                                ("queue-repeat", i),
+                                &mut runs,
+                                (1.0, repeat_max),
+                                1.0,
+                                "x",
+                            ) {
+                                repeat = Some((i, runs as u32));
+                            }
+                        } else if item.repeat > 1 {
+                            ui.label(
+                                RichText::new(self.ws(
+                                    Msg::QueueRun,
+                                    &[item.round.to_string(), item.repeat.to_string()],
+                                ))
+                                .color(col(self.theme.dim)),
+                            );
+                        }
                         let waiting = state == State::Waiting;
                         if ui
                             .add_enabled(waiting && i > 0, egui::Button::new("^"))
@@ -172,14 +367,35 @@ impl App {
                     });
                 }
             });
+        let (runs, seconds) = self.queue_total();
+        if runs > 0 {
+            ui.label(
+                RichText::new(self.ws(Msg::QueueTotal, &[runs.to_string(), hms(seconds)]))
+                    .color(col(self.theme.dim)),
+            );
+        }
         let mut cont = false;
         let mut clear = false;
+        let mut cancel_wait = false;
+        if let Some(until) = self.queue_gate {
+            let left = until
+                .saturating_duration_since(Instant::now())
+                .as_secs_f64();
+            ui.colored_label(col(self.theme.warn), format!("{} ...", hms(left)));
+            cancel_wait = ui.button(self.t(Text::McCancel)).clicked();
+        }
         if self.queue.halted() {
             ui.colored_label(col(self.theme.warn), self.t(Text::McQueueHalted));
+        }
+        // a queue that stopped, was left before it started or was kept from the last run waits for the operator
+        if self.queue.current().is_none() && !self.queue.active && self.queue.waiting() > 0 {
             cont = ui.button(self.t(Text::McQueueContinue)).clicked();
         }
         if ui.button(self.t(Text::McQueueClear)).clicked() {
             clear = true;
+        }
+        if let Some((i, n)) = repeat {
+            self.queue.set_repeat(i, n, self.settings.tuning.repeat_max);
         }
         if let Some(i) = up {
             self.queue.move_up(i);
@@ -195,6 +411,13 @@ impl App {
         }
         if clear {
             self.queue.clear();
+        }
+        if cancel_wait {
+            self.queue_gate = None;
+            self.queue.unstart();
+            self.session
+                .log
+                .push("queue: stopped before the next run".into());
         }
         if cont {
             self.queue_continue();
@@ -356,5 +579,164 @@ mod tests {
         a.start_queue(vec![files[0].clone()]);
         assert!(a.queue.is_empty());
         assert_eq!(a.path, files[0].display().to_string());
+    }
+
+    fn repeated(tag: &str, runs: u32, programs: &[&str]) -> App {
+        let mut a = app();
+        a.settings.confirm_start = false;
+        a.queue = Queue::new(jobs(tag, programs));
+        a.queue.set_repeat(0, runs, 100);
+        a.queue_next();
+        a.queue_tick();
+        a
+    }
+
+    #[test]
+    fn a_program_that_repeats_asks_before_each_new_run_and_then_the_next_program_comes() {
+        let mut a = repeated("rep", 2, &["G1 X1 F600\n", "G1 X2 F600\n"]);
+        assert!(a.session.running);
+        run_to_the_end(&mut a);
+        // the first run ended: the operator is asked (the default), the program is still the loaded one
+        assert!(matches!(a.win, Some(Win::Between(0))));
+        assert_eq!(a.queue.round_of_current(), Some((2, 2)));
+        assert_eq!(states(&a), vec![State::Running, State::Waiting]);
+        a.queue_tick();
+        assert_eq!(states(&a)[0], State::Running, "the question is open");
+        // the operator says yes: it runs again
+        a.win = None;
+        a.queue_rerun();
+        assert!(a.session.running);
+        a.queue_tick();
+        run_to_the_end(&mut a);
+        assert_eq!(states(&a), vec![State::Done, State::Running]);
+        assert!(a.win.is_none());
+    }
+
+    #[test]
+    fn without_a_confirmation_or_a_wait_the_next_run_begins_at_once() {
+        let mut a = repeated("now", 3, &["G1 X1 F600\n"]);
+        a.settings.tuning.confirm_between = false;
+        a.settings.tuning.pause_s = 0.0;
+        run_to_the_end(&mut a);
+        assert!(a.session.running && a.win.is_none());
+        assert_eq!(a.queue.round_of_current(), Some((2, 3)));
+        a.queue_tick();
+        run_to_the_end(&mut a);
+        assert!(a.session.running);
+        assert_eq!(a.queue.round_of_current(), Some((3, 3)));
+        a.queue_tick();
+        run_to_the_end(&mut a);
+        assert!(a.queue.finished());
+    }
+
+    #[test]
+    fn a_wait_between_two_runs_runs_out_by_itself_and_can_be_cancelled() {
+        let mut a = repeated("wait", 2, &["G1 X1 F600\n"]);
+        a.settings.tuning.confirm_between = false;
+        a.settings.tuning.pause_s = 30.0;
+        run_to_the_end(&mut a);
+        assert!(a.queue_gate.is_some() && a.win.is_none() && !a.session.running);
+        assert!(a
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("Waiting 30 s before")));
+        // nothing happens while the wait lasts
+        a.queue_tick();
+        assert!(!a.session.running && a.queue_gate.is_some());
+        // it runs out: the program runs again
+        a.queue_gate = Some(std::time::Instant::now());
+        a.queue_tick();
+        assert!(a.session.running && a.queue_gate.is_none());
+    }
+
+    #[test]
+    fn a_run_left_before_it_begins_goes_on_from_the_same_run() {
+        let mut a = repeated("left", 3, &["G1 X1 F600\n"]);
+        run_to_the_end(&mut a);
+        assert_eq!(a.queue.round_of_current(), Some((2, 3)));
+        // the operator does not confirm
+        a.win = None;
+        a.queue.unstart();
+        assert_eq!(states(&a), vec![State::Waiting]);
+        a.queue_continue();
+        assert_eq!(a.queue.round_of_current(), Some((2, 3)));
+        assert!(a.session.running);
+    }
+
+    #[test]
+    fn skipping_a_program_in_a_wait_ends_the_wait() {
+        let mut a = repeated("skipwait", 2, &["G1 X1 F600\n", "G1 X2 F600\n"]);
+        a.settings.tuning.confirm_between = false;
+        a.settings.tuning.pause_s = 60.0;
+        run_to_the_end(&mut a);
+        assert!(a.queue_gate.is_some());
+        a.queue_skip(0);
+        assert!(a.queue_gate.is_none());
+        assert_eq!(states(&a)[0], State::Skipped);
+        assert_eq!(a.queue.current(), Some(1));
+    }
+
+    #[test]
+    fn the_time_of_the_queue_counts_every_run_and_the_waits_between_runs() {
+        let mut a = app();
+        // 60 mm at 600 mm/min: 6 seconds each run
+        a.queue = Queue::new(jobs("total", &["G1 X60 F600\n", "G1 X60 F600\n"]));
+        a.queue.set_repeat(0, 2, 100);
+        assert_eq!(a.queue_total(), (3, 18.0));
+        // a wait between the runs of a program is counted once for the one that repeats
+        a.settings.tuning.confirm_between = false;
+        a.settings.tuning.pause_s = 30.0;
+        assert_eq!(a.queue_total(), (3, 48.0));
+        // the programs were measured once each
+        assert_eq!(a.estimate.misses, 2);
+        assert!(a.estimate.hits >= 2);
+    }
+
+    #[test]
+    fn the_queue_is_kept_in_a_file_and_comes_back_waiting() {
+        let files = jobs("keep", &["G1 X1 F600\n", "G1 X2 F600\n"]);
+        let mut a = app();
+        a.queue = Queue::new(files.clone());
+        a.queue.set_repeat(1, 3, 100);
+        a.queue_persist();
+        let file = queue_state_path(&a.settings_path);
+        assert!(file.is_file());
+        // another run of the program takes it back: nothing starts and the repeats are kept
+        let mut b = app();
+        b.settings_path = a.settings_path.clone();
+        b.restore_queue();
+        assert_eq!(b.queue.items.len(), 2);
+        assert_eq!(b.queue.items[1].repeat, 3);
+        assert!(!b.queue.active && !b.session.running && b.win.is_none());
+        assert!(b.session.log.iter().any(|l| l.contains("restored")));
+        // the operator goes on with it
+        b.queue_continue();
+        assert_eq!(b.queue.current(), Some(0));
+        // when nothing is left the file goes away
+        b.queue = Queue::default();
+        b.queue_persist();
+        assert!(!file.exists());
+    }
+
+    #[test]
+    fn the_queue_is_not_kept_when_the_settings_say_so() {
+        let mut a = app();
+        a.settings.tuning.queue_remember = false;
+        a.queue = Queue::new(jobs("nokeep", &["G1 X1 F600\n"]));
+        a.queue_persist();
+        assert!(!queue_state_path(&a.settings_path).exists());
+        // and a queue already in the window is not replaced by the one of the file
+        a.settings.tuning.queue_remember = true;
+        a.queue_persist();
+        let mut b = app();
+        b.settings_path = a.settings_path.clone();
+        b.queue = Queue::new(jobs("other", &["G1 X9 F600\n"]));
+        b.restore_queue();
+        assert_eq!(b.queue.items.len(), 1);
+        assert!(b.queue.items[0].path.ends_with("job0.nc"));
+        assert!(!b.session.log.iter().any(|l| l.contains("restored")));
+        a.queue = Queue::default();
+        a.queue_persist();
     }
 }

@@ -37,6 +37,8 @@ pub(super) enum Win {
     KeepOut(Box<keepout::KeepState>),
     /// The statistics of the program and its simulation.
     Sim(Box<sim::SimState>),
+    /// Between two runs of a program of the queue: the operator places the work and confirms.
+    Between(usize),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -396,7 +398,7 @@ impl App {
     /// Draws the window that is open, if there is one.
     pub(super) fn windows(&mut self, ctx: &egui::Context) {
         let Some(win) = self.win.take() else { return };
-        self.win = match win {
+        let next = match win {
             Win::Settings(d) => self.settings_window(ctx, d),
             Win::Open(b) => self.file_window(ctx, b, Mode::Open),
             Win::Save(b) => self.file_window(ctx, b, Mode::Save),
@@ -410,7 +412,12 @@ impl App {
             Win::Check(c) => self.check_window(ctx, c),
             Win::KeepOut(k) => self.keepout_window(ctx, k),
             Win::Sim(s) => self.sim_window(ctx, s),
+            Win::Between(i) => self.between_window(ctx, i),
         };
+        // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
+        if next.is_some() || self.win.is_none() {
+            self.win = next;
+        }
     }
 
     pub(super) fn window(&self, title: &str) -> egui::Window<'static> {

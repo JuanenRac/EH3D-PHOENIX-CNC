@@ -29,7 +29,7 @@ pub(super) fn advanced(t: f64, dt: f64, speed: f64, total: f64) -> (f64, bool) {
 }
 
 impl App {
-    fn sim_rates(&self) -> Rates {
+    pub(super) fn sim_rates(&self) -> Rates {
         Rates {
             rapid: self.settings.rapid_mm_min,
             default_feed: self.settings.feed_mm_min,

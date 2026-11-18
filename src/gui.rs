@@ -196,6 +196,9 @@ pub struct App {
     /// The programs that run one after the other, and whether the one that is loaded has been seen running.
     queue: Queue,
     queue_seen: bool,
+    /// The end of the wait between two runs of a program (None: not waiting), and the text of the queue as it was last written to its file.
+    queue_gate: Option<std::time::Instant>,
+    queue_saved: String,
     /// The files picked with Ctrl+click in the Open window.
     open_multi: Vec<PathBuf>,
     /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
@@ -279,6 +282,8 @@ impl App {
             preview: None,
             queue: Queue::default(),
             queue_seen: false,
+            queue_gate: None,
+            queue_saved: String::new(),
             open_multi: Vec::new(),
             focus_line: None,
             focus_scroll: false,
@@ -311,6 +316,10 @@ impl App {
                     Recovery::clear(&recovery::recovery_path(&app.settings_path));
                 }
             }
+        }
+        // the queue of the last run comes back waiting: nothing starts until the operator says so
+        if o.file.is_none() && o.window.is_none() && o.shot.is_none() && !cfg!(test) {
+            app.restore_queue();
         }
         if let Some(w) = &o.window {
             app.open_window(w);
@@ -360,6 +369,7 @@ impl App {
     pub fn open(&mut self, path: &Path) {
         self.queue = Queue::default();
         self.queue_seen = false;
+        self.queue_gate = None;
         self.load_file(path);
     }
 
@@ -1129,6 +1139,10 @@ impl eframe::App for App {
             ctx.request_repaint_after(std::time::Duration::from_millis(60));
         }
         self.queue_tick();
+        self.queue_persist();
+        if self.queue_gate.is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        }
         self.track_recovery();
         self.server_tick(&ctx);
         self.keys(&ctx);
