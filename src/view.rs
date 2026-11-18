@@ -79,6 +79,9 @@ pub struct Orbit {
     pub yaw_deg: f64,
     pub pitch_deg: f64,
     pub zoom: f64,
+    /// A point of the table in mm (x and y from the corner of the travel, z from its floor) that is kept in the middle of the area, in
+    /// place of the middle of the table: where the view was zoomed to. `None` keeps the middle of the table.
+    pub focus: Option<(f64, f64, f64)>,
 }
 
 /// The view the 3D starts in: the usual isometric one.
@@ -86,6 +89,7 @@ pub const ORBIT_HOME: Orbit = Orbit {
     yaw_deg: 0.0,
     pitch_deg: 30.0,
     zoom: 1.0,
+    focus: None,
 };
 
 /// Degrees of turn per pixel dragged.
@@ -112,6 +116,28 @@ impl Orbit {
         *self = ORBIT_HOME;
     }
 
+    /// Puts the middle of the line from `a` to `b` (points of the table in mm) in the middle of the area and magnifies the view, at the
+    /// turn and tilt it has, until the line takes most of the width or the height (as much as the limit of the zoom allows).
+    pub fn zoom_to_line(
+        &mut self,
+        table: &Table,
+        height_mm: f64,
+        a: (f64, f64, f64),
+        b: (f64, f64, f64),
+        width: f64,
+        height: f64,
+    ) {
+        self.focus = Some(((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0, (a.2 + b.2) / 2.0));
+        self.zoom = 1.0;
+        let iso = self.iso(table, height_mm, width, height);
+        let (pa, pb) = (iso.project(a.0, a.1, a.2), iso.project(b.0, b.1, b.2));
+        let (dx, dy) = ((pa.0 - pb.0).abs(), (pa.1 - pb.1).abs());
+        let fit = |size: f64, d: f64| if d > 1e-9 { size * 0.7 / d } else { ZOOM_MAX };
+        self.zoom = fit(width, dx)
+            .min(fit(height, dy))
+            .clamp(ZOOM_MIN, ZOOM_MAX);
+    }
+
     pub fn is_home(&self) -> bool {
         *self == ORBIT_HOME
     }
@@ -128,8 +154,11 @@ impl Orbit {
         let h = height_mm.max(1.0);
         let fit_k = (width / (diagonal * 1.3)).min(height / (diagonal * 1.45 + h * 1.2));
         iso.k = fit_k.min(iso.k).max(f64::MIN_POSITIVE) * self.zoom;
-        // the middle of the table (half way up the volume) to the middle of the area
-        let (mx, my) = iso.project(iso.pivot.0, iso.pivot.1, height_mm.max(1.0) / 2.0);
+        // the middle of the table (half way up the volume), or the point the view was zoomed to, to the middle of the area
+        let aim = self
+            .focus
+            .unwrap_or((iso.pivot.0, iso.pivot.1, height_mm.max(1.0) / 2.0));
+        let (mx, my) = iso.project(aim.0, aim.1, aim.2);
         iso.origin = (
             iso.origin.0 + width / 2.0 - mx,
             iso.origin.1 + height / 2.0 - my,
@@ -235,6 +264,7 @@ mod tests {
                 yaw_deg: yaw,
                 pitch_deg: pitch,
                 zoom,
+                focus: None,
             };
             let iso = o.iso(&table, 150.0, 800.0, 600.0);
             let (x, y) = iso.project(250.0, 150.0, 75.0);
@@ -251,6 +281,57 @@ mod tests {
         }
         .iso(&table, 150.0, 800.0, 600.0);
         assert!((far.k - near.k * 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn zooming_the_3d_view_to_a_line_puts_its_middle_in_the_middle_and_fills_most_of_the_area() {
+        let table = Table::new(500.0, 300.0);
+        let (a, b) = ((100.0, 50.0, 10.0), (140.0, 50.0, 10.0));
+        for (yaw, pitch) in [(0.0, 30.0), (75.0, 55.0), (200.0, 10.0)] {
+            let mut o = Orbit {
+                yaw_deg: yaw,
+                pitch_deg: pitch,
+                ..Orbit::default()
+            };
+            o.zoom_to_line(&table, 150.0, a, b, 800.0, 600.0);
+            assert!(o.zoom > 1.0 && !o.is_home(), "{yaw} {pitch}");
+            let iso = o.iso(&table, 150.0, 800.0, 600.0);
+            let (px, py) = iso.project(120.0, 50.0, 10.0);
+            assert!(
+                (px - 400.0).abs() < 1e-6 && (py - 300.0).abs() < 1e-6,
+                "{yaw} {pitch}: {px} {py}"
+            );
+            // both ends are inside the area, and the line takes 70% of one of its sides
+            let (ea, eb) = (iso.project(a.0, a.1, a.2), iso.project(b.0, b.1, b.2));
+            for e in [ea, eb] {
+                assert!((0.0..=800.0).contains(&e.0) && (0.0..=600.0).contains(&e.1));
+            }
+            let (dx, dy) = ((ea.0 - eb.0).abs(), (ea.1 - eb.1).abs());
+            assert!(
+                (dx - 560.0).abs() < 1e-6 || (dy - 420.0).abs() < 1e-6,
+                "{yaw} {pitch}: {dx} {dy}"
+            );
+        }
+        // a point is magnified up to the limit, a line longer than the table down to the other
+        let mut o = Orbit::default();
+        o.zoom_to_line(&table, 150.0, a, a, 800.0, 600.0);
+        assert_eq!(o.zoom, ZOOM_MAX);
+        o.zoom_to_line(
+            &table,
+            150.0,
+            (0.0, 0.0, 0.0),
+            (1e9, 1e9, 0.0),
+            800.0,
+            600.0,
+        );
+        assert_eq!(o.zoom, ZOOM_MIN);
+        // the focus goes with the reset, and the wheel and the turn keep it
+        o.zoom_to_line(&table, 150.0, a, b, 800.0, 600.0);
+        o.drag(30.0, 5.0);
+        o.wheel(10.0);
+        assert!(o.focus.is_some());
+        o.reset();
+        assert!(o.is_home() && o.focus.is_none());
     }
 
     #[test]

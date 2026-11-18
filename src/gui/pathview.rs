@@ -13,7 +13,6 @@ impl App {
         let mut mode = self.viewer.color_by;
         let mut toggle: Option<Option<u32>> = None;
         let mut zoom = false;
-        let three = self.settings.view_3d;
         let tools = self.viewer.tools.clone();
         let hidden = self.viewer.hidden.clone();
         let has_selection = self.viewer.selected.is_some();
@@ -44,10 +43,7 @@ impl App {
             }
             ui.separator();
             if ui
-                .add_enabled(
-                    has_selection && !three,
-                    egui::Button::new(self.w(Msg::VwZoomSel)),
-                )
+                .add_enabled(has_selection, egui::Button::new(self.w(Msg::VwZoomSel)))
                 .clicked()
             {
                 zoom = true;
@@ -152,14 +148,32 @@ impl App {
             return;
         }
         self.viewer.zoom_request = false;
-        if self.settings.view_3d {
-            return;
-        }
         let Some(s) = self.viewer.selected.and_then(|i| self.path_toolpath.get(i)) else {
             return;
         };
-        let b = crate::viewer::bounds_of(s);
         let off = self.work_offset();
+        if self.settings.view_3d {
+            // the move in the table of the 3D view (from the corner and the floor of the travel)
+            let tr = self.settings.travel;
+            let table = eh3d_view::scene::Table::new(tr[0].1 - tr[0].0, tr[1].1 - tr[1].0);
+            let rel = |p: crate::gcode::Point| {
+                (
+                    p.0 + off[0] - tr[0].0,
+                    p.1 + off[1] - tr[1].0,
+                    p.2 + off[2] - tr[2].0,
+                )
+            };
+            self.orbit.zoom_to_line(
+                &table,
+                tr[2].1 - tr[2].0,
+                rel(s.from),
+                rel(s.to),
+                rect.width() as f64,
+                rect.height() as f64,
+            );
+            return;
+        }
+        let b = crate::viewer::bounds_of(s);
         let frame = self.plan_frame(rect);
         let a = frame.fitted(b[0] + off[0], b[1] + off[1]);
         let c = frame.fitted(b[2] + off[0], b[3] + off[1]);
@@ -264,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn the_zoom_to_the_selection_changes_the_plan_only_when_asked_and_only_in_the_plan() {
+    fn the_zoom_to_the_selection_changes_the_view_only_when_asked() {
         let mut a = app_with_two_tools();
         let rect = Rect::from_min_size(Pos2::new(0.0, 0.0), Vec2::new(800.0, 600.0));
         a.select_segment(Some(2));
@@ -274,12 +288,18 @@ mod tests {
         a.zoom_to_selection(rect);
         assert!(a.plan2d.zoom > 1.0);
         assert!(!a.viewer.zoom_request);
-        // in 3D the request is dropped
+        // in 3D the view that is turned is the one that is magnified, with the move in the middle
         a.plan2d.reset();
         a.settings.view_3d = true;
+        a.select_segment(Some(2));
+        a.zoom_to_selection(rect);
+        assert!(a.orbit.is_home(), "nothing was asked");
         a.viewer.zoom_request = true;
         a.zoom_to_selection(rect);
         assert!(a.plan2d.is_default() && !a.viewer.zoom_request);
+        assert!(a.orbit.zoom > 1.0 && a.orbit.focus.is_some());
+        a.reset_view();
+        assert!(a.orbit.is_home());
     }
 
     #[test]
