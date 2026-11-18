@@ -651,6 +651,7 @@ mod tests {
         assert!(d.jog_soft_limits == JogMode::AfterHoming && d.lint.enabled);
         assert_eq!(d.probe, ProbeCfg::default());
         assert_eq!((d.probe_grid_mm, d.heightmap_segment_mm), (10.0, 1.0));
+        assert_eq!((d.lint.max_feed_mm_min, d.lint.max_rpm), (5000.0, 24_000.0));
         let s = Settings::parse(
             "jog_soft_limits = no\nlint = off\nlint_rapid_floor = -2\nlint_max_feed = 1800\nlint_max_rpm = 18000\nprobe_feed = 12\nprobe_depth = 4\nprobe_retract = 1\nprobe_plate = 1.2\nprobe_clearance = 6\nprobe_grid = 8\nheightmap_segment = 0.25\n",
         );

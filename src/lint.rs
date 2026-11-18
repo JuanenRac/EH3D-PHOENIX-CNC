@@ -14,7 +14,7 @@ pub struct LintCfg {
     pub enabled: bool,
     /// A rapid move (`G0`) that ends with Z below this value (work coordinates, mm) is said.
     pub rapid_floor_mm: f64,
-    /// A feed rate above this (mm/min) or a spindle speed above this (rpm) is said; 0 turns the check off.
+    /// A feed rate above this (mm/min) or a spindle speed above this (rpm) is said (5000 and 24000 by default); 0 turns the check off.
     pub max_feed_mm_min: f64,
     pub max_rpm: f64,
 }
@@ -24,8 +24,8 @@ impl Default for LintCfg {
         LintCfg {
             enabled: true,
             rapid_floor_mm: 0.0,
-            max_feed_mm_min: 0.0,
-            max_rpm: 0.0,
+            max_feed_mm_min: 5000.0,
+            max_rpm: 24_000.0,
         }
     }
 }
@@ -356,6 +356,19 @@ mod tests {
     }
 
     #[test]
+    fn the_default_limits_are_24000_rpm_and_5000_mm_per_min() {
+        let d = LintCfg::default();
+        assert_eq!((d.max_feed_mm_min, d.max_rpm), (5000.0, 24_000.0));
+        let got: Vec<Kind> = lint(&lines("M3 S30000\nG1 X1 F6000\nM30"), &d)
+            .iter()
+            .map(|f| f.kind)
+            .collect();
+        assert_eq!(got, vec![Kind::FeedTooHigh, Kind::SpeedTooHigh]);
+        // at the limit is not above it
+        assert!(lint(&lines("M3 S24000\nG1 X1 F5000\nM30"), &d).is_empty());
+    }
+
+    #[test]
     fn a_feed_or_a_speed_above_the_limit_is_found_and_the_limit_is_a_setting() {
         let cfg = LintCfg {
             max_feed_mm_min: 1000.0,
@@ -374,8 +387,14 @@ mod tests {
                 (Kind::SpeedTooHigh, 1, 1, 12_000.0)
             ]
         );
-        // 0 is off, which is the default
+        // the defaults are 5000 mm/min and 24000 rpm: this program is under both, and 0 turns the check off
         assert!(lint(&p, &LintCfg::default()).is_empty());
+        let off = LintCfg {
+            max_feed_mm_min: 0.0,
+            max_rpm: 0.0,
+            ..LintCfg::default()
+        };
+        assert!(lint(&lines("M3 S90000\nG1 X1 F90000\nM30"), &off).is_empty());
         // inches are told: F40 in inches is 1016 mm/min
         let inch = lines("G20\nM3 S1000\nG1 X1 F40\nM30");
         assert_eq!(lint(&inch, &cfg).len(), 1);
