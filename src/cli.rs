@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use eh3d_view::texts::Lang;
 use eh3d_view::theme::ThemeId;
 
+use crate::viewer::ColorBy;
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Options {
     pub lang: Option<Lang>,
@@ -25,6 +27,10 @@ pub struct Options {
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
     pub view_3d: Option<bool>,
+    /// How the path is coloured at the start (`--color state|kind|progress|tool|feed`): for the pictures of the viewer.
+    pub color: Option<ColorBy>,
+    /// The line of the program (from 1, as the program panel counts) whose move is selected at the start (`--select LINE`): for the pictures.
+    pub select: Option<usize>,
     /// Drives GRBL on a serial port instead of the simulator (`--grbl PORT[@BAUD]`).
     pub grbl: Option<String>,
     /// Lists the serial ports and leaves (`--ports`).
@@ -74,6 +80,8 @@ pub fn help_text() -> String {
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view plan|3d     how the path is seen at the start\n\
+         \x20 --color MODE       how the path is coloured at the start ({})\n\
+         \x20 --select LINE      select the move of that line of the program (from 1) at the start\n\
          \x20 --window NAME      open a window at the start ({})\n\
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
@@ -84,6 +92,7 @@ pub fn help_text() -> String {
          \x20 --version, -V      print the version and leave\n\
          \x20 --help, -h         print this text and leave\n",
         env!("CARGO_PKG_VERSION"),
+        ColorBy::ALL.map(ColorBy::key).join(", "),
         WINDOWS.join(", ")
     )
 }
@@ -124,6 +133,20 @@ impl Options {
                         _ => return Err(format!("unknown view '{v}' (plan or 3d)")),
                     });
                 }
+                "--color" => {
+                    let v = value("--color")?;
+                    o.color = Some(ColorBy::from_key(&v).ok_or(format!(
+                        "unknown colouring '{v}' ({})",
+                        ColorBy::ALL.map(ColorBy::key).join(", ")
+                    ))?);
+                }
+                "--select" => {
+                    let v = value("--select")?;
+                    o.select = match v.parse::<usize>() {
+                        Ok(n) if n >= 1 => Some(n),
+                        _ => return Err(format!("--select needs a line number from 1, not '{v}'")),
+                    };
+                }
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
                 "--report" => o.report = true,
@@ -149,6 +172,9 @@ impl Options {
         }
         if o.html.is_some() && !o.report {
             return Err("--html only goes with --report".to_string());
+        }
+        if o.select.is_some() && o.file.is_none() {
+            return Err("--select needs a G-code file".to_string());
         }
         if o.start_real && !o.start {
             return Err("--start-real only goes with --start".to_string());
@@ -248,6 +274,8 @@ mod tests {
             "--theme",
             "--view",
             "--window",
+            "--color",
+            "--select",
             "--shot",
             "--wait",
             "--start",
@@ -281,6 +309,30 @@ mod tests {
         assert!(parse("--html out.html job.nc").is_err());
         assert!(parse("--report job.nc --html").is_err());
         assert_eq!(parse("--report job.nc").unwrap().html, None);
+    }
+
+    #[test]
+    fn the_colouring_and_the_selected_line_are_read_for_the_pictures() {
+        let o = parse("--color Tool --select 4 job.nc --shot a.png").unwrap();
+        assert_eq!((o.color, o.select), (Some(ColorBy::Tool), Some(4)));
+        assert_eq!(parse("job.nc").unwrap().color, None);
+        assert_eq!(parse("job.nc").unwrap().select, None);
+        for c in ColorBy::ALL {
+            let o = parse(&format!("--color {}", c.key())).unwrap();
+            assert_eq!(o.color, Some(c));
+        }
+        // a colouring that does not exist, a line that is not a number from 1, and a line with no program to select in
+        assert!(parse("--color rainbow").is_err());
+        assert!(parse("--color").is_err());
+        assert!(parse("--select 0 job.nc").is_err());
+        assert!(parse("--select two job.nc").is_err());
+        assert!(parse("--select -3 job.nc").is_err());
+        assert!(parse("--select 4").is_err());
+        // every colouring is in the help
+        let h = help_text();
+        for c in ColorBy::ALL {
+            assert!(h.contains(c.key()), "{} is not in the help", c.key());
+        }
     }
 
     #[test]

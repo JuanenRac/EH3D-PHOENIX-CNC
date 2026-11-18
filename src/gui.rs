@@ -331,6 +331,14 @@ impl App {
                 app.start_queue(all);
             }
         }
+        // the pictures: the way the path is coloured and the move that is selected
+        if let Some(c) = o.color {
+            app.viewer.color_by = c;
+        }
+        if let Some(n) = o.select {
+            let i = crate::viewer::segment_at_line(&app.path_toolpath, n);
+            app.select_segment(i);
+        }
         // a program that was left in the middle by a crash or by a link that went down: the operator chooses to go on or to leave it
         if o.file.is_none() && o.window.is_none() && o.shot.is_none() && !cfg!(test) {
             if let Some(r) = Recovery::load(&recovery::recovery_path(&app.settings_path)) {

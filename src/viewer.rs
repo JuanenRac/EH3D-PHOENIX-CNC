@@ -30,6 +30,30 @@ impl ColorBy {
         ColorBy::Tool,
         ColorBy::Feed,
     ];
+
+    /// The word of the command line (`--color`) for this way of colouring.
+    pub fn key(self) -> &'static str {
+        match self {
+            ColorBy::State => "state",
+            ColorBy::Kind => "kind",
+            ColorBy::Progress => "progress",
+            ColorBy::Tool => "tool",
+            ColorBy::Feed => "feed",
+        }
+    }
+
+    /// The way of colouring a word of the command line names (capitals do not matter).
+    pub fn from_key(word: &str) -> Option<ColorBy> {
+        ColorBy::ALL
+            .into_iter()
+            .find(|c| c.key().eq_ignore_ascii_case(word.trim()))
+    }
+}
+
+/// The move that comes from a line of the program, counting the lines from 1 as the program panel does (the first move of the line).
+pub fn segment_at_line(path: &[Segment], line: usize) -> Option<usize> {
+    let from_zero = line.checked_sub(1)?;
+    path.iter().position(|s| s.line == from_zero)
 }
 
 /// The kind of a move.
@@ -292,6 +316,29 @@ mod tests {
         let mut s = State::default();
         s.refresh(&lines, &path);
         (s, path)
+    }
+
+    #[test]
+    fn the_ways_of_colouring_are_named_for_the_command_line() {
+        for c in ColorBy::ALL {
+            assert_eq!(ColorBy::from_key(c.key()), Some(c));
+        }
+        assert_eq!(ColorBy::from_key(" Tool "), Some(ColorBy::Tool));
+        assert_eq!(ColorBy::from_key("rainbow"), None);
+        assert_eq!(ColorBy::from_key(""), None);
+    }
+
+    #[test]
+    fn a_line_of_the_program_names_its_move() {
+        let (_, path) = state(TWO);
+        // line 1 (G21 G90) and line 2 (T1 M6) move nothing; line 3 is the first move; line 4 the plunge
+        assert_eq!(segment_at_line(&path, 1), None);
+        assert_eq!(segment_at_line(&path, 3), Some(0));
+        assert_eq!(segment_at_line(&path, 4), Some(1));
+        assert_eq!(segment_at_line(&path, 10), Some(6));
+        assert_eq!(segment_at_line(&path, 0), None);
+        assert_eq!(segment_at_line(&path, 99), None);
+        assert_eq!(segment_at_line(&[], 1), None);
     }
 
     #[test]
