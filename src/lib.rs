@@ -21,6 +21,7 @@ pub mod plan;
 pub mod probe;
 pub mod progcheck;
 pub mod queue;
+pub mod ranges;
 pub mod recovery;
 pub mod report;
 pub mod server;

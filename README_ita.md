@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-356-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-363-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano con le righe eseguite segnate e si ferma su ciò che il controllore rifiuta. La finestra parla 37 lingue e porta undici temi. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) ha GRBL scritto contro una linea simulata ed elenca le altre famiglie come non ancora pilotate. 356 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**, una porta seriale si apre solo per GRBL e una connessione di rete solo quando un programma è inviato al server, e gli archi e gli altri codici il simulatore non li disegna né li esegue.
+**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano con le righe eseguite segnate e si ferma su ciò che il controllore rifiuta. La finestra parla 37 lingue e porta undici temi. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) ha GRBL scritto contro una linea simulata ed elenca le altre famiglie come non ancora pilotate. 363 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**, una porta seriale si apre solo per GRBL e una connessione di rete solo quando un programma è inviato al server, e gli archi e gli altri codici il simulatore non li disegna né li esegue.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.1.3` |
 | Maturità | Funzionale |
-| Test | 356 |
+| Test | 363 |
 | Stack tecnologico | Rust |
 | Su hardware reale | No: per impostazione predefinita pilota una macchina simulata; un vero controllore GRBL (`--grbl`) non è mai stato provato |
 
@@ -47,7 +47,7 @@ Ogni riga è una parte di questo repository e la luce dice a che punto è oggi. 
 | Libreria di base | 🟡 | Un crate Rust che riesporta `scene`, `texts` e `theme` di `eh3d-view` con il nome di questo programma; richiede la cartella di EH3D-COMMON accanto. |
 | Scena e viste | 🟡 | Scritta e provata in EH3D-COMMON; la finestra di questo programma disegna il percorso di un programma sul piano e la posizione dell'utensile (vista su un computer). |
 | Temi e testi | 🟡 | Undici temi e le parole dell'interfaccia in 37 lingue, viste nella finestra di questo programma. |
-| Test | 🟡 | 356 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
+| Test | 🟡 | 363 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
 | Finestra e jog | 🟡 | Funziona su un computer con il controllore simulato: posizione, tastierino di jog, passi, avanzamento, origine, zero, sblocco, una riga di comandi e un registro; nessuna macchina reale. |
 | Controllo della macchina | 🟠 | Solo il simulatore: un programma gira riga per riga con pausa, stop e arresto di emergenza; da qui non è ancora collegato alcun controllore reale. |
 | Documentazione | 🟡 | README in otto lingue, le due immagini, tre programmi di esempio e il changelog. |
@@ -70,6 +70,7 @@ Ogni riga è una parte di questo repository e la luce dice a che punto è oggi. 
 * **Una coda di programmi e la corsa del controllore:** più file scelti nella finestra Apri con Ctrl+clic, trascinati insieme o dati sulla riga di comando (`phoenix-cnc a.nc b.nc`) vengono eseguiti uno dopo l'altro, ciascuno dopo il proprio riepilogo; la finestra li elenca con il loro stato, permette di rimuovere, saltare e riordinare quelli in attesa, e la coda si ferma quando un programma non termina. Con un controllore GRBL il programma legge `$130`, `$131` e `$132` (la corsa massima di X, Y e Z) alla connessione e usa il minore tra questo e `travel_x`, `travel_y` e `travel_z` per il riepilogo e il rifiuto; se il controllore non risponde o non li fornisce, si usano le impostazioni e il registro lo dice (`read_controller_travel = no` disattiva la lettura).
 * **Controlli del programma, limiti software del jog e sonda:** il riepilogo dice anche cosa sembra sbagliato nel programma (un movimento rapido che finisce sotto la superficie, un taglio a mandrino fermo, un mandrino avviato senza velocità, un cambio utensile, un programma senza fine, e un avanzamento o una velocità del mandrino sopra `lint_max_feed` o `lint_max_rpm`, che valgono 5000 mm/min e 24000 giri/min di default e sono spenti a 0; `lint = no` spegne i controlli e `lint_rapid_floor` fissa lo Z sotto il quale si segnala un rapido). Un passo del jog che supererebbe la corsa viene accorciato fino al limite e uno che parte dal limite verso l'esterno viene rifiutato (`jog_soft_limits` è `homing` per impostazione predefinita: il limite vale solo dopo l'homing; `always` lo applica dall'inizio e `no` lo spegne). **Macchina > Tastare Z** esegue il ciclo su una piastra di contatto (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` e `probe_clearance` nel file delle impostazioni) e **Macchina > Tastare una griglia** tocca una griglia sui tagli del programma (`probe_grid` mm di distanza) per costruire una mappa delle altezze; **Correggere il programma con la mappa delle altezze** divide ogni movimento di taglio in pezzi di al massimo `heightmap_segment` mm e alza o abbassa ciascuno secondo l'altezza sottostante (un programma in millimetri assoluti senza archi; uno che esce dall'area tastata viene rifiutato) e **Annullare la correzione di altezza** rimette il programma com'era. Le due tastature chiedono prima conferma perché la macchina si muove, e un controllore senza sonda le rifiuta. Provato solo con controfigure; nulla è stato eseguito su una macchina reale.
 * **Gli strumenti del programma, nella finestra e da riga di comando:** **Programma > Controllare il programma...** elenca ciò che trovano i controlli, riga per riga (il numero accanto a ogni rilievo mostra quella riga nel pannello del programma), **Programma > Riquadri vietati...** modifica i punti dove l'utensile non deve andare (un programma che ne attraversa uno non parte, salvo con `keepout_reject = no`) e **Programma > Statistiche e simulazione...** riproduce il percorso sulla carta con il cursore sulla riga, mentre il pannello del programma indica il tempo che manca. La coda ripete un programma (una casella con il numero di passate), chiede all'operatore o attende `queue_pause` secondi tra due passate, mostra il suo tempo totale e viene conservata in un file tra un'esecuzione e l'altra (torna in attesa: nulla parte da solo). Il menu **Macro** esegue dopo conferma le macro di `phoenix-cnc-macros.txt` (accanto al file delle impostazioni); **Macchina > Salvare la mappa delle altezze...** e **Macchina > Caricare una mappa delle altezze...** conservano la mappa in un file (mai sovrascritto senza chiedere) e **File > Esportare il registro della sessione...** salva il registro come testo, CSV o JSON (mai sopra un file). I loro valori (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` e `tool_change_time`) sono nel file delle impostazioni, e la finestra li conserva quando salva le altre impostazioni. `phoenix-cnc --report FILE` stampa gli stessi rilievi con le statistiche e il tempo di un programma senza aprire la finestra (codice di uscita 0 se nulla da leggere, 1 se c'è qualcosa, 2 se il file non si può leggere; `--lang` sceglie la lingua), e `--version` e `--help` rispondono subito. Provato solo sul simulatore; nulla ha girato su una macchina reale.
+* **La finestra delle impostazioni ha tre sezioni per gli strumenti del programma:** **Controlli** (il primo e il secondo controllo, il margine e il rifiuto delle zone vietate, il limite inferiore dei movimenti rapidi e l'avanzamento e la velocità del mandrino più alti), **Sonda e mappa delle altezze** (la sonda, la griglia, la lunghezza dei pezzi di un taglio corretto e i limiti del movimento manuale) e **Coda, macro e registro** (le ripetizioni e la pausa della coda, la velocità della simulazione, le voci del registro di sessione, le macro e il tempo di un cambio utensile). Ogni numero resta nell'intervallo che il file delle impostazioni accetta (l'intervallo è il suo suggerimento), **Valori predefiniti di questa sezione** riporta una sezione allo stato iniziale e il salvataggio conserva tutte le altre chiavi del file.
 
 ## 🧩 Ruolo in EH3D
 
@@ -136,7 +137,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Test
 
-`cargo test --features gui` esegue 356 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
+`cargo test --features gui` esegue 363 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
 
 ## 🏗️ Compilazione e rilascio
 
@@ -168,6 +169,7 @@ EH3D-PHOENIX-CNC/
 │   ├── logbook.rs                               registro della sessione in testo, CSV o JSON, senza sovrascrivere
 │   ├── report.rs                                il rapporto di --report: statistiche, tempo, anomalie
 │   ├── tuning.rs                                i valori di questi strumenti nel file delle impostazioni
+│   ├── ranges.rs                                l'intervallo di ogni chiave di questi strumenti, per la finestra e il file
 │   ├── words.rs                                 i messaggi di questi strumenti in otto lingue
 │   ├── gcode.rs                                 i movimenti rettilinei di un programma G-code, per disegnarne il percorso
 │   ├── heightmap.rs                             la mappa delle altezze del materiale e la correzione di un programma
@@ -181,6 +183,7 @@ EH3D-PHOENIX-CNC/
 │   ├── server.rs                                il collegamento al server EH3D: invia, segui, pausa, ferma
 │   ├── settings.rs                              ciò che si ricorda tra esecuzioni
 │   ├── gui/dialogs.rs                           menu, impostazioni, Apri, Salva, editor
+│   ├── gui/prefs.rs                             le sezioni delle impostazioni degli strumenti: controlli, sonda, coda
 │   ├── gui/remote.rs                            il programma sul server: Avvia, Pausa, Ferma e riprendi
 │   ├── gui/views.rs                             il centro della finestra: il percorso dall'alto o in 3D, con l'utensile
 │   ├── gui/summary.rs                           la finestra di riepilogo prima dell'avvio e l'elenco dei tasti

@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-356-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-363-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 356 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 363 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.3` |
 | Reifegrad | Funktionsfähig |
-| Tests | 356 |
+| Tests | 363 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
@@ -47,7 +47,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche in 37 Sprachen, im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 356 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 363 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur der Simulator: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt; von hier ist noch keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -70,6 +70,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 * **Eine Warteschlange von Programmen und der Verfahrweg der Steuerung:** mehrere im Öffnen-Fenster mit Strg+Klick gewählte, zusammen abgelegte oder in der Befehlszeile genannte Dateien (`phoenix-cnc a.nc b.nc`) laufen nacheinander, jede nach ihrer eigenen Zusammenfassung; das Fenster listet sie mit ihrem Zustand auf, erlaubt das Entfernen, Überspringen und Umordnen der wartenden, und die Warteschlange hält an, wenn ein Programm nicht fertig wird. Bei einer GRBL-Steuerung liest das Programm beim Verbinden `$130`, `$131` und `$132` (den größten Verfahrweg von X, Y und Z) und nimmt für Zusammenfassung und Ablehnung den kleineren Wert aus diesem und `travel_x`, `travel_y` und `travel_z`; antwortet die Steuerung nicht oder liefert sie die Werte nicht, gelten die Einstellungen und das Protokoll sagt es (`read_controller_travel = no` schaltet das Lesen ab).
 * **Prüfungen des Programms, weiche Grenzen des Jog und der Taster:** die Zusammenfassung sagt auch, was im Programm falsch aussieht (ein Eilgang, der unter der Oberfläche endet, ein Schnitt bei stehender Spindel, eine ohne Drehzahl gestartete Spindel, ein Werkzeugwechsel, ein Programm ohne Ende sowie ein Vorschub oder eine Spindeldrehzahl über `lint_max_feed` oder `lint_max_rpm`, die standardmäßig 5000 mm/min und 24000 U/min betragen und bei 0 aus sind; `lint = no` schaltet die Prüfungen aus und `lint_rapid_floor` legt das Z fest, unter dem ein Eilgang gemeldet wird). Ein Jog-Schritt, der den Verfahrweg überschreiten würde, wird bis zur Grenze gekürzt, und einer von der Grenze nach außen wird abgelehnt (`jog_soft_limits` ist standardmäßig `homing`: die Grenze gilt erst nach dem Referenzieren; `always` wendet sie von Anfang an an und `no` schaltet sie aus). **Maschine > Z antasten** führt den Zyklus auf einer Tastplatte aus (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` und `probe_clearance` in der Einstellungsdatei) und **Maschine > Raster antasten** tastet ein Raster über den Schnitten des Programms ab (`probe_grid` mm Abstand), um eine Höhenkarte zu bauen; **Programm mit der Höhenkarte korrigieren** teilt jede Schnittbewegung in Stücke von höchstens `heightmap_segment` mm und hebt oder senkt jedes um die Höhe darunter (ein Programm in absoluten Millimetern ohne Bögen; eines, das den abgetasteten Bereich verlässt, wird abgelehnt), und **Höhenkorrektur rückgängig machen** stellt das Programm wieder her. Beide Antastungen fragen vorher, weil sich die Maschine bewegt, und eine Steuerung ohne Taster lehnt sie ab. Nur gegen Attrappen erprobt; nichts lief auf einer echten Maschine.
 * **Die Programmwerkzeuge, im Fenster und auf der Befehlszeile:** **Programm > Programm prüfen...** listet zeilenweise auf, was die Prüfungen finden (die Nummer neben jedem Fund zeigt diese Zeile im Programmfeld), **Programm > Sperrboxen...** bearbeitet die Stellen, an die das Werkzeug nicht fahren darf (ein Programm, das in eine hineinfährt, wird nicht gestartet, außer mit `keepout_reject = no`), und **Programm > Statistik und Simulation...** spielt die Bahn auf dem Papier ab, mit dem Cursor in der Zeile, während das Programmfeld die Restzeit nennt. Die Warteschlange wiederholt ein Programm (ein Feld mit der Zahl der Durchläufe), fragt den Bediener oder wartet `queue_pause` Sekunden zwischen zwei Durchläufen, zeigt ihre Gesamtzeit und wird zwischen den Läufen in einer Datei gehalten (sie kommt wartend zurück: nichts startet von selbst). Das Menü **Makros** führt nach Rückfrage die Makros aus `phoenix-cnc-macros.txt` (neben der Einstellungsdatei) aus; **Maschine > Höhenkarte speichern...** und **Maschine > Höhenkarte laden...** halten die Karte in einer Datei (nie ohne Rückfrage überschrieben), und **Datei > Sitzungsprotokoll exportieren...** speichert das Protokoll als Text, CSV oder JSON (nie über eine Datei). Ihre Werte (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` und `tool_change_time`) stehen in der Einstellungsdatei, und das Fenster behält sie, wenn es die übrigen Einstellungen speichert. `phoenix-cnc --report DATEI` gibt dieselben Funde mit Statistik und Zeit eines Programms aus, ohne das Fenster zu öffnen (Exitcode 0, wenn nichts zu lesen ist, 1, wenn etwas zu lesen ist, 2, wenn die Datei nicht gelesen werden kann; `--lang` wählt die Sprache), und `--version` und `--help` antworten sofort. Nur am Simulator erprobt; nichts lief auf einer echten Maschine.
+* **Das Einstellungsfenster hat drei Gruppen für die Programmwerkzeuge:** **Prüfungen** (die erste und die zweite Prüfung, der Abstand und die Ablehnung der Sperrzonen, die Untergrenze der Eilgangbewegungen sowie der höchste Vorschub und die höchste Spindeldrehzahl), **Taster und Höhenkarte** (der Taster, das Raster, die Länge der Stücke eines korrigierten Schnitts und die Grenzen des Handfahrens) und **Warteschlange, Makros und Protokoll** (die Wiederholungen und die Pause der Warteschlange, die Geschwindigkeit der Simulation, die Einträge des Sitzungsprotokolls, die Makros und die Zeit eines Werkzeugwechsels). Jede Zahl bleibt im Bereich, den die Einstellungsdatei annimmt (der Bereich steht im Tooltip), **Standardwerte dieser Gruppe** setzt eine Gruppe zurück, und beim Speichern bleiben alle anderen Schlüssel der Datei erhalten.
 
 ## 🧩 Rolle in EH3D
 
@@ -136,7 +137,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 356 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 363 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -168,6 +169,7 @@ EH3D-PHOENIX-CNC/
 │   ├── logbook.rs                               Sitzungsprotokoll als Text, CSV oder JSON, nie über eine Datei
 │   ├── report.rs                                der Bericht von --report: Statistik, Zeit, Auffälliges
 │   ├── tuning.rs                                die Werte dieser Werkzeuge in der Einstellungsdatei
+│   ├── ranges.rs                                der Bereich jedes Schlüssels dieser Werkzeuge, für Fenster und Datei
 │   ├── words.rs                                 die Meldungen dieser Werkzeuge in acht Sprachen
 │   ├── gcode.rs                                 die geraden Bewegungen eines G-Code-Programms, um seine Bahn zu zeichnen
 │   ├── heightmap.rs                             die Höhenkarte des Materials und die Korrektur eines Programms
@@ -181,6 +183,7 @@ EH3D-PHOENIX-CNC/
 │   ├── server.rs                                die Verbindung zum EH3D-Server: senden, verfolgen, anhalten, stoppen
 │   ├── settings.rs                              was zwischen Läufen gemerkt wird
 │   ├── gui/dialogs.rs                           Menüs, Einstellungen, Öffnen, Speichern
+│   ├── gui/prefs.rs                             die Einstellungsgruppen der Werkzeuge: Prüfungen, Taster, Warteschlange
 │   ├── gui/remote.rs                            das Programm auf dem Server: Start, Pause, Stopp und Fortsetzen
 │   ├── gui/views.rs                             die Fenstermitte: die Bahn von oben oder in 3D, mit dem Werkzeug
 │   ├── gui/summary.rs                           das Zusammenfassungsfenster vor dem Start und die Tastenliste

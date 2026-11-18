@@ -29,6 +29,7 @@ mod keepout;
 mod keys;
 mod macros;
 mod numfield;
+mod prefs;
 mod probe;
 mod queue;
 mod remote;

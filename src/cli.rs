@@ -21,7 +21,7 @@ pub struct Options {
     pub start: bool,
     /// Says that `--start` with `--grbl` is meant: a real machine starts the program as soon as the window is open.
     pub start_real: bool,
-    /// A window to open at the start (`--window settings|open|save|edit|about|summary|keys|check|keepout|stats`): for the pictures.
+    /// A window to open at the start (`--window settings|settings-checks|settings-probe|settings-queue|open|save|edit|about|summary|keys|check|keepout|stats`): for the pictures.
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
     pub view_3d: Option<bool>,
@@ -50,7 +50,7 @@ pub fn help_text() -> String {
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view plan|3d     how the path is seen at the start\n\
-         \x20 --window NAME      open a window at the start (settings, open, save, edit, about, summary, keys, check, keepout, stats)\n\
+         \x20 --window NAME      open a window at the start (settings, settings-checks, settings-probe, settings-queue, open, save, edit, about, summary, keys, check, keepout, stats)\n\
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
          \x20 --start            start the program as soon as the window is open\n\
@@ -231,7 +231,18 @@ mod tests {
         }
         // every window that --window opens is listed
         for name in [
-            "settings", "open", "save", "edit", "about", "summary", "keys", "check", "keepout",
+            "settings",
+            "settings-checks",
+            "settings-probe",
+            "settings-queue",
+            "open",
+            "save",
+            "edit",
+            "about",
+            "summary",
+            "keys",
+            "check",
+            "keepout",
             "stats",
         ] {
             assert!(h.contains(name), "{name} is not in the help");

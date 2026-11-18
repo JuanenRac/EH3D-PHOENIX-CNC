@@ -106,10 +106,17 @@ impl App {
     /// Opens a window by its name (for the pictures and the command line).
     pub(super) fn open_window(&mut self, name: &str) {
         self.win = match name {
-            "settings" => Some(Win::Settings(Box::new(Draft {
-                s: self.settings.clone(),
-                section: 1,
-            }))),
+            "settings" | "settings-checks" | "settings-probe" | "settings-queue" => {
+                Some(Win::Settings(Box::new(Draft {
+                    s: self.settings.clone(),
+                    section: match name {
+                        "settings-checks" => prefs::FIRST_SECTION,
+                        "settings-probe" => prefs::FIRST_SECTION + 1,
+                        "settings-queue" => prefs::FIRST_SECTION + 2,
+                        _ => 1,
+                    },
+                })))
+            }
             "open" => Some(Win::Open(self.browser(Mode::Open))),
             "save" => Some(Win::Save(self.browser(Mode::Save))),
             "edit" => Some(Win::Edit(self.session.program.join(
@@ -1034,18 +1041,22 @@ impl App {
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.set_width(150.0);
+                        let tools = self.tool_sections();
                         for (i, n) in [
-                            Text::McSecGeneral,
-                            Text::McSecInterface,
-                            Text::McSecAxes,
-                            Text::McSecJog,
-                            Text::McSecServer,
-                            Text::McSecSafety,
+                            self.t(Text::McSecGeneral),
+                            self.t(Text::McSecInterface),
+                            self.t(Text::McSecAxes),
+                            self.t(Text::McSecJog),
+                            self.t(Text::McSecServer),
+                            self.t(Text::McSecSafety),
+                            tools[0],
+                            tools[1],
+                            tools[2],
                         ]
                         .into_iter()
                         .enumerate()
                         {
-                            if ui.selectable_label(d.section == i, self.t(n)).clicked() {
+                            if ui.selectable_label(d.section == i, n).clicked() {
                                 d.section = i;
                             }
                         }
@@ -1201,6 +1212,12 @@ impl App {
                                     );
                                 });
                             }
+                            prefs::FIRST_SECTION..=8 => {
+                                egui::ScrollArea::vertical()
+                                    .id_salt("set-tools-scroll")
+                                    .max_height(340.0)
+                                    .show(ui, |ui| self.settings_tools(ui, &mut d));
+                            }
                             _ => {
                                 ui.label(self.t(Text::McDefaultStep));
                                 ui.horizontal(|ui| {
@@ -1335,6 +1352,9 @@ mod tests {
         // the windows open by their names
         for (name, ok) in [
             ("settings", true),
+            ("settings-checks", true),
+            ("settings-probe", true),
+            ("settings-queue", true),
             ("open", true),
             ("about", true),
             ("edit", true),

@@ -402,6 +402,39 @@ impl Settings {
         out
     }
 
+    /// The checks of the program go back to their defaults (the keep-out boxes stay).
+    pub fn reset_checks(&mut self) {
+        let d = Settings::default();
+        self.lint = d.lint;
+        self.tuning.progcheck = d.tuning.progcheck;
+        self.tuning.keepout_margin = d.tuning.keepout_margin;
+        self.tuning.keepout_reject = d.tuning.keepout_reject;
+    }
+
+    /// The probe, the grid of the height map and the limits of the jog go back to their defaults.
+    pub fn reset_probe(&mut self) {
+        let d = Settings::default();
+        self.probe = d.probe;
+        self.probe_grid_mm = d.probe_grid_mm;
+        self.heightmap_segment_mm = d.heightmap_segment_mm;
+        self.jog_soft_limits = d.jog_soft_limits;
+    }
+
+    /// The queue, the simulation, the session log, the macros and the time of a tool change go back to their defaults (the keep-out boxes stay).
+    pub fn reset_queue(&mut self) {
+        let d = Tuning::default();
+        let t = &mut self.tuning;
+        t.repeat_max = d.repeat_max;
+        t.confirm_between = d.confirm_between;
+        t.pause_s = d.pause_s;
+        t.queue_remember = d.queue_remember;
+        t.sim_speed = d.sim_speed;
+        t.log_max = d.log_max;
+        t.macros_confirm = d.macros_confirm;
+        t.macro_max_lines = d.macro_max_lines;
+        t.tool_change_s = d.tool_change_s;
+    }
+
     /// Puts a file at the head of the recent ones (it is not listed twice).
     pub fn remember_recent(&mut self, path: &str) {
         self.recent.retain(|p| p != path);
@@ -714,5 +747,61 @@ mod tests {
         assert_eq!(s.summary_far_mm, d.summary_far_mm);
         assert_eq!(s.summary_margin_mm, d.summary_margin_mm);
         assert!(!s.confirm_start);
+    }
+    fn changed() -> Settings {
+        let mut s = Settings::parse(
+            "lint = no
+lint_max_feed = 100
+progcheck = no
+keepout_margin = 9
+keepout_reject = no
+keepout = clamp 0 0 -5 20 20 40
+             probe_feed = 50
+probe_grid = 40
+heightmap_segment = 5
+jog_soft_limits = always
+             queue_repeat_max = 7
+queue_pause = 60
+queue_confirm_between = no
+queue_remember = no
+sim_speed = 99
+             log_max_entries = 77
+macros_confirm = no
+macros_max_lines = 9
+tool_change_time = 5
+step = 0.1
+server_token = t
+",
+        );
+        s.recent = vec!["a.nc".into()];
+        s
+    }
+
+    #[test]
+    fn each_section_of_the_program_tools_goes_back_to_its_defaults_and_leaves_the_rest() {
+        let d = Settings::default();
+        let mut s = changed();
+        s.reset_checks();
+        assert_eq!((s.lint, s.tuning.progcheck), (d.lint, true));
+        assert_eq!(s.tuning.keepout_margin, 1.0);
+        assert!(s.tuning.keepout_reject);
+        // the boxes, the other sections and the rest of the settings stay
+        assert_eq!(s.tuning.keepouts.len(), 1);
+        assert_eq!((s.probe.feed_mm_min, s.tuning.repeat_max), (50.0, 7));
+        assert_eq!((s.step_mm, s.server_token.as_str()), (0.1, "t"));
+        s.reset_probe();
+        assert_eq!((s.probe, s.probe_grid_mm), (d.probe, d.probe_grid_mm));
+        assert_eq!(s.heightmap_segment_mm, d.heightmap_segment_mm);
+        assert_eq!(s.jog_soft_limits, d.jog_soft_limits);
+        assert_eq!(s.tuning.repeat_max, 7);
+        s.reset_queue();
+        let want = Tuning {
+            keepouts: s.tuning.keepouts.clone(),
+            ..Tuning::default()
+        };
+        assert_eq!(s.tuning, want);
+        assert_eq!(s.recent, ["a.nc"]);
+        // what was reset is what the file says too
+        assert_eq!(Settings::parse(&s.to_text()), s);
     }
 }

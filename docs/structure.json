@@ -216,6 +216,19 @@
           }
         },
         {
+          "name": "ranges.rs",
+          "desc": {
+            "en": "the range of each key of these tools, shared by the window and the file",
+            "es": "el rango de cada clave de estas herramientas, común a la ventana y al fichero",
+            "de": "der Bereich jedes Schlüssels dieser Werkzeuge, für Fenster und Datei",
+            "fr": "la plage de chaque clé de ces outils, commune à la fenêtre et au fichier",
+            "it": "l'intervallo di ogni chiave di questi strumenti, per la finestra e il file",
+            "ja": "これらのツールの各キーの範囲（ウィンドウとファイルで共通）",
+            "zh": "这些工具每个键的范围，窗口与文件共用",
+            "pt": "o intervalo de cada chave destas ferramentas, comum à janela e ao ficheiro"
+          }
+        },
+        {
           "name": "words.rs",
           "desc": {
             "en": "the messages of these tools in the eight languages",
@@ -382,6 +395,19 @@
             "ja": "メニュー、設定、開く、保存、編集",
             "zh": "菜单、设置、打开、保存、编辑器",
             "pt": "menus, definições, Abrir, Guardar, editor"
+          }
+        },
+        {
+          "name": "gui/prefs.rs",
+          "desc": {
+            "en": "the settings sections of the program tools: checks, probe, queue",
+            "es": "las secciones de ajustes de las herramientas: revisiones, sonda, cola",
+            "de": "die Einstellungsgruppen der Werkzeuge: Prüfungen, Taster, Warteschlange",
+            "fr": "les sections de réglages des outils : vérifications, palpeur, file",
+            "it": "le sezioni delle impostazioni degli strumenti: controlli, sonda, coda",
+            "ja": "ツールの設定セクション：チェック、プローブ、キュー",
+            "zh": "程序工具的设置分区：检查、探针、队列",
+            "pt": "as secções de definições das ferramentas: verificações, sonda, fila"
           }
         },
         {
