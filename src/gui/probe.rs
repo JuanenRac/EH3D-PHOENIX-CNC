@@ -206,7 +206,7 @@ impl App {
             .clicked()
         {
             if self.session.drop_height_correction() {
-                self.path_toolpath = gcode::toolpath(&self.session.program);
+                self.refresh_path();
             }
             ui.close();
         }
@@ -219,7 +219,7 @@ impl App {
             .session
             .apply_height_map(self.settings.heightmap_segment_mm)
         {
-            self.path_toolpath = gcode::toolpath(&self.session.program);
+            self.refresh_path();
         }
     }
 

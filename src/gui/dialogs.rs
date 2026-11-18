@@ -322,6 +322,7 @@ impl App {
             if ui.button(self.t(Text::McClearProgram)).clicked() {
                 self.session.clear_program();
                 self.path_toolpath.clear();
+                self.path_extras = crate::sim::Extras::default();
                 ui.close();
             }
             ui.separator();
@@ -574,7 +575,7 @@ impl App {
             });
         if apply {
             self.session.load(&text);
-            self.path_toolpath = gcode::toolpath(&self.session.program);
+            self.refresh_path();
         }
         keep.then_some(Win::Edit(text))
     }

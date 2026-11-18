@@ -181,6 +181,8 @@ pub struct App {
     mdi: String,
     path: String,
     path_toolpath: Vec<Segment>,
+    /// The length of the arcs and the tool changes of the program, which the estimate of time adds to the path.
+    path_extras: crate::sim::Extras,
     frame: u32,
     start_at: Option<u32>,
     shot: Option<Shot>,
@@ -279,6 +281,7 @@ impl App {
             mdi: String::new(),
             path: String::new(),
             path_toolpath: Vec::new(),
+            path_extras: crate::sim::Extras::default(),
             frame: 0,
             start_at: o.start.then_some(4),
             recovery_saved: None,
@@ -393,7 +396,7 @@ impl App {
                 let text: String = bytes.iter().map(|&b| b as char).collect();
                 self.session.load(&text);
                 self.focus_line = None;
-                self.path_toolpath = gcode::toolpath(&self.session.program);
+                self.refresh_path();
                 self.path = path.display().to_string();
                 self.remember(path);
                 true

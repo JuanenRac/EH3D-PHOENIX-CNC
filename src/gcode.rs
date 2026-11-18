@@ -21,10 +21,82 @@ pub struct Segment {
 
 /// The straight moves of the program, in order, starting at the origin.
 pub fn toolpath(lines: &[String]) -> Vec<Segment> {
+    trace(lines).0
+}
+
+/// The length of the curve of an arc move, in mm: the lines that have one (their number from 0) and the length along the arc, with the
+/// rise of a helix. An arc that cannot be measured (no centre and no radius, or a centre on the start) has no entry, and its chord counts.
+pub fn arc_lengths(lines: &[String]) -> Vec<(usize, f64)> {
+    trace(lines).1
+}
+
+/// The length along an arc: from `from` to `to` in the plane `plane` (17, 18 or 19), clockwise or not, with the offsets of the centre
+/// `off` (I, J, K) or the radius `radius`. A helix adds the rise of the third axis.
+fn arc_length(
+    from: Point,
+    to: Point,
+    plane: u8,
+    cw: bool,
+    off: [Option<f64>; 3],
+    radius: Option<f64>,
+    centre_absolute: bool,
+) -> Option<f64> {
+    let (a, b, c) = match plane {
+        18 => (2, 0, 1),
+        19 => (1, 2, 0),
+        _ => (0, 1, 2),
+    };
+    let at = |p: Point, i: usize| [p.0, p.1, p.2][i];
+    let (sa, sb, ea, eb) = (at(from, a), at(from, b), at(to, a), at(to, b));
+    let rise = at(to, c) - at(from, c);
+    let tau = std::f64::consts::TAU;
+    let (r, sweep) = if let Some(rr) = radius {
+        let half = (ea - sa).hypot(eb - sb) / 2.0;
+        let r = rr.abs().max(half);
+        if r <= 1e-9 {
+            return None;
+        }
+        let minor = 2.0 * (half / r).clamp(0.0, 1.0).asin();
+        (r, if rr < 0.0 { tau - minor } else { minor })
+    } else {
+        if off[a].is_none() && off[b].is_none() {
+            return None;
+        }
+        let (ca, cb) = if centre_absolute {
+            (off[a].unwrap_or(sa), off[b].unwrap_or(sb))
+        } else {
+            (sa + off[a].unwrap_or(0.0), sb + off[b].unwrap_or(0.0))
+        };
+        let r = (sa - ca).hypot(sb - cb);
+        if r <= 1e-9 {
+            return None;
+        }
+        let mut d = (eb - cb).atan2(ea - ca) - (sb - cb).atan2(sa - ca);
+        if cw {
+            while d > 1e-12 {
+                d -= tau;
+            }
+        } else {
+            while d < -1e-12 {
+                d += tau;
+            }
+        }
+        let d = d.abs();
+        (r, if d < 1e-9 { tau } else { d })
+    };
+    Some((r * sweep).hypot(rise)).filter(|l| l.is_finite())
+}
+
+/// The straight moves of the program and the length of the curve of its arcs.
+fn trace(lines: &[String]) -> (Vec<Segment>, Vec<(usize, f64)>) {
     let mut out = Vec::new();
+    let mut arcs: Vec<(usize, f64)> = Vec::new();
     let (mut pos, mut absolute, mut scale, mut rapid) = ((0.0, 0.0, 0.0), true, 1.0, true);
     let (mut feed, mut arc) = (0.0, false);
+    let (mut plane, mut cw, mut centre_absolute) = (17u8, true, false);
     for (n, raw) in lines.iter().enumerate() {
+        let mut off: [Option<f64>; 3] = [None; 3];
+        let mut radius: Option<f64> = None;
         let text = raw.split(';').next().unwrap_or("");
         let mut target = [None; 3];
         let mut word = String::new();
@@ -55,9 +127,17 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
                 "G" => match (v * 10.0).round() as i32 {
                     0 => (rapid, arc) = (true, false),
                     10 => (rapid, arc) = (false, false),
-                    20 | 30 => (rapid, arc) = (false, true),
+                    20 | 30 => {
+                        (rapid, arc) = (false, true);
+                        cw = (v * 10.0).round() as i32 == 20;
+                    }
                     900 => absolute = true,
                     910 => absolute = false,
+                    901 => centre_absolute = true,
+                    911 => centre_absolute = false,
+                    170 => plane = 17,
+                    180 => plane = 18,
+                    190 => plane = 19,
                     200 => scale = 25.4,
                     210 => scale = 1.0,
                     _ => {}
@@ -65,6 +145,10 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
                 "X" => target[0] = Some(v * scale),
                 "Y" => target[1] = Some(v * scale),
                 "Z" => target[2] = Some(v * scale),
+                "I" => off[0] = Some(v * scale),
+                "J" => off[1] = Some(v * scale),
+                "K" => off[2] = Some(v * scale),
+                "R" => radius = Some(v * scale),
                 "F" => feed = v * scale,
                 _ => {}
             }
@@ -81,6 +165,11 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
                 pick(target[2], pos.2),
             );
             if to != pos {
+                if arc {
+                    if let Some(l) = arc_length(pos, to, plane, cw, off, radius, centre_absolute) {
+                        arcs.push((n, l));
+                    }
+                }
                 out.push(Segment {
                     from: pos,
                     to,
@@ -93,7 +182,7 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
             pos = to;
         }
     }
-    out
+    (out, arcs)
 }
 
 /// A program seen before it is opened: its path and how big it is.
@@ -421,5 +510,70 @@ mod tests {
         let program = lines("G1 X1\nG2 X2 Y2 I1 J0\nX3 Y3 I1 J1\nG1 X4\nG3 X0 R5\nG2");
         assert_eq!(arc_moves(&program), 3);
         assert_eq!(arc_moves(&lines("G0 X1\nG1 X2 F100")), 0);
+    }
+
+    fn near(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-6
+    }
+
+    #[test]
+    fn a_half_circle_is_as_long_as_its_curve_and_not_its_chord() {
+        // from (0,0) to (10,0) round the centre (5,0): half of a circle of radius 5
+        let l = arc_lengths(&lines("G21 G90\nG3 X10 Y0 I5 J0"));
+        assert_eq!(l.len(), 1);
+        assert_eq!(l[0].0, 1);
+        assert!(near(l[0].1, 5.0 * std::f64::consts::PI), "{l:?}");
+        // the other way round it is the same half
+        let l = arc_lengths(&lines("G2 X10 Y0 I5 J0"));
+        assert!(near(l[0].1, 5.0 * std::f64::consts::PI), "{l:?}");
+    }
+
+    #[test]
+    fn a_quarter_the_long_way_and_the_radius_form_are_measured() {
+        // from (0,0) to (5,5) round (0,5): counter-clockwise it is a quarter turn of radius 5 (7.854 mm), clockwise the other three
+        let cw = arc_lengths(&lines("G2 X5 Y5 I0 J5"));
+        let ccw = arc_lengths(&lines("G3 X5 Y5 I0 J5"));
+        assert!(near(cw[0].1, 7.5 * std::f64::consts::PI), "{cw:?}");
+        assert!(near(ccw[0].1, 2.5 * std::f64::consts::PI), "{ccw:?}");
+        // the radius form: a positive radius is the short way and a negative one the long way
+        let short = arc_lengths(&lines("G3 X10 Y0 R5"));
+        assert!(near(short[0].1, 5.0 * std::f64::consts::PI));
+        let small = arc_lengths(&lines("G3 X10 Y0 R10"));
+        let long = arc_lengths(&lines("G3 X10 Y0 R-10"));
+        let full = 2.0 * std::f64::consts::PI * 10.0;
+        assert!(near(small[0].1 + long[0].1, full), "{small:?} {long:?}");
+        // a radius smaller than half the chord is taken as half the chord
+        let tiny = arc_lengths(&lines("G3 X10 Y0 R1"));
+        assert!(near(tiny[0].1, 5.0 * std::f64::consts::PI));
+    }
+
+    #[test]
+    fn a_helix_adds_its_rise_and_inches_and_the_plane_are_followed() {
+        let helix = arc_lengths(&lines("G3 X10 Y0 Z5 I5 J0"));
+        let flat = 5.0 * std::f64::consts::PI;
+        assert!(near(helix[0].1, flat.hypot(5.0)), "{helix:?}");
+        // in inches the length is in mm
+        let inch = arc_lengths(&lines("G20\nG3 X1 Y0 I0.5 J0"));
+        assert!(near(inch[0].1, 12.7 * std::f64::consts::PI), "{inch:?}");
+        // the plane XZ (G18) takes the offsets I and K
+        let xz = arc_lengths(&lines("G18\nG3 X10 Z0 I5 K0"));
+        assert!(near(xz[0].1, 5.0 * std::f64::consts::PI), "{xz:?}");
+        // an absolute centre (G90.1) is a point, not an offset
+        let abs = arc_lengths(&lines("G90.1\nG1 X10 F100\nG3 X0 Y0 I5 J0"));
+        assert!(near(abs[0].1, 5.0 * std::f64::consts::PI), "{abs:?}");
+    }
+
+    #[test]
+    fn a_full_circle_that_ends_where_it_starts_has_no_move_and_an_arc_with_no_centre_has_no_length()
+    {
+        // the path has no segment for a move that ends where it is
+        assert!(arc_lengths(&lines("G1 X10 F100\nG2 X10 Y0 I-5 J0")).is_empty());
+        // no centre and no radius, or a centre on the start
+        assert!(arc_lengths(&lines("G2 X10 Y0")).is_empty());
+        assert!(arc_lengths(&lines("G2 X10 Y0 I0 J0")).is_empty());
+        // a program with no arc has none
+        assert!(arc_lengths(&lines("G0 X1\nG1 X5 F10")).is_empty());
+        // the path itself did not change
+        assert_eq!(toolpath(&lines("G2 X10 Y0 I5 J0")).len(), 1);
     }
 }

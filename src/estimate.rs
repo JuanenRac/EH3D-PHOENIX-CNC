@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crate::gcode::{toolpath, Segment};
-use crate::sim::{Rates, Timeline};
+use crate::sim::{Extras, Rates, Timeline};
 
 /// The biggest file measured for the queue (the same limit as the report of the command line).
 pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
@@ -29,6 +29,28 @@ pub fn fingerprint(path: &[Segment], r: Rates) -> u64 {
             put(v.to_bits());
         }
         put(u64::from(s.rapid) | (u64::from(s.arc) << 1) | ((s.line as u64) << 2));
+    }
+    h
+}
+
+/// The fingerprint of a path with what is added to it (the arcs, the tool changes and the time of a change).
+pub fn fingerprint_with(path: &[Segment], r: Rates, extras: &Extras, change_s: f64) -> u64 {
+    let mut h = fingerprint(path, r);
+    let mut put = |v: u64| {
+        for b in v.to_le_bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    put(change_s.to_bits());
+    put(extras.arc_mm.len() as u64);
+    for (line, mm) in &extras.arc_mm {
+        put(*line as u64);
+        put(mm.to_bits());
+    }
+    put(extras.changes.len() as u64);
+    for line in &extras.changes {
+        put(*line as u64);
     }
     h
 }
@@ -64,12 +86,23 @@ impl Cache {
 
     /// The program in time, measured again only when the path or the speeds are not the ones of the last call.
     pub fn timeline(&mut self, path: &[Segment], r: Rates) -> &Timeline {
-        let key = fingerprint(path, r);
+        self.timeline_with(path, r, &Extras::default(), 0.0)
+    }
+
+    /// The same, with the length of the arcs and `change_s` seconds for every tool change.
+    pub fn timeline_with(
+        &mut self,
+        path: &[Segment],
+        r: Rates,
+        extras: &Extras,
+        change_s: f64,
+    ) -> &Timeline {
+        let key = fingerprint_with(path, r, extras, change_s);
         if matches!(&self.current, Some((k, _)) if *k == key) {
             self.hits += 1;
         } else {
             self.misses += 1;
-            self.current = Some((key, Timeline::build(path, r)));
+            self.current = Some((key, Timeline::build_with(path, r, extras, change_s)));
         }
         &self
             .current
@@ -80,6 +113,11 @@ impl Cache {
     /// The seconds a G-code file takes at these speeds, or nothing when it cannot be read or is too big. The file is read again only when
     /// its size or its date changed, or when the speeds did.
     pub fn file_seconds(&mut self, file: &Path, r: Rates) -> Option<f64> {
+        self.file_seconds_with(file, r, 0.0)
+    }
+
+    /// The same, with the arcs by their curve and `change_s` seconds for every tool change.
+    pub fn file_seconds_with(&mut self, file: &Path, r: Rates, change_s: f64) -> Option<f64> {
         let meta = std::fs::metadata(file).ok()?;
         if !meta.is_file() || meta.len() > MAX_FILE_BYTES {
             return None;
@@ -89,7 +127,10 @@ impl Cache {
             .ok()
             .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
             .map_or(0, |d| d.as_nanos());
-        let rates = (r.rapid.to_bits(), r.default_feed.to_bits());
+        let rates = (
+            r.rapid.to_bits() ^ change_s.to_bits().rotate_left(17),
+            r.default_feed.to_bits(),
+        );
         if let Some(e) = self.files.get(file) {
             if e.len == meta.len() && e.modified_ns == modified_ns && e.rates == rates {
                 self.hits += 1;
@@ -101,7 +142,8 @@ impl Cache {
         // every byte is a character, as the program reads a file
         let text: String = bytes.iter().map(|&b| b as char).collect();
         let lines: Vec<String> = text.lines().map(str::to_string).collect();
-        let seconds = Timeline::build(&toolpath(&lines), r).total_s;
+        let seconds =
+            Timeline::build_with(&toolpath(&lines), r, &Extras::of(&lines), change_s).total_s;
         if self.files.len() >= self.max_files && !self.files.contains_key(file) {
             // the room is made by dropping one that is not the one asked for
             if let Some(old) = self.files.keys().next().cloned() {
@@ -184,6 +226,52 @@ mod tests {
         assert_ne!(a, fingerprint(&path_of("G1 X1 F101"), RATES));
         assert_ne!(a, fingerprint(&path_of("G0 X1"), RATES));
         assert_ne!(a, fingerprint(&[], RATES));
+    }
+
+    #[test]
+    fn the_arcs_and_the_tool_changes_are_part_of_the_estimate_and_of_its_key() {
+        let lines: Vec<String> = "T1 M6
+G1 X60 F600
+G3 X60 Y10 I0 J5"
+            .lines()
+            .map(str::to_string)
+            .collect();
+        let p = toolpath(&lines);
+        let x = Extras::of(&lines);
+        let mut c = Cache::new(4);
+        let plain = c.timeline(&p, RATES).total_s;
+        let with = c.timeline_with(&p, RATES, &x, 20.0).total_s;
+        // 20 s for the change and the curve of the half circle (15.7 mm) instead of its chord (10 mm)
+        assert!((with - plain - 20.0 - 5.0 * std::f64::consts::PI / 10.0 + 1.0).abs() < 1e-9);
+        let again = c.timeline_with(&p, RATES, &x, 20.0).total_s;
+        assert_eq!(with, again);
+        // another time for a change is another estimate
+        let other = c.timeline_with(&p, RATES, &x, 25.0).total_s;
+        assert!((other - with - 5.0).abs() < 1e-9);
+        assert_ne!(
+            fingerprint_with(&p, RATES, &x, 20.0),
+            fingerprint_with(&p, RATES, &Extras::default(), 20.0)
+        );
+    }
+
+    #[test]
+    fn a_file_in_the_queue_counts_its_changes_and_is_measured_again_when_the_time_changes() {
+        let d = temp("changes");
+        let f = d.join("a.nc");
+        std::fs::write(
+            &f,
+            "T1 M6
+G1 X60 F600
+",
+        )
+        .unwrap();
+        let mut c = Cache::new(4);
+        let a = c.file_seconds_with(&f, RATES, 0.0).unwrap();
+        let b = c.file_seconds_with(&f, RATES, 30.0).unwrap();
+        assert!((b - a - 30.0).abs() < 1e-9, "{a} {b}");
+        assert_eq!(c.misses, 2);
+        assert_eq!(c.file_seconds(&f, RATES), Some(a));
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The time left counts the tool changes and the curve of the arcs:** the estimate of the time (the time left of the program panel, the queue, the statistics and `--report`) adds `tool_change_time` seconds for every `T` then `M6` that takes a different tool, before the move of its line (and the ones after the last move at the end), and measures an arc by its curve, not by its chord: `G2` and `G3` with the centre (`I`, `J`, `K`, in the plane of `G17`, `G18` or `G19`, relative or absolute with `G91.1` and `G90.1`) or with the radius `R` (a positive one is the short way, a negative one the long way), with the rise of a helix and the inches of `G20`. An arc with no centre and no radius still counts by its chord. The time left from a line also counts the change that comes with that line as still to do. The summary before a start keeps its own measure.
+
 ## [0.1.3] - Program checks, keep-out boxes, a simulated path, statistics and a queue with repeats, macros, a Z probe and a height map
 
 - **The README says what the program tools do, how `--report` is used and which files the program writes:** the eight READMEs describe the Check, Keep-out boxes and Statistics windows, the repeats, the wait and the kept queue, the Macros menu, the height map and log files, the values of these tools in the settings file, `--report FILE` with its exit codes, `--version` and `--help`; the security paragraph names the files the program reads and writes (only where the operator says, the log never over a file, a queue that comes back never starts by itself); the tree of the files and the picture list the new ones; and the number of tests is the real one (344).

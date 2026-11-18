@@ -27,23 +27,62 @@ pub struct Timeline {
     pub total_s: f64,
     /// Arc moves, whose time is the one of their chord and so is short.
     pub arcs: usize,
+    /// The lines where the tool is changed and the seconds a change takes, which are in the times above.
+    pub changes: Vec<usize>,
+    pub change_s: f64,
 }
 
 fn length(s: &Segment) -> f64 {
     ((s.to.0 - s.from.0).powi(2) + (s.to.1 - s.from.1).powi(2) + (s.to.2 - s.from.2).powi(2)).sqrt()
 }
 
-/// The seconds a move takes (0 when its speed is not a positive number).
-pub fn seconds_of(s: &Segment, r: Rates) -> f64 {
-    let rate = if s.rapid {
+/// What the estimate adds to the straight moves: the length of the curve of the arcs and the lines where the tool is changed.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Extras {
+    /// The lines of the arcs with the length along the arc in mm, by line.
+    pub arc_mm: Vec<(usize, f64)>,
+    /// The lines where a different tool is taken (`T` then `M6`).
+    pub changes: Vec<usize>,
+}
+
+impl Extras {
+    /// Reads them from the lines of the program.
+    pub fn of(lines: &[String]) -> Extras {
+        Extras {
+            arc_mm: crate::gcode::arc_lengths(lines),
+            changes: crate::stats::change_lines(lines),
+        }
+    }
+
+    /// The length of the arc at a line, when it is known.
+    pub fn arc_len(&self, line: usize) -> Option<f64> {
+        self.arc_mm
+            .binary_search_by_key(&line, |a| a.0)
+            .ok()
+            .map(|i| self.arc_mm[i].1)
+    }
+}
+
+fn rate_of(s: &Segment, r: Rates) -> f64 {
+    if s.rapid {
         r.rapid
     } else if s.feed > 0.0 {
         s.feed
     } else {
         r.default_feed
-    };
+    }
+}
+
+/// The seconds a move takes (0 when its speed is not a positive number).
+pub fn seconds_of(s: &Segment, r: Rates) -> f64 {
+    seconds_along(s, r, length(s))
+}
+
+/// The seconds a move takes when its way is `len` mm long (an arc is longer than its chord).
+pub fn seconds_along(s: &Segment, r: Rates, len: f64) -> f64 {
+    let rate = rate_of(s, r);
     if rate > 0.0 && rate.is_finite() {
-        length(s) / rate * 60.0
+        len / rate * 60.0
     } else {
         0.0
     }
@@ -51,10 +90,31 @@ pub fn seconds_of(s: &Segment, r: Rates) -> f64 {
 
 impl Timeline {
     pub fn build(path: &[Segment], r: Rates) -> Timeline {
+        Timeline::build_with(path, r, &Extras::default(), 0.0)
+    }
+
+    /// The program in time with the length of its arcs and `change_s` seconds for every tool change (a change comes before the move of
+    /// its line; the ones after the last move are added to the total).
+    pub fn build_with(path: &[Segment], r: Rates, extras: &Extras, change_s: f64) -> Timeline {
+        let change = if change_s.is_finite() && change_s > 0.0 {
+            change_s
+        } else {
+            0.0
+        };
         let mut steps = Vec::with_capacity(path.len());
         let mut t = 0.0;
+        let mut next_change = 0;
         for s in path {
-            let d = seconds_of(s, r);
+            while next_change < extras.changes.len() && extras.changes[next_change] <= s.line {
+                t += change;
+                next_change += 1;
+            }
+            let len = if s.arc {
+                extras.arc_len(s.line).unwrap_or_else(|| length(s))
+            } else {
+                length(s)
+            };
+            let d = seconds_along(s, r, len);
             steps.push(Step {
                 seg: *s,
                 t0: t,
@@ -62,10 +122,13 @@ impl Timeline {
             });
             t += d;
         }
+        t += change * (extras.changes.len() - next_change) as f64;
         Timeline {
             steps,
             total_s: t,
             arcs: path.iter().filter(|s| s.arc).count(),
+            changes: extras.changes.clone(),
+            change_s: change,
         }
     }
 
@@ -106,6 +169,21 @@ impl Timeline {
     /// The moment a line starts, or the start of the first move of a later line when the line has no move of its own.
     pub fn time_of_line(&self, line: usize) -> Option<f64> {
         self.steps.iter().find(|s| s.seg.line >= line).map(|s| s.t0)
+    }
+
+    /// The moment the work of a line begins: as `time_of_line`, but a tool change on that line (or between it and its first move) is still to do.
+    pub fn begin_of_line(&self, line: usize) -> f64 {
+        let pending = |upto: usize| {
+            self.changes
+                .iter()
+                .filter(|c| **c >= line && **c <= upto)
+                .count() as f64
+                * self.change_s
+        };
+        match self.steps.iter().find(|s| s.seg.line >= line) {
+            Some(s) => (s.t0 - pending(s.seg.line)).max(0.0),
+            None => (self.total_s - pending(usize::MAX)).max(0.0),
+        }
     }
 
     /// The part of the path done by the moment `t`: the whole moves before it and the part of the one in progress.
@@ -297,5 +375,111 @@ mod tests {
         assert_eq!(hms(-3.0), "0 s");
         assert_eq!(hms(f64::NAN), "0 s");
         assert_eq!(hms(f64::INFINITY), "0 s");
+    }
+
+    fn program(text: &str) -> Vec<String> {
+        text.lines().map(str::to_string).collect()
+    }
+
+    fn timeline_of(text: &str, change_s: f64) -> Timeline {
+        let lines = program(text);
+        Timeline::build_with(
+            &crate::gcode::toolpath(&lines),
+            R,
+            &Extras::of(&lines),
+            change_s,
+        )
+    }
+
+    #[test]
+    fn an_arc_takes_the_time_of_its_curve_and_not_of_its_chord() {
+        // a half circle of radius 5 at 600 mm/min: 15.708 mm take 1.5708 s, the chord of 10 mm would take 1 s
+        let t = timeline_of(
+            "G21 G90
+G3 X10 Y0 I5 J0 F600",
+            0.0,
+        );
+        assert!(
+            (t.total_s - 5.0 * std::f64::consts::PI / 10.0).abs() < 1e-9,
+            "{}",
+            t.total_s
+        );
+        // without the extras the chord is what counts, as before
+        let lines = program("G3 X10 Y0 I5 J0 F600");
+        let chord = Timeline::build(&crate::gcode::toolpath(&lines), R);
+        assert!((chord.total_s - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_work_of_a_line_begins_before_the_change_of_tool_that_comes_with_it() {
+        let t = timeline_of(
+            "G21 G90
+T1 M6
+G1 X60 F600
+T2 M6
+G1 X0",
+            30.0,
+        );
+        // the first change is still to do from the start and from its own line, not from the move that follows it
+        assert_eq!(t.begin_of_line(0), 0.0);
+        assert_eq!(t.begin_of_line(1), 0.0);
+        assert!((t.begin_of_line(2) - 30.0).abs() < 1e-9);
+        assert!((t.begin_of_line(3) - 36.0).abs() < 1e-9);
+        assert!((t.begin_of_line(4) - 66.0).abs() < 1e-9);
+        // after the last move
+        assert!((t.begin_of_line(99) - t.total_s).abs() < 1e-9);
+        let tail = timeline_of(
+            "T1 M6
+G1 X60 F600
+T2 M6",
+            10.0,
+        );
+        assert!((tail.begin_of_line(2) - 16.0).abs() < 1e-9);
+        assert!((tail.remaining(tail.begin_of_line(2)) - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn every_tool_change_adds_its_time_before_the_move_of_its_line() {
+        let text = "G21 G90
+T1 M6
+G1 X60 F600
+T2 M6
+G1 X0";
+        let t = timeline_of(text, 30.0);
+        // two changes of 30 s and two moves of 6 s
+        assert!((t.total_s - 72.0).abs() < 1e-9, "{}", t.total_s);
+        assert!((t.steps[0].t0 - 30.0).abs() < 1e-9);
+        assert!((t.steps[1].t0 - 66.0).abs() < 1e-9);
+        // the time left from the second move counts only that move
+        let from = t.time_of_line(4).unwrap();
+        assert!((t.remaining(from) - 6.0).abs() < 1e-9);
+        // a change that is not there, a tool taken again and a negative time add nothing
+        assert!(
+            (timeline_of(
+                "T1 M6
+G1 X60 F600
+T1 M6",
+                30.0
+            )
+            .total_s
+                - 36.0)
+                .abs()
+                < 1e-9
+        );
+        assert!((timeline_of(text, -5.0).total_s - 12.0).abs() < 1e-9);
+        assert!((timeline_of(text, f64::NAN).total_s - 12.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_change_after_the_last_move_is_added_to_the_total() {
+        let t = timeline_of(
+            "T1 M6
+G1 X60 F600
+T2 M6",
+            10.0,
+        );
+        assert!((t.total_s - 26.0).abs() < 1e-9, "{}", t.total_s);
+        // the tool stays where it ended
+        assert_eq!(t.position_at(1e9), Some((60.0, 0.0, 0.0)));
     }
 }

@@ -2,8 +2,8 @@
 //! does (the distance it cuts and the time it works). The tool in force is the one chosen by `T` and taken by `M6`. Nothing here moves a
 //! machine; the numbers are the estimate of the summary, with the time of each tool change added.
 
-use crate::gcode::{toolpath, words};
-use crate::sim::{hms, seconds_of, Rates};
+use crate::gcode::{arc_lengths, toolpath, words};
+use crate::sim::{hms, seconds_along, Rates};
 use crate::words::{say, Msg};
 
 /// What one tool does in the program.
@@ -30,23 +30,23 @@ pub struct Stats {
     pub seconds: f64,
     /// The lines that have at least one G-code word.
     pub program_lines: usize,
-    /// Arc moves, counted by their chord.
+    /// Arc moves, whose length is that of the curve (their chord when the centre or the radius is missing).
     pub arcs: usize,
 }
 
-/// The tool in force after each line, and how many changes there were.
-fn tools_by_line(lines: &[String]) -> (Vec<Option<u32>>, usize) {
+/// The tool in force after each line, and the lines where a different tool is taken.
+fn tools_by_line(lines: &[String]) -> (Vec<Option<u32>>, Vec<usize>) {
     let (mut current, mut pending): (Option<u32>, Option<u32>) = (None, None);
-    let mut changes = 0;
+    let mut changes = Vec::new();
     let mut out = Vec::with_capacity(lines.len());
-    for raw in lines {
+    for (n, raw) in lines.iter().enumerate() {
         for (l, v) in words(raw) {
             if l == 'T' && (0.0..1e6).contains(&v) && v.fract() == 0.0 {
                 pending = Some(v as u32);
             } else if l == 'M' && v == 6.0 {
                 if let Some(p) = pending {
                     if current != Some(p) {
-                        changes += 1;
+                        changes.push(n);
                     }
                     current = Some(p);
                 }
@@ -57,9 +57,16 @@ fn tools_by_line(lines: &[String]) -> (Vec<Option<u32>>, usize) {
     (out, changes)
 }
 
+/// The lines (from 0) where a different tool is taken (`T` then `M6`), in order.
+pub fn change_lines(lines: &[String]) -> Vec<usize> {
+    tools_by_line(lines).1
+}
+
 /// Measures the program. `change_s` is the time a tool change adds, in seconds.
 pub fn measure(lines: &[String], rates: Rates, change_s: f64) -> Stats {
-    let (by_line, changes) = tools_by_line(lines);
+    let (by_line, change_at) = tools_by_line(lines);
+    let changes = change_at.len();
+    let arc_mm = arc_lengths(lines);
     let mut st = Stats {
         changes,
         program_lines: lines.iter().filter(|l| !words(l).is_empty()).count(),
@@ -67,11 +74,19 @@ pub fn measure(lines: &[String], rates: Rates, change_s: f64) -> Stats {
     };
     for s in toolpath(lines) {
         let tool = by_line.get(s.line).copied().flatten();
-        let len = ((s.to.0 - s.from.0).powi(2)
+        let chord = ((s.to.0 - s.from.0).powi(2)
             + (s.to.1 - s.from.1).powi(2)
             + (s.to.2 - s.from.2).powi(2))
         .sqrt();
-        let secs = seconds_of(&s, rates);
+        // an arc is as long as its curve, when that can be worked out
+        let len = if s.arc {
+            arc_mm
+                .binary_search_by_key(&s.line, |a| a.0)
+                .map_or(chord, |i| arc_mm[i].1)
+        } else {
+            chord
+        };
+        let secs = seconds_along(&s, rates, len);
         let i = match st.tools.iter().position(|t| t.tool == tool) {
             Some(i) => i,
             None => {
@@ -214,6 +229,17 @@ mod tests {
         let a = measure(&prog("T1 M6\nG1 X1 F60\nM30"), R, f64::NAN);
         let b = measure(&prog("T1 M6\nG1 X1 F60\nM30"), R, -5.0);
         assert!((a.seconds - 1.0).abs() < 1e-9 && (b.seconds - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn an_arc_counts_by_its_curve_and_the_change_lines_are_known() {
+        let s = measure(&prog("G3 X10 Y0 I5 J0 F600\nT1 M6\nG1 X0"), R, 0.0);
+        assert_eq!(s.arcs, 1);
+        let curve = 5.0 * std::f64::consts::PI;
+        assert!((s.cut_mm - (curve + 10.0)).abs() < 1e-9, "{}", s.cut_mm);
+        assert!((s.seconds - (curve + 10.0) / 10.0).abs() < 1e-9);
+        assert_eq!(change_lines(&prog("G1 X1\nT1 M6\nT1 M6\nT2 M6")), [1, 3]);
+        assert!(change_lines(&[]).is_empty());
     }
 
     #[test]

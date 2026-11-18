@@ -208,7 +208,10 @@ impl App {
         let (mut runs, mut seconds) = (0u32, 0.0f64);
         for (i, n) in self.queue.remaining_runs() {
             let path = self.queue.items[i].path.clone();
-            let one = self.estimate.file_seconds(&path, rates).unwrap_or(0.0);
+            let one = self
+                .estimate
+                .file_seconds_with(&path, rates, self.settings.tuning.tool_change_s)
+                .unwrap_or(0.0);
             runs += n;
             seconds += one * f64::from(n) + wait * f64::from(n.saturating_sub(1));
         }

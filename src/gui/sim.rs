@@ -29,6 +29,12 @@ pub(super) fn advanced(t: f64, dt: f64, speed: f64, total: f64) -> (f64, bool) {
 }
 
 impl App {
+    /// Reads the path of the program again, with the length of its arcs and its tool changes.
+    pub(super) fn refresh_path(&mut self) {
+        self.path_toolpath = gcode::toolpath(&self.session.program);
+        self.path_extras = crate::sim::Extras::of(&self.session.program);
+    }
+
     pub(super) fn sim_rates(&self) -> Rates {
         Rates {
             rapid: self.settings.rapid_mm_min,
@@ -55,7 +61,12 @@ impl App {
     pub(super) fn sim_seek(&mut self, t: f64) {
         let rates = self.sim_rates();
         let (line, pos) = {
-            let tl = self.estimate.timeline(&self.path_toolpath, rates);
+            let tl = self.estimate.timeline_with(
+                &self.path_toolpath,
+                rates,
+                &self.path_extras,
+                self.settings.tuning.tool_change_s,
+            );
             (tl.line_at(t), tl.position_at(t))
         };
         self.sim_pos = pos;
@@ -88,8 +99,13 @@ impl App {
         let rates = self.sim_rates();
         let line = self.program_line();
         let (left, total) = {
-            let tl = self.estimate.timeline(&self.path_toolpath, rates);
-            let done = tl.time_of_line(line).unwrap_or(tl.total_s);
+            let tl = self.estimate.timeline_with(
+                &self.path_toolpath,
+                rates,
+                &self.path_extras,
+                self.settings.tuning.tool_change_s,
+            );
+            let done = tl.begin_of_line(line);
             (tl.remaining(done), tl.total_s)
         };
         Some(self.ws(Msg::TimeLeft, &[hms(left), hms(total)]))
@@ -100,7 +116,15 @@ impl App {
             st = Box::new(self.sim_state());
         }
         let rates = self.sim_rates();
-        let total = self.estimate.timeline(&self.path_toolpath, rates).total_s;
+        let total = self
+            .estimate
+            .timeline_with(
+                &self.path_toolpath,
+                rates,
+                &self.path_extras,
+                self.settings.tuning.tool_change_s,
+            )
+            .total_s;
         let speed = self.settings.tuning.sim_speed;
         if st.playing {
             let dt = f64::from(ctx.input(|i| i.stable_dt));
@@ -187,7 +211,12 @@ impl App {
         if let Some(l) = to_line {
             let at = self
                 .estimate
-                .timeline(&self.path_toolpath, rates)
+                .timeline_with(
+                    &self.path_toolpath,
+                    rates,
+                    &self.path_extras,
+                    self.settings.tuning.tool_change_s,
+                )
                 .time_of_line(l);
             if let Some(t) = at {
                 st.t = t;
@@ -296,5 +325,35 @@ mod tests {
         // no program, no time
         a.path_toolpath.clear();
         assert_eq!(a.time_left_text(), None);
+    }
+
+    #[test]
+    fn the_time_left_counts_the_tool_changes_and_the_curve_of_the_arcs() {
+        let mut a = App::isolated();
+        a.session.load(
+            "G21 G90
+T1 M6
+G1 X60 F600
+G3 X60 Y10 I0 J5",
+        );
+        a.refresh_path();
+        a.settings.tuning.tool_change_s = 30.0;
+        // 30 s of change, 6 s of cut and the half circle (1.57 s) instead of its chord (1 s)
+        assert_eq!(
+            a.time_left_text().unwrap(),
+            "Time left 38 s of 38 s".to_string()
+        );
+        // the change is done when the program is past its line
+        a.session.next = 2;
+        assert_eq!(
+            a.time_left_text().unwrap(),
+            "Time left 8 s of 38 s".to_string()
+        );
+        // a shorter change is another estimate
+        a.settings.tuning.tool_change_s = 0.0;
+        assert_eq!(
+            a.time_left_text().unwrap(),
+            "Time left 8 s of 8 s".to_string()
+        );
     }
 }

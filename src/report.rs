@@ -6,7 +6,7 @@ use crate::boxes::{arc_chords, hits, travel_excess};
 use crate::gcode::toolpath;
 use crate::lint::{lint, Kind as LintKind, LintCfg};
 use crate::progcheck::{check, Level};
-use crate::sim::{hms, Rates, Timeline};
+use crate::sim::{hms, Extras, Rates, Timeline};
 use crate::stats::measure;
 use crate::tuning::Tuning;
 use crate::words::{say, Msg};
@@ -115,7 +115,7 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
     };
     let stats = measure(lines, rates, tuning.tool_change_s);
     let path = toolpath(lines);
-    let timeline = Timeline::build(&path, rates);
+    let timeline = Timeline::build_with(&path, rates, &Extras::of(lines), tuning.tool_change_s);
     let mut out: Vec<String> = stats.lines(lang);
     out.push(say(
         lang,
