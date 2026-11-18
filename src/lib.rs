@@ -8,8 +8,12 @@ pub mod cli;
 pub mod gcode;
 #[cfg(feature = "gui")]
 pub mod gui;
+pub mod heightmap;
+pub mod jog;
 pub mod link;
+pub mod lint;
 pub mod plan;
+pub mod probe;
 pub mod queue;
 pub mod recovery;
 pub mod server;

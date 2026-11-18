@@ -32,6 +32,7 @@ impl App {
                 margin_mm: self.settings.summary_margin_mm,
                 reject: self.settings.reject_out_of_travel,
             },
+            lint: self.settings.lint,
         }
     }
 

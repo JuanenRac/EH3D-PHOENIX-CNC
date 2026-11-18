@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 use eh3d_view::texts::Lang;
 use eh3d_view::theme::ThemeId;
 
+use crate::lint::LintCfg;
+use crate::probe::ProbeCfg;
+
 /// How many recent files are kept.
 pub const RECENT_MAX: usize = 8;
 
@@ -70,6 +73,15 @@ pub struct Settings {
     /// When a program goes on after a failure it is taken up this many lines before the last one that was sent, because the controller keeps
     /// some lines in its buffer and may not have run them.
     pub resume_backoff_lines: u32,
+    /// A step of the jog that would take an axis past the travel is shortened to the limit, and one from the limit outwards is refused.
+    pub jog_soft_limits: bool,
+    /// What looks wrong in a program besides the travel is said in the summary (`lint`), and the floor under which a rapid move is said.
+    pub lint: LintCfg,
+    /// The probe: speed, depth, retract, thickness of the plate and the height it travels at.
+    pub probe: ProbeCfg,
+    /// The distance between the points of a grid of the height map (mm), and the longest piece a cut is divided into when the program is corrected (mm).
+    pub probe_grid_mm: f64,
+    pub heightmap_segment_mm: f64,
 }
 
 impl Default for Settings {
@@ -109,6 +121,11 @@ impl Default for Settings {
             busy_wait_s: 4.0 * 3600.0,
             resume_plunge_feed_mm_min: 100.0,
             resume_backoff_lines: 16,
+            jog_soft_limits: true,
+            lint: LintCfg::default(),
+            probe: ProbeCfg::default(),
+            probe_grid_mm: 10.0,
+            heightmap_segment_mm: 1.0,
         }
     }
 }
@@ -224,6 +241,58 @@ impl Settings {
                         .filter(|x| *x <= 1000)
                         .unwrap_or(s.resume_backoff_lines)
                 }
+                "jog_soft_limits" => s.jog_soft_limits = on(v),
+                "lint" => s.lint.enabled = on(v),
+                "lint_rapid_floor" => {
+                    s.lint.rapid_floor_mm = num(v)
+                        .filter(|x| (-500.0..=500.0).contains(x))
+                        .unwrap_or(s.lint.rapid_floor_mm)
+                }
+                "lint_max_feed" => {
+                    s.lint.max_feed_mm_min = num(v)
+                        .filter(|x| (0.0..=1_000_000.0).contains(x))
+                        .unwrap_or(s.lint.max_feed_mm_min)
+                }
+                "lint_max_rpm" => {
+                    s.lint.max_rpm = num(v)
+                        .filter(|x| (0.0..=1_000_000.0).contains(x))
+                        .unwrap_or(s.lint.max_rpm)
+                }
+                "probe_feed" => {
+                    s.probe.feed_mm_min = num(v)
+                        .filter(|x| (1.0..=1000.0).contains(x))
+                        .unwrap_or(s.probe.feed_mm_min)
+                }
+                "probe_depth" => {
+                    s.probe.depth_mm = num(v)
+                        .filter(|x| (0.1..=200.0).contains(x))
+                        .unwrap_or(s.probe.depth_mm)
+                }
+                "probe_retract" => {
+                    s.probe.retract_mm = num(v)
+                        .filter(|x| (0.0..=100.0).contains(x))
+                        .unwrap_or(s.probe.retract_mm)
+                }
+                "probe_plate" => {
+                    s.probe.plate_mm = num(v)
+                        .filter(|x| (0.0..=100.0).contains(x))
+                        .unwrap_or(s.probe.plate_mm)
+                }
+                "probe_clearance" => {
+                    s.probe.clearance_mm = num(v)
+                        .filter(|x| (0.5..=200.0).contains(x))
+                        .unwrap_or(s.probe.clearance_mm)
+                }
+                "probe_grid" => {
+                    s.probe_grid_mm = num(v)
+                        .filter(|x| (1.0..=1000.0).contains(x))
+                        .unwrap_or(s.probe_grid_mm)
+                }
+                "heightmap_segment" => {
+                    s.heightmap_segment_mm = num(v)
+                        .filter(|x| (0.05..=100.0).contains(x))
+                        .unwrap_or(s.heightmap_segment_mm)
+                }
                 "shortcuts" => s.shortcuts = on(v),
                 "show_toolbar" => s.show_toolbar = on(v),
                 "open_preview" => s.open_preview = on(v),
@@ -256,7 +325,7 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         let t = &self.travel;
-        format!(
+        let mut out = format!(
             "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
             self.lang.code(),
             self.theme.key(),
@@ -301,7 +370,23 @@ impl Settings {
             self.busy_wait_s,
             self.resume_plunge_feed_mm_min,
             self.resume_backoff_lines
-        )
+        );
+        out.push_str(&format!(
+            "jog_soft_limits = {}\nlint = {}\nlint_rapid_floor = {}\nlint_max_feed = {}\nlint_max_rpm = {}\nprobe_feed = {}\nprobe_depth = {}\nprobe_retract = {}\nprobe_plate = {}\nprobe_clearance = {}\nprobe_grid = {}\nheightmap_segment = {}\n",
+            yes(self.jog_soft_limits),
+            yes(self.lint.enabled),
+            self.lint.rapid_floor_mm,
+            self.lint.max_feed_mm_min,
+            self.lint.max_rpm,
+            self.probe.feed_mm_min,
+            self.probe.depth_mm,
+            self.probe.retract_mm,
+            self.probe.plate_mm,
+            self.probe.clearance_mm,
+            self.probe_grid_mm,
+            self.heightmap_segment_mm
+        ));
+        out
     }
 
     /// Puts a file at the head of the recent ones (it is not listed twice).
@@ -388,6 +473,22 @@ mod tests {
             busy_wait_s: 600.0,
             resume_plunge_feed_mm_min: 60.0,
             resume_backoff_lines: 4,
+            jog_soft_limits: false,
+            lint: LintCfg {
+                enabled: false,
+                rapid_floor_mm: -1.5,
+                max_feed_mm_min: 2400.0,
+                max_rpm: 24_000.0,
+            },
+            probe: ProbeCfg {
+                feed_mm_min: 15.0,
+                depth_mm: 6.0,
+                retract_mm: 3.0,
+                plate_mm: 1.6,
+                clearance_mm: 8.0,
+            },
+            probe_grid_mm: 5.0,
+            heightmap_segment_mm: 0.5,
         };
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
@@ -486,6 +587,38 @@ mod tests {
             (s.busy_wait_s, s.resume_backoff_lines),
             (d.busy_wait_s, d.resume_backoff_lines)
         );
+    }
+
+    #[test]
+    fn the_probe_the_height_map_the_jog_limits_and_the_checks_are_in_the_settings_file() {
+        let d = Settings::default();
+        assert!(d.jog_soft_limits && d.lint.enabled);
+        assert_eq!(d.probe, ProbeCfg::default());
+        assert_eq!((d.probe_grid_mm, d.heightmap_segment_mm), (10.0, 1.0));
+        let s = Settings::parse(
+            "jog_soft_limits = no\nlint = off\nlint_rapid_floor = -2\nlint_max_feed = 1800\nlint_max_rpm = 18000\nprobe_feed = 12\nprobe_depth = 4\nprobe_retract = 1\nprobe_plate = 1.2\nprobe_clearance = 6\nprobe_grid = 8\nheightmap_segment = 0.25\n",
+        );
+        assert!(!s.jog_soft_limits && !s.lint.enabled);
+        assert_eq!(s.lint.rapid_floor_mm, -2.0);
+        assert_eq!((s.lint.max_feed_mm_min, s.lint.max_rpm), (1800.0, 18_000.0));
+        assert_eq!(
+            s.probe,
+            ProbeCfg {
+                feed_mm_min: 12.0,
+                depth_mm: 4.0,
+                retract_mm: 1.0,
+                plate_mm: 1.2,
+                clearance_mm: 6.0
+            }
+        );
+        assert_eq!((s.probe_grid_mm, s.heightmap_segment_mm), (8.0, 0.25));
+        // what is out of range or not a number keeps the default
+        let s = Settings::parse(
+            "probe_feed = 0\nprobe_depth = deep\nprobe_retract = -1\nprobe_plate = 900\nprobe_clearance = 0\nprobe_grid = 0\nheightmap_segment = 0\nlint_rapid_floor = 1e9\nlint_max_feed = -5\nlint_max_rpm = fast\n",
+        );
+        assert_eq!(s.probe, d.probe);
+        assert_eq!((s.probe_grid_mm, s.heightmap_segment_mm), (10.0, 1.0));
+        assert_eq!(s.lint, d.lint);
     }
 
     #[test]

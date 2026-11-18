@@ -28,6 +28,8 @@ pub(super) enum Win {
     Summary(Box<summary::PendingStart>),
     /// The list of the keys.
     Shortcuts,
+    /// The question before the probe moves the machine.
+    Probe(probe::Ask),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -349,6 +351,7 @@ impl App {
                 self.session.coolant(false);
                 ui.close();
             }
+            self.probe_menu(ui);
         });
     }
 
@@ -380,6 +383,7 @@ impl App {
             Win::Resume(r) => self.resume_window(ctx, r),
             Win::Summary(p) => self.summary_window(ctx, p),
             Win::Shortcuts => self.shortcuts_window(ctx),
+            Win::Probe(a) => self.probe_window(ctx, a),
         };
     }
 

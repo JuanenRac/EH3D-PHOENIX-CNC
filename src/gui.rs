@@ -25,6 +25,7 @@ mod dialogs;
 mod icons;
 mod keys;
 mod numfield;
+mod probe;
 mod queue;
 mod remote;
 mod summary;
@@ -1075,6 +1076,16 @@ impl eframe::App for App {
         self.start_queue(dropped);
         // the lines go out by a thread of their own: the window only hands them over and looks at what was done
         self.session.allow_system_lines = self.settings.program_system_commands;
+        // the jog stops at the end of the travel (the travel of the settings, shortened to the one the controller reported)
+        self.session.soft_limits = self.settings.jog_soft_limits.then(|| {
+            crate::session::effective_travel(
+                self.settings.travel,
+                self.settings
+                    .read_controller_travel
+                    .then_some(self.session.controller_travel)
+                    .flatten(),
+            )
+        });
         self.session.pump_async(PUMP_BATCH);
         if self.session.running || self.session.busy() {
             ctx.request_repaint_after(std::time::Duration::from_millis(60));

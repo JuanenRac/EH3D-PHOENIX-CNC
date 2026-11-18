@@ -10,6 +10,7 @@ use eh3d_summary::summary::{bounds_of, check_work, clock, Limits, Summary, Warni
 use eh3d_view::texts::{tr, Lang, Text};
 
 use crate::gcode::{arc_moves, toolpath};
+use crate::lint::{lint, Finding, LintCfg};
 
 /// What the check needs to know about the machine and the operator (all of it comes from the settings).
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +25,8 @@ pub struct Checks {
     pub rapid_mm_min: f64,
     /// The thresholds of the sanity checks and whether a program that leaves the travel is refused.
     pub limits: Limits,
+    /// Which of the checks of the program itself are made (see `lint`).
+    pub lint: LintCfg,
 }
 
 /// What the program does, measured, and what looks wrong in it.
@@ -37,6 +40,8 @@ pub struct Report {
     pub cuts_without_feed: usize,
     pub summary: Summary,
     pub limits: Limits,
+    /// What looks wrong in the program besides the travel (a rapid below the surface, a cut with the spindle off, no end...).
+    pub findings: Vec<Finding>,
 }
 
 fn axis_of(i: usize) -> Axis {
@@ -158,6 +163,7 @@ pub fn analyse(lines: &[String], c: &Checks) -> Report {
         cuts_without_feed,
         summary: Summary::new(path.len(), 0, program_bounds, dry, course, warnings),
         limits: c.limits,
+        findings: lint(lines, &c.lint),
     }
 }
 
@@ -200,12 +206,16 @@ impl Report {
                 &self.cuts_without_feed.to_string(),
             ));
         }
+        out.extend(self.findings.iter().map(|f| f.message(lang.code())));
         out
     }
 
     /// Whether anything is worth the operator's second look before the start.
     pub fn has_warnings(&self) -> bool {
-        !self.summary.warnings.is_empty() || self.arcs > 0 || self.cuts_without_feed > 0
+        !self.summary.warnings.is_empty()
+            || self.arcs > 0
+            || self.cuts_without_feed > 0
+            || !self.findings.is_empty()
     }
 
     /// The lines of the summary, ready to show: the facts, the reach of the axes, the verdict of the dry run and the warnings.
@@ -274,13 +284,14 @@ mod tests {
                 margin_mm: 0.5,
                 reject: true,
             },
+            lint: LintCfg::default(),
         }
     }
 
     #[test]
     fn the_moves_the_distance_the_reach_and_the_time_are_measured() {
         // a rapid of 100 mm at 3000 mm/min (2 s) and a cut of 50 mm at 600 mm/min (5 s)
-        let r = analyse(&lines("G0 X100\nG1 X150 F600"), &checks());
+        let r = analyse(&lines("M3 S1000\nG0 X100\nG1 X150 F600\nM30"), &checks());
         assert_eq!((r.rapid_moves, r.cut_moves), (1, 1));
         assert!((r.cut_mm - 50.0).abs() < 1e-9);
         assert!((r.summary.dry.seconds - 7.0).abs() < 1e-9);
@@ -354,6 +365,32 @@ mod tests {
         );
         // a cut with no feed is timed at the default one: 10 mm at 600 mm/min
         assert!((r.summary.dry.seconds - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn what_the_program_itself_gets_wrong_is_said_with_the_other_warnings() {
+        let c = checks();
+        // a cut with the spindle off and no end of program
+        let r = analyse(&lines("G1 X10 F100"), &c);
+        assert!(r.has_warnings());
+        let text = r.warnings(Lang::En);
+        assert!(text.iter().any(|l| l.contains("spindle off")), "{text:?}");
+        assert!(text.iter().any(|l| l.contains("no end")), "{text:?}");
+        // the facts come first and the warnings last, as the window expects
+        let all = r.lines(Lang::En);
+        assert_eq!(&all[all.len() - text.len()..], text.as_slice(), "{all:?}");
+        // said in Spanish, and in English for a language outside the eight
+        assert!(r
+            .warnings(Lang::Es)
+            .iter()
+            .any(|l| l.contains("husillo parado")));
+        assert_eq!(r.warnings(Lang::Ru).len(), text.len());
+        // a good program says nothing, and the checks can be turned off
+        let good = "M3 S1000\nG1 X10 F100\nM30";
+        assert!(!analyse(&lines(good), &c).has_warnings());
+        let mut off = checks();
+        off.lint.enabled = false;
+        assert!(analyse(&lines("G1 X10 F100"), &off).findings.is_empty());
     }
 
     #[test]

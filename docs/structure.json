@@ -99,6 +99,58 @@
           }
         },
         {
+          "name": "heightmap.rs",
+          "desc": {
+            "en": "the height map of the stock and the correction of a program",
+            "es": "el mapa de alturas del material y la corrección de un programa",
+            "de": "die Höhenkarte des Materials und die Korrektur eines Programms",
+            "fr": "la carte des hauteurs de la matière et la correction d'un programme",
+            "it": "la mappa delle altezze del materiale e la correzione di un programma",
+            "ja": "材料の高さマップとプログラムの補正",
+            "zh": "材料的高度图以及程序校正",
+            "pt": "o mapa de alturas do material e a correção de um programa"
+          }
+        },
+        {
+          "name": "jog.rs",
+          "desc": {
+            "en": "the soft limits of the jog: a step past the travel is shortened or refused",
+            "es": "los límites suaves del jog: un paso más allá del recorrido se acorta o se rechaza",
+            "de": "die weichen Grenzen des Jog: ein Schritt über den Verfahrweg hinaus wird gekürzt oder abgelehnt",
+            "fr": "les limites logicielles du jog : un pas au-delà de la course est raccourci ou refusé",
+            "it": "i limiti software del jog: un passo oltre la corsa viene accorciato o rifiutato",
+            "ja": "ジョグのソフトリミット：移動範囲を超えるステップは短縮または拒否されます",
+            "zh": "点动的软限位：超出行程的步进会被缩短或拒绝",
+            "pt": "os limites por software do jog: um passo além do curso é encurtado ou recusado"
+          }
+        },
+        {
+          "name": "lint.rs",
+          "desc": {
+            "en": "what looks wrong in a program: rapids, spindle, feed and speed",
+            "es": "lo que parece mal en un programa: rápidos, husillo, avance y velocidad",
+            "de": "was an einem Programm auffällt: Eilgänge, Spindel, Vorschub, Drehzahl",
+            "fr": "ce qui semble faux dans un programme : rapides, broche, avance, vitesse",
+            "it": "ciò che sembra sbagliato in un programma: rapidi, mandrino, avanzamento",
+            "ja": "プログラムの疑わしい点：早送り、スピンドル、送り、回転数",
+            "zh": "程序中看起来有问题的地方：快速移动、主轴、进给、转速",
+            "pt": "o que parece errado num programa: rápidos, fuso, avanço e velocidade"
+          }
+        },
+        {
+          "name": "probe.rs",
+          "desc": {
+            "en": "the probe: the Z cycle on a touch plate and the grid of touches for the height map",
+            "es": "la sonda: el ciclo de Z sobre una placa de contacto y la rejilla de toques para el mapa de alturas",
+            "de": "der Taster: der Z-Zyklus auf einer Tastplatte und das Raster von Antastungen für die Höhenkarte",
+            "fr": "la sonde : le cycle de Z sur une plaque de contact et la grille de touches pour la carte des hauteurs",
+            "it": "la sonda: il ciclo di Z su una piastra di contatto e la griglia di tocchi per la mappa delle altezze",
+            "ja": "プローブ：接触プレート上の Z サイクルと、高さマップ用の接触グリッド",
+            "zh": "探针：对刀块上的 Z 循环以及用于高度图的接触网格",
+            "pt": "a sonda: o ciclo de Z numa placa de contacto e a grelha de toques para o mapa de alturas"
+          }
+        },
+        {
           "name": "view.rs",
           "desc": {
             "en": "the plan that is dragged and zoomed and the 3D view that is turned, as numbers",
@@ -226,6 +278,19 @@
             "ja": "開始前の概要ウィンドウとキー一覧",
             "zh": "开始前的摘要窗口和按键列表",
             "pt": "a janela de resumo antes do arranque e a lista de teclas"
+          }
+        },
+        {
+          "name": "gui/probe.rs",
+          "desc": {
+            "en": "the probe in the window: questions and height-map entries",
+            "es": "la sonda en la ventana: preguntas y entradas del mapa de alturas",
+            "de": "der Taster im Fenster: Rückfragen und Höhenkarten-Einträge",
+            "fr": "la sonde dans la fenêtre : questions et entrées de la carte",
+            "it": "la sonda nella finestra: domande e voci della mappa delle altezze",
+            "ja": "ウィンドウ内のプローブ：確認と高さマップの項目",
+            "zh": "窗口中的探针：确认与高度图菜单项",
+            "pt": "a sonda na janela: perguntas e entradas do mapa de alturas"
           }
         },
         {

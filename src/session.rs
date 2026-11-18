@@ -17,6 +17,9 @@ use eh3d_controller::urgent::{Urgent, UrgentChannel};
 use eh3d_controller::{Command, Controller, Error, State, Status, AXES};
 
 use crate::gcode::{toolpath, words, Modal};
+use crate::heightmap::HeightMap;
+use crate::jog::{limit_step, Step as JogStep};
+use crate::probe::{grid_script, z_touch_off_lines, Act, ProbeCfg};
 
 /// The jog steps offered, in mm.
 pub const STEPS: [f64; 5] = [0.01, 0.1, 1.0, 10.0, 100.0];
@@ -38,6 +41,8 @@ enum Step {
     Wait(f64),
     /// Tells the controller to go on after a hold.
     Resume,
+    /// Reads the machine Z where the probe stands and keeps it (the height of a contact of a grid).
+    Sample,
 }
 
 /// What a batch of steps came to: how many were done and why it stopped early, if it did.
@@ -55,6 +60,14 @@ enum Then {
     Resumed,
     /// The controller is back in the state of the program and waits for the operator to lower the tool.
     Positioned,
+    /// The cycle of the Z probe.
+    Probed,
+    /// The grid of the height map: when it ends well the map is built from the heights read.
+    Grid {
+        area: [f64; 4],
+        nx: usize,
+        ny: usize,
+    },
 }
 
 /// A batch the emitter is working on.
@@ -112,6 +125,13 @@ pub struct Session {
     pub travel_asked: bool,
     /// Lines that start with `$` (settings and commands of the controller) are sent when the program has them; off by default, and then the program stops at such a line.
     pub allow_system_lines: bool,
+    /// The travel of X, Y and Z in the coordinates of the machine: a step of the jog past it is shortened and one from the limit outwards is refused (`None`: no limit).
+    pub soft_limits: Option<[(f64, f64); 3]>,
+    /// The height map measured with the probe, and the program as it was before the map corrected it (to put it back).
+    pub height_map: Option<HeightMap>,
+    uncorrected: Option<Vec<String>>,
+    /// The heights the emitter read during a grid.
+    samples: Arc<Mutex<Vec<f64>>>,
 }
 
 /// The travel the summary and the refusal use: where the settings put it, shortened to the longest travel the controller reports when that is
@@ -154,6 +174,7 @@ fn run_steps(
     steps: &[Step],
     halt: &AtomicBool,
     progress: &AtomicUsize,
+    samples: &Mutex<Vec<f64>>,
 ) -> Outcome {
     let mut c = controller.lock().unwrap_or_else(PoisonError::into_inner);
     for (i, step) in steps.iter().enumerate() {
@@ -176,6 +197,12 @@ fn run_steps(
                 Ok(())
             }
             Step::Resume => c.command(Command::Resume),
+            Step::Sample => c.status().map(|s| {
+                samples
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(s.machine_mm[2]);
+            }),
         };
         match result {
             Ok(()) => progress.store(i + 1, Ordering::SeqCst),
@@ -219,6 +246,10 @@ impl Session {
             controller_travel: None,
             travel_asked: false,
             allow_system_lines: false,
+            soft_limits: None,
+            height_map: None,
+            uncorrected: None,
+            samples: Arc::new(Mutex::new(Vec::new())),
         };
         s.refresh();
         s
@@ -286,9 +317,25 @@ impl Session {
         if self.refuse_busy("jog") {
             return;
         }
+        let mut distance_mm = dir * self.step_mm;
+        if let (Some(limits), true) = (self.soft_limits, axis < 3) {
+            match limit_step(self.status.machine_mm[axis], distance_mm, limits[axis]) {
+                JogStep::Go(d) => distance_mm = d,
+                JogStep::Shorten(d) => {
+                    distance_mm = d;
+                    self.say(format!(
+                        "jog: the step is shortened to {d:.3} mm, where the travel of the axis ends"
+                    ));
+                }
+                JogStep::Refuse => {
+                    self.say("jog: the axis is at the end of its travel (jog_soft_limits = no in the settings file turns the limit off)");
+                    return;
+                }
+            }
+        }
         let command = Command::Jog {
             axis,
-            distance_mm: dir * self.step_mm,
+            distance_mm,
             feed_mm_min: self.feed_mm_min,
         };
         let r = self.ctl().command(command);
@@ -508,6 +555,7 @@ impl Session {
         self.running = false;
         self.paused = false;
         self.program = text.lines().map(|l| l.trim_end().to_string()).collect();
+        self.uncorrected = None;
         self.next = 0;
     }
 
@@ -633,8 +681,13 @@ impl Session {
         let halt = Arc::clone(&self.halt);
         let progress = Arc::clone(&self.progress);
         let work = steps.clone();
+        let samples = Arc::clone(&self.samples);
+        samples
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
         std::thread::spawn(move || {
-            let outcome = run_steps(&controller, &work, &halt, &progress);
+            let outcome = run_steps(&controller, &work, &halt, &progress, &samples);
             // the controller is free before the answer is given
             let _ = tx.send(outcome);
         });
@@ -706,6 +759,15 @@ impl Session {
                             };
                             format!("resume ({line})")
                         }
+                        Then::Probed | Then::Grid { .. } => {
+                            let line = match f.steps.get(f.applied) {
+                                Some(Step::Line(l)) => l.clone(),
+                                _ => String::new(),
+                            };
+                            // a touch that fails leaves the controller in relative distances
+                            let _ = self.ctl().send_line("G90");
+                            format!("probe ({line})")
+                        }
                     };
                     self.failed(&what, e);
                 }
@@ -727,11 +789,175 @@ impl Session {
                                 self.say(text);
                             }
                         }
+                        Then::Probed => {
+                            self.say("probe: touched, the zero of Z is set and the head is up")
+                        }
+                        Then::Grid { area, nx, ny } => self.finish_grid(area, nx, ny),
                     }
                 }
             }
         }
         self.refresh();
+    }
+
+    /// Whether a probe cannot start now (and why, in the log). A probe moves the machine, so it is only made when the operator confirmed it.
+    fn probe_refused(&mut self, what: &str, confirmed: bool) -> bool {
+        if !confirmed {
+            self.say(format!(
+                "{what}: the machine would move and it was not confirmed"
+            ));
+            return true;
+        }
+        if self.running {
+            self.say(format!("{what}: a program is running"));
+            return true;
+        }
+        if self.alarm() {
+            self.say(format!("{what}: the controller is in alarm"));
+            return true;
+        }
+        if self.refuse_busy(what) {
+            return true;
+        }
+        let has_probe = self.ctl().capabilities().probe;
+        if !has_probe {
+            self.say(format!("{what}: this controller has no probe"));
+            return true;
+        }
+        false
+    }
+
+    /// The cycle of the Z probe: down until the probe closes, the Z of the work set to the thickness of the plate, and up. The lines go out by the
+    /// emitter, so the stop is heard meanwhile. It moves the machine: nothing happens unless `confirmed`.
+    pub fn probe_z(&mut self, cfg: &ProbeCfg, confirmed: bool) -> bool {
+        if self.probe_refused("probe", confirmed) {
+            return false;
+        }
+        match z_touch_off_lines(cfg) {
+            Ok(lines) => {
+                self.say(format!(
+                    "probe: down up to {} mm at {} mm/min, then Z is set to {} mm",
+                    cfg.depth_mm, cfg.feed_mm_min, cfg.plate_mm
+                ));
+                self.post(Self::steps_of(&lines), false, Then::Probed);
+                true
+            }
+            Err(e) => {
+                self.say(format!("probe: {e}"));
+                false
+            }
+        }
+    }
+
+    /// The grid of the height map: the head visits the points of `area` (`[x0, y0, x1, y1]`, work coordinates) and touches at each; when it ends
+    /// the map is in `height_map`. It moves the machine: nothing happens unless `confirmed`.
+    pub fn probe_grid(
+        &mut self,
+        area: [f64; 4],
+        nx: usize,
+        ny: usize,
+        cfg: &ProbeCfg,
+        confirmed: bool,
+    ) -> bool {
+        if self.probe_refused("probe", confirmed) {
+            return false;
+        }
+        match grid_script(area, nx, ny, cfg) {
+            Ok(script) => {
+                let steps: Vec<Step> = script
+                    .into_iter()
+                    .map(|a| match a {
+                        Act::Mark(_) => Step::Skip,
+                        Act::Line(l) => Step::Line(l),
+                        Act::Sample => Step::Sample,
+                    })
+                    .collect();
+                self.say(format!("probe: a grid of {nx} x {ny} points"));
+                self.post(steps, false, Then::Grid { area, nx, ny });
+                true
+            }
+            Err(e) => {
+                self.say(format!("probe: {e}"));
+                false
+            }
+        }
+    }
+
+    /// The grid ended well: the map is built from the heights read.
+    fn finish_grid(&mut self, area: [f64; 4], nx: usize, ny: usize) {
+        let readings = self
+            .samples
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        match HeightMap::from_readings(area, nx, ny, &readings) {
+            Ok(map) => {
+                let (lo, hi) = map.span();
+                self.say(format!(
+                    "heightmap: {} points, the surface varies from {lo:.3} to {hi:.3} mm",
+                    readings.len()
+                ));
+                self.height_map = Some(map);
+            }
+            Err(e) => self.say(format!("heightmap: {e}")),
+        }
+    }
+
+    /// Corrects the loaded program to follow the height map (the program as it was is kept, see [`Session::drop_height_correction`]).
+    pub fn apply_height_map(&mut self, segment_mm: f64) -> bool {
+        if self.running {
+            self.say("heightmap: a program is running");
+            return false;
+        }
+        if self.uncorrected.is_some() {
+            self.say("heightmap: the program is corrected already");
+            return false;
+        }
+        let Some(result) = self
+            .height_map
+            .as_ref()
+            .map(|m| m.compensate(&self.program, segment_mm))
+        else {
+            self.say("heightmap: there is no map, probe a grid first");
+            return false;
+        };
+        match result {
+            Ok(out) => {
+                self.say(format!(
+                    "heightmap: the program is corrected ({} lines instead of {})",
+                    out.len(),
+                    self.program.len()
+                ));
+                self.uncorrected = Some(std::mem::replace(&mut self.program, out));
+                self.next = 0;
+                true
+            }
+            Err(e) => {
+                self.say(format!("heightmap: {e}"));
+                false
+            }
+        }
+    }
+
+    /// Puts back the program as it was before the height map corrected it.
+    pub fn drop_height_correction(&mut self) -> bool {
+        if self.running {
+            return false;
+        }
+        match self.uncorrected.take() {
+            Some(original) => {
+                self.program = original;
+                self.next = 0;
+                self.say("heightmap: the program is as it was");
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Whether the loaded program has been corrected by the height map.
+    pub fn corrected(&self) -> bool {
+        self.uncorrected.is_some()
     }
 
     /// Waits until the emitter has nothing in hand (for what has to see the outcome now: a script, the tests).
@@ -1450,5 +1676,221 @@ G0 X2",
         assert!(s.resume_at_safe(4, 4.0, 0.0));
         let d = s.resume_descent.clone().expect("a descent");
         assert_eq!(d.lines[0], "G1 Z-1.0000 F80");
+    }
+
+    /// A controller with a probe: it keeps where the head is, takes the lines of a touch and answers a contact at the height of a surface.
+    struct Touchy {
+        sent: Arc<Mutex<Vec<String>>>,
+        at: (f64, f64, f64),
+        surface: fn(f64, f64) -> f64,
+        miss_at: Option<usize>,
+        touches: usize,
+    }
+
+    impl Touchy {
+        fn new(surface: fn(f64, f64) -> f64) -> (Touchy, Arc<Mutex<Vec<String>>>) {
+            let sent = Arc::new(Mutex::new(Vec::new()));
+            (
+                Touchy {
+                    sent: Arc::clone(&sent),
+                    at: (0.0, 0.0, 5.0),
+                    surface,
+                    miss_at: None,
+                    touches: 0,
+                },
+                sent,
+            )
+        }
+    }
+
+    impl Controller for Touchy {
+        fn family(&self) -> eh3d_controller::Family {
+            eh3d_controller::Family::Grbl
+        }
+        fn capabilities(&self) -> eh3d_controller::Capabilities {
+            eh3d_controller::Capabilities {
+                probe: true,
+                ..SimController::new().capabilities()
+            }
+        }
+        fn status(&mut self) -> Result<Status, Error> {
+            let mut machine_mm = [0.0; AXES];
+            machine_mm[..3].copy_from_slice(&[self.at.0, self.at.1, self.at.2]);
+            Ok(Status {
+                state: State::Idle,
+                machine_mm,
+                ..Status::default()
+            })
+        }
+        fn command(&mut self, _command: Command) -> Result<(), Error> {
+            Ok(())
+        }
+        fn send_line(&mut self, line: &str) -> Result<(), Error> {
+            self.sent.lock().unwrap().push(line.to_string());
+            if line.starts_with("G38.2") {
+                self.touches += 1;
+                if Some(self.touches) == self.miss_at {
+                    return Err(Error::Refused("error:9".into()));
+                }
+                self.at.2 = (self.surface)(self.at.0, self.at.1);
+            } else if let Some(rest) = line.strip_prefix("G0 X") {
+                let (x, y) = rest.split_once(" Y").unwrap();
+                self.at.0 = x.parse().unwrap();
+                self.at.1 = y.parse().unwrap();
+            } else if let Some(z) = line.strip_prefix("G0 Z") {
+                self.at.2 = z.parse().unwrap();
+            }
+            Ok(())
+        }
+    }
+
+    fn touchy_session(surface: fn(f64, f64) -> f64) -> (Session, Arc<Mutex<Vec<String>>>) {
+        let (c, sent) = Touchy::new(surface);
+        (Session::new(Box::new(c)), sent)
+    }
+
+    #[test]
+    fn a_jog_stops_at_the_end_of_the_travel_when_the_limits_are_on() {
+        let mut s = session();
+        s.step_mm = 10.0;
+        s.soft_limits = Some([(0.0, 15.0), (0.0, 100.0), (-50.0, 50.0)]);
+        s.jog(0, 1.0);
+        assert_eq!(s.status.machine_mm[0], 10.0);
+        // the second step would reach 20: it is shortened to the 15 where the travel ends
+        s.jog(0, 1.0);
+        assert_eq!(s.status.machine_mm[0], 15.0);
+        assert!(s.log.iter().any(|l| l.contains("shortened")), "{:?}", s.log);
+        // from the limit outwards nothing moves
+        s.jog(0, 1.0);
+        assert_eq!(s.status.machine_mm[0], 15.0);
+        assert!(
+            s.log.iter().any(|l| l.contains("end of its travel")),
+            "{:?}",
+            s.log
+        );
+        // and the way back is free
+        s.jog(0, -1.0);
+        assert_eq!(s.status.machine_mm[0], 5.0);
+    }
+
+    #[test]
+    fn a_probe_moves_nothing_without_the_confirmation_and_not_on_a_controller_without_a_probe() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        assert!(!s.probe_z(&ProbeCfg::default(), false));
+        assert!(!s.probe_grid([0.0, 0.0, 10.0, 10.0], 2, 2, &ProbeCfg::default(), false));
+        assert!(sent.lock().unwrap().is_empty());
+        assert!(
+            s.log.iter().any(|l| l.contains("not confirmed")),
+            "{:?}",
+            s.log
+        );
+        // the simulator has no probe
+        let mut sim = session();
+        assert!(!sim.probe_z(&ProbeCfg::default(), true));
+        assert!(
+            sim.log.iter().any(|l| l.contains("no probe")),
+            "{:?}",
+            sim.log
+        );
+        // values that make no sense are refused before anything is sent
+        let bad = ProbeCfg {
+            depth_mm: 0.0,
+            ..ProbeCfg::default()
+        };
+        assert!(!s.probe_z(&bad, true));
+        assert!(sent.lock().unwrap().is_empty());
+        // a program that runs does not share the controller with a probe
+        s.load("G0 X1");
+        s.start();
+        assert!(!s.probe_z(&ProbeCfg::default(), true));
+    }
+
+    #[test]
+    fn the_z_probe_sends_its_cycle_through_the_emitter() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        let cfg = ProbeCfg {
+            plate_mm: 1.2,
+            ..ProbeCfg::default()
+        };
+        assert!(s.probe_z(&cfg, true));
+        s.wait_idle();
+        assert_eq!(
+            *sent.lock().unwrap(),
+            vec![
+                "G91",
+                "G38.2 Z-10 F20",
+                "G90",
+                "G10 L20 P1 Z1.2",
+                "G91",
+                "G0 Z2",
+                "G90"
+            ]
+        );
+        assert!(
+            s.log.iter().any(|l| l.contains("zero of Z is set")),
+            "{:?}",
+            s.log
+        );
+        assert!(!s.busy());
+    }
+
+    #[test]
+    fn a_grid_builds_the_height_map_that_then_corrects_the_program_and_can_be_put_back() {
+        let (mut s, _) = touchy_session(|x, _| -1.0 + x * 0.1);
+        assert!(s.probe_grid([0.0, 0.0, 10.0, 10.0], 3, 3, &ProbeCfg::default(), true));
+        s.wait_idle();
+        let map = s.height_map.clone().expect("a map");
+        assert_eq!((map.nx, map.ny), (3, 3));
+        assert!(
+            (map.offset_at(10.0, 10.0) - 1.0).abs() < 1e-9,
+            "{:?}",
+            map.z
+        );
+        // no map, no correction
+        let (mut empty, _) = touchy_session(|_, _| 0.0);
+        empty.load("G1 X1 F10");
+        assert!(!empty.apply_height_map(1.0));
+        // the program is corrected, and put back as it was
+        s.load("M3 S100\nG0 X0 Y0\nG1 Z-1 F100\nG1 X10\nM30");
+        let original = s.program.clone();
+        assert!(s.apply_height_map(5.0));
+        assert!(s.corrected() && s.program.len() > original.len());
+        assert!(!s.apply_height_map(5.0), "it is not corrected twice");
+        assert!(
+            s.program.iter().any(|l| l == "G1 X10 Y0 Z0"),
+            "{:?}",
+            s.program
+        );
+        assert!(s.drop_height_correction());
+        assert!(!s.corrected() && s.program == original);
+        // a program that leaves the probed area is not corrected
+        s.load("G1 X50 F10");
+        assert!(!s.apply_height_map(5.0));
+        assert!(
+            s.log.iter().any(|l| l.contains("probed area")),
+            "{:?}",
+            s.log
+        );
+        // loading another program forgets the way back
+        s.load("G1 X1 F10");
+        assert!(s.apply_height_map(5.0));
+        s.load("G1 X2 F10");
+        assert!(!s.corrected());
+    }
+
+    #[test]
+    fn a_touch_that_misses_ends_the_grid_and_puts_the_distances_back() {
+        let (mut c, sent) = Touchy::new(|_, _| 0.0);
+        c.miss_at = Some(2);
+        let mut s = Session::new(Box::new(c));
+        assert!(s.probe_grid([0.0, 0.0, 10.0, 10.0], 2, 2, &ProbeCfg::default(), true));
+        s.wait_idle();
+        assert!(s.height_map.is_none());
+        assert!(
+            s.log.iter().any(|l| l.contains("probe (G38.2")),
+            "{:?}",
+            s.log
+        );
+        assert_eq!(sent.lock().unwrap().last().map(String::as_str), Some("G90"));
     }
 }
