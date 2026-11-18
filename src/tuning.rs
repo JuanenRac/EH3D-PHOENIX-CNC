@@ -12,11 +12,17 @@ pub struct Tuning {
     /// The boxes the tool must not enter and how much bigger they are tested (`keepout`, `keepout_margin`).
     pub keepouts: Vec<KeepOut>,
     pub keepout_margin: f64,
+    /// A program with a move that enters a box cannot be started (`keepout_reject`); off: it is only said.
+    pub keepout_reject: bool,
     /// The most a program may be repeated in the queue, whether the operator confirms between two runs, and the wait in seconds when
     /// they do not (`queue_repeat_max`, `queue_confirm_between`, `queue_pause`).
     pub repeat_max: u32,
     pub confirm_between: bool,
     pub pause_s: f64,
+    /// The queue of programs is kept in a file between runs (`queue_remember`); what it holds never starts by itself.
+    pub queue_remember: bool,
+    /// The speed of the simulation of a program, as a multiple of real time (`sim_speed`).
+    pub sim_speed: f64,
     /// The most entries the session log keeps (`log_max_entries`).
     pub log_max: usize,
     /// Every macro asks before it runs (`macros_confirm`) and the most lines of one (`macros_max_lines`).
@@ -32,9 +38,12 @@ impl Default for Tuning {
             progcheck: true,
             keepouts: Vec::new(),
             keepout_margin: 1.0,
+            keepout_reject: true,
             repeat_max: 100,
             confirm_between: true,
             pause_s: 0.0,
+            queue_remember: true,
+            sim_speed: 10.0,
             log_max: 5_000,
             macros_confirm: true,
             macro_max_lines: 200,
@@ -94,6 +103,13 @@ impl Tuning {
                         .filter(|x| (0.0..=100.0).contains(x))
                         .unwrap_or(t.keepout_margin)
                 }
+                "keepout_reject" => t.keepout_reject = on(v),
+                "queue_remember" => t.queue_remember = on(v),
+                "sim_speed" => {
+                    t.sim_speed = num(v)
+                        .filter(|x| (0.1..=10_000.0).contains(x))
+                        .unwrap_or(t.sim_speed)
+                }
                 "queue_repeat_max" => {
                     t.repeat_max = v
                         .parse::<u32>()
@@ -139,6 +155,9 @@ impl Tuning {
         let mut put = |k: &str, v: String| s.push_str(&format!("{k} = {v}\n"));
         put("progcheck", yes_no(self.progcheck).to_string());
         put("keepout_margin", self.keepout_margin.to_string());
+        put("keepout_reject", yes_no(self.keepout_reject).to_string());
+        put("queue_remember", yes_no(self.queue_remember).to_string());
+        put("sim_speed", self.sim_speed.to_string());
         put("queue_repeat_max", self.repeat_max.to_string());
         put(
             "queue_confirm_between",
@@ -178,6 +197,9 @@ mod tests {
     fn the_defaults_are_the_cautious_ones() {
         let d = Tuning::default();
         assert!(d.progcheck && d.confirm_between && d.macros_confirm);
+        // a program that enters a box does not start, and the queue kept in the file waits for the operator
+        assert!(d.keepout_reject && d.queue_remember);
+        assert_eq!(d.sim_speed, 10.0);
         assert_eq!(d.repeat_max, 100);
         assert_eq!(d.pause_s, 0.0);
         assert!(d.keepouts.is_empty());
@@ -195,6 +217,17 @@ mod tests {
         assert_eq!(t.macro_max_lines, 50);
         assert_eq!(t.tool_change_s, 30.0);
         assert!(!t.progcheck);
+    }
+
+    #[test]
+    fn the_refusal_the_memory_of_the_queue_and_the_speed_of_the_simulation_are_read() {
+        let t = Tuning::parse("keepout_reject = no\nqueue_remember = off\nsim_speed = 250\n");
+        assert!(!t.keepout_reject && !t.queue_remember);
+        assert_eq!(t.sim_speed, 250.0);
+        // out of the range keeps the default
+        assert_eq!(Tuning::parse("sim_speed = 0\n").sim_speed, 10.0);
+        assert_eq!(Tuning::parse("sim_speed = 1e9\n").sim_speed, 10.0);
+        assert_eq!(Tuning::parse(&t.to_text()), t);
     }
 
     #[test]
