@@ -41,7 +41,7 @@ pub struct Rules {
 }
 
 impl Rules {
-    fn between(&self) -> After {
+    pub fn between(&self) -> After {
         if self.confirm_between {
             After::Confirm
         } else if self.pause_s.is_finite() && self.pause_s > 0.0 {
