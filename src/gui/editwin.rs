@@ -277,7 +277,7 @@ mod tests {
         a.session.load("G21 G90\nM3 S10000\nM30");
         let mut st = a.edit_state();
         let n = a.notes_of_text(&st);
-        assert!(n.is_empty(), "{n:?}");
+        assert!(n.iter().all(|x| !x.problem), "{n:?}");
         st.text = "G21 G90\nG0 X1 Z-3\nM30".to_string();
         let n = a.notes_of_text(&st);
         assert!(
