@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-426-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-436-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 426 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
+**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 436 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.1.4` |
 | Madurez | Funcional |
-| Pruebas | 426 |
+| Pruebas | 436 |
 | Pila tecnológica | Rust |
 | En hardware real | No: por defecto maneja una máquina simulada; un controlador GRBL real (`--grbl`) nunca se ha probado |
 
@@ -47,7 +47,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 | Biblioteca base | 🟡 | Un crate de Rust que reexporta `scene`, `texts` y `theme` de `eh3d-view` con el nombre de este programa; necesita la carpeta de EH3D-COMMON al lado. |
 | Escena y vistas | 🟡 | Escrita y probada en EH3D-COMMON; la ventana de este programa dibuja la trayectoria de un programa en la mesa y la posición de la herramienta (vista en un ordenador). |
 | Temas y textos | 🟡 | Once temas y las palabras de la interfaz en 37 idiomas, vistos en la ventana de este programa. |
-| Pruebas | 🟡 | Pasan 426 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
+| Pruebas | 🟡 | Pasan 436 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
 | Ventana y jog | 🟡 | Funciona en un ordenador con el controlador simulado: posición, teclado de jog, pasos, avance, referencia, cero, desbloqueo, una línea de órdenes y un registro; sin máquina real. |
 | Control de máquina | 🟠 | Solo el simulador: un programa se ejecuta línea a línea con pausa, parada y parada de emergencia; aún no se conecta ningún controlador real desde aquí. |
 | Documentación | 🟡 | README en ocho idiomas, las dos imágenes, tres programas de ejemplo y el changelog. |
@@ -74,6 +74,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 * **Un informe de trabajo en una sola página HTML:** **Archivo > Exportar el informe de trabajo...** (o `phoenix-cnc --report FICHERO.NC --html INFORME.html`) escribe una página que lo lleva todo dentro, sin script, sin enlaces y sin imágenes aparte: las estadísticas y el tiempo del programa, las herramientas, lo que parece mal con su línea, la trayectoria vista desde arriba con las líneas que tienen un aviso rodeadas y el mapa de alturas como una rejilla de colores cuando se midió uno. Sigue el idioma, los colores siguen el modo claro u oscuro del navegador y nunca se escribe sobre un fichero que ya existe.
 * **La trayectoria se puede colorear, filtrar por herramienta y pulsar:** bajo el título de la trayectoria (en el plano y en 3D) una fila elige cómo se colorea (**hecho / por hacer**, **tipo de movimiento**: rápido, corte, penetración y arco; **avance del programa**, de azul a rojo a lo largo del recorrido; **herramienta**; o **velocidad de corte**, de la más lenta a la más rápida), muestra una casilla por cada herramienta del programa (una herramienta se oculta o se muestra con su casilla y la última visible se queda) y tiene **Ampliar a la selección** para el plano y para 3D (en 3D el movimiento pasa al centro de la vista, con el giro que tenga). Pulsar un movimiento lo selecciona (se dibuja grueso), el panel del programa muestra su línea y la fila dice la línea, su código, el tipo de movimiento, su longitud, su avance y su herramienta. El plano y la vista 3D conservan el arrastre, la rueda y el doble clic. Para las capturas, `--color MODO` (`state`, `kind`, `progress`, `tool` o `feed`) y `--select LÍNEA` (una línea del programa, desde 1) abren la ventana con ese coloreado y ese movimiento seleccionado, junto con `--shot`.
 * **Un editor para el programa:** el editor del programa (Ctrl+E) muestra el texto con los **números de línea** en el margen (se colorean las líneas de las que la comprobación tiene algo que decir), **buscar y reemplazar** (con o sin mayúsculas; Intro busca la siguiente; se reemplaza una o todas y se dice cuántas), **ir a la línea**, las **notas de la comprobación para el texto tal como se escribe** (pulsar el número de una nota lleva a su línea) y **Aplicar**, que pasa el texto al programa (no mientras un programa corre). **Aplicar y guardar** y **Aplicar y guardar como...** pasan por la ventana de Guardar, que pregunta antes de reemplazar un archivo existente. Las reglas (`src/editor.rs`) se prueban sin ventana.
+* **Perfiles de máquina:** en la sección General de los ajustes se puede guardar una máquina como perfil (el recorrido de los tres ejes, la velocidad del husillo y su límite de aviso, el avance del jog, la velocidad rápida y el límite de aviso del avance, y los valores de la sonda) y volver a tomarla con un clic; Aceptar guarda la elección y Cancelar deja los ajustes como estaban. El archivo de ajustes guarda una línea `profile = NOMBRE | tx=0,500 | ty=0,300 | tz=-100,50 | spindle=10000 | ...` por perfil (hasta 16, nombres de hasta 40 caracteres, un valor no válido conserva el de por defecto) y `profile_active = NOMBRE` para el que está en uso. Las reglas (`src/profiles.rs`) se prueban sin ventana.
 * **Tab completa el código en el cuadro de órdenes:** mientras el cuadro de la parte baja tiene el teclado, Tab completa el código que se escribe (`G38` da `G38.`, `M30` da `M30 `, `$J` da `$J=`) o, si encajan varios, escribe lo que comparten y los lista junto al cuadro (`G5` lista de `G53` a `G59`). Actúa sobre la última palabra de la línea, no distingue mayúsculas de minúsculas y no envía nada: la línea sigue saliendo con Intro.
 
 ## 🧩 Papel en EH3D
@@ -141,7 +142,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Pruebas
 
-`cargo test --features gui` ejecuta 426 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
+`cargo test --features gui` ejecuta 436 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
 
 ## 🏗️ Compilación y publicación
 
@@ -187,6 +188,7 @@ EH3D-PHOENIX-CNC/
 │   ├── cli.rs                                   la línea de comandos: el fichero, el idioma, el tema y las opciones de imagen
 │   ├── complete.rs                              Tab en el cuadro de órdenes: completa los códigos G, M y $
 │   ├── editor.rs                                el editor del programa: buscar, reemplazar, ir a línea, notas
+│   ├── profiles.rs                              perfiles de máquina: recorrido, husillo, avances y sonda de cada una
 │   ├── bin/phoenix-cnc.rs                       el programa que abre la ventana
 │   ├── server.rs                                el enlace con el servidor de EH3D: enviar, seguir, pausar, detener
 │   ├── settings.rs                              lo que se recuerda entre ejecuciones

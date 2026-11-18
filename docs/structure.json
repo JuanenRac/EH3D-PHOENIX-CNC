@@ -398,6 +398,19 @@
           }
         },
         {
+          "name": "profiles.rs",
+          "desc": {
+            "en": "machine profiles: travel, spindle, feeds and probe of each machine",
+            "es": "perfiles de máquina: recorrido, husillo, avances y sonda de cada una",
+            "de": "Maschinenprofile: Verfahrweg, Spindel, Vorschübe und Taster je Maschine",
+            "fr": "profils de machine : course, broche, avances et sonde de chacune",
+            "it": "profili macchina: corsa, mandrino, avanzamenti e sonda di ognuna",
+            "ja": "マシンプロファイル：ストローク、スピンドル、送り、プローブ",
+            "zh": "机床配置文件：每台机床的行程、主轴、进给和探针",
+            "pt": "perfis de máquina: curso, fuso, avanços e sonda de cada uma"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",

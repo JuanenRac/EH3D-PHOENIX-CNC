@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-426-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-436-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 426 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
+**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 436 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.4` |
 | Maturité | Fonctionnel |
-| Tests | 426 |
+| Tests | 436 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non : par défaut il pilote une machine simulée ; un vrai contrôleur GRBL (`--grbl`) n'a jamais été essayé |
 
@@ -47,7 +47,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Bibliothèque de base | 🟡 | Un crate Rust qui réexporte `scene`, `texts` et `theme` d'`eh3d-view` sous le nom de ce programme ; il a besoin du dossier d'EH3D-COMMON à côté. |
 | Scène et vues | 🟡 | Écrite et testée dans EH3D-COMMON ; la fenêtre de ce programme dessine la trajectoire d'un programme sur la table et la position de l'outil (vue sur un ordinateur). |
 | Thèmes et textes | 🟡 | Onze thèmes et les mots de l'interface en 37 langues, vus dans la fenêtre de ce programme. |
-| Tests | 🟡 | 426 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
+| Tests | 🟡 | 436 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
 | Fenêtre et jog | 🟡 | Fonctionne sur un ordinateur avec le contrôleur simulé : position, pavé de jog, pas, avance, prise d'origine, zéro, déverrouillage, une ligne de commandes et un journal ; pas de vraie machine. |
 | Commande de machine | 🟠 | Seulement le simulateur : un programme s'exécute ligne par ligne avec pause, arrêt et arrêt d'urgence ; aucun vrai contrôleur n'est encore connecté d'ici. |
 | Documentation | 🟡 | README en huit langues, les deux images, trois programmes d'exemple et le changelog. |
@@ -74,6 +74,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 * **Un rapport de travail en une seule page HTML :** **Fichier > Exporter le rapport de travail...** (ou `phoenix-cnc --report FICHIER.NC --html RAPPORT.html`) écrit une page qui contient tout, sans script, sans lien et sans image à part : les statistiques et la durée du programme, les outils, ce qui semble anormal avec sa ligne, la trajectoire vue de dessus avec les lignes qui ont un avertissement entourées, et la carte des hauteurs comme une grille de couleurs quand une a été mesurée. Il suit la langue, les couleurs suivent le mode clair ou sombre du navigateur et un fichier existant n'est jamais écrasé.
 * **La trajectoire peut être colorée, filtrée par outil et cliquée :** sous le titre de la trajectoire (dans le plan et en 3D) une ligne choisit la façon de la colorer (**fait / à faire**, **type de mouvement** : rapide, coupe, plongée et arc ; **avancement du programme**, du bleu au rouge le long du parcours ; **outil** ; ou **vitesse d'avance**, de la plus lente à la plus rapide), montre une case par outil du programme (un outil se masque ou se montre avec sa case, le dernier affiché reste) et propose **Zoomer sur la sélection** pour le plan et pour la 3D (en 3D le mouvement passe au centre de la vue, avec la rotation qu'elle a). Un clic sur un mouvement le sélectionne (il est dessiné en gras), le panneau du programme montre sa ligne et la ligne indique le numéro, son code, le type de mouvement, sa longueur, son avance et son outil. Le plan et la vue 3D gardent le glisser, la molette et le double clic. Pour les captures, `--color MODE` (`state`, `kind`, `progress`, `tool` ou `feed`) et `--select LIGNE` (une ligne du programme, à partir de 1) ouvrent la fenêtre avec cette coloration et ce mouvement sélectionné, avec `--shot`.
 * **Un éditeur pour le programme :** l'éditeur du programme (Ctrl+E) montre le texte avec les **numéros de ligne** en marge (les lignes sur lesquelles la vérification a quelque chose à dire sont colorées), **rechercher et remplacer** (avec ou sans casse ; Entrée cherche le suivant ; remplacer un ou tous, le nombre est annoncé), **aller à la ligne**, les **notes de la vérification pour le texte tel qu'il s'écrit** (un clic sur le numéro d'une note mène à sa ligne) et **Appliquer**, qui met le texte dans le programme (pas pendant qu'un programme tourne). **Appliquer et enregistrer** et **Appliquer et enregistrer sous...** passent par la fenêtre Enregistrer, qui demande avant de remplacer un fichier existant. Les règles (`src/editor.rs`) sont testées sans fenêtre.
+* **Profils de machine :** dans la section Général des réglages, une machine peut être enregistrée comme profil (la course des trois axes, la vitesse de broche et sa limite d'alerte, l'avance du jog, la vitesse rapide et la limite d'alerte de l'avance, et les valeurs de la sonde) puis reprise d'un clic ; OK garde le choix et Annuler laisse les réglages tels qu'ils étaient. Le fichier de réglages contient une ligne `profile = NOM | tx=0,500 | ty=0,300 | tz=-100,50 | spindle=10000 | ...` par profil (jusqu'à 16, des noms de 40 caractères au plus, une valeur non valide garde sa valeur par défaut) et `profile_active = NOM` pour celui en cours. Les règles (`src/profiles.rs`) sont testées sans fenêtre.
 * **Tab complète le code dans la zone de commande :** tant que la zone du bas de la fenêtre a le clavier, Tab complète le code en cours de saisie (`G38` donne `G38.`, `M30` donne `M30 `, `$J` donne `$J=`) ou, quand plusieurs conviennent, écrit ce qu'ils ont en commun et les liste à côté de la zone (`G5` liste `G53` à `G59`). Il agit sur le dernier mot de la ligne, ignore majuscules et minuscules et n'envoie rien : la ligne part toujours avec Entrée.
 
 ## 🧩 Rôle dans EH3D
@@ -141,7 +142,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` lance 426 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
+`cargo test --features gui` lance 436 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
 
 ## 🏗️ Compilation et publication
 
@@ -187,6 +188,7 @@ EH3D-PHOENIX-CNC/
 │   ├── cli.rs                                   la ligne de commande : le fichier, la langue, le thème et les options d'image
 │   ├── complete.rs                              Tab dans la zone de commande : complète les codes G, M et $
 │   ├── editor.rs                                l'éditeur du programme : rechercher, remplacer, ligne, notes
+│   ├── profiles.rs                              profils de machine : course, broche, avances et sonde de chacune
 │   ├── bin/phoenix-cnc.rs                       le programme qui ouvre la fenêtre
 │   ├── server.rs                                la liaison au serveur EH3D : envoyer, suivre, mettre en pause, arrêter
 │   ├── settings.rs                              ce qui est mémorisé entre exécutions

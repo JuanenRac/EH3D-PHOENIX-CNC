@@ -21,6 +21,7 @@ pub mod logbook;
 pub mod macros;
 pub mod plan;
 pub mod probe;
+pub mod profiles;
 pub mod progcheck;
 pub mod queue;
 pub mod ranges;

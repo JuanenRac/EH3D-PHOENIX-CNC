@@ -23,6 +23,48 @@ impl App {
         ]
     }
 
+    /// The machine profiles at the top of the General section: the ones saved (a click takes the values of one), the name of the one in use,
+    /// which can be written to save the values as a new profile, and the button that takes it away. Only the copy of the settings that the
+    /// window changes is touched: Ok keeps it and Cancel drops it.
+    pub(super) fn set_profiles(&self, ui: &mut egui::Ui, d: &mut Draft) {
+        let dim = col(self.theme.dim);
+        ui.label(RichText::new(self.w(Msg::SetProfiles).to_uppercase()).color(dim));
+        if d.s.profiles.is_empty() {
+            ui.label(RichText::new(self.w(Msg::SetProfileNone)).color(dim));
+        }
+        let names: Vec<String> = d.s.profiles.iter().map(|p| p.name.clone()).collect();
+        ui.horizontal_wrapped(|ui| {
+            for n in &names {
+                if ui.selectable_label(d.s.profile == *n, n.as_str()).clicked() {
+                    d.s.use_profile(n);
+                }
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label(self.w(Msg::SetProfileName));
+            ui.add(egui::TextEdit::singleline(&mut d.s.profile).desired_width(160.0));
+            if ui.button(self.w(Msg::SetProfileSave)).clicked() {
+                let name = d.s.profile.clone();
+                d.s.save_profile(&name);
+            }
+            let there = d.s.profiles.iter().any(|p| p.name == d.s.profile);
+            if ui
+                .add_enabled(there, egui::Button::new(self.w(Msg::SetProfileDelete)))
+                .clicked()
+            {
+                let name = d.s.profile.clone();
+                d.s.delete_profile(&name);
+            }
+        });
+        ui.label(
+            RichText::new(self.w(Msg::SetProfileHelp))
+                .color(dim)
+                .small(),
+        );
+        ui.separator();
+        ui.add_space(4.0);
+    }
+
     /// A row of the grid: the name, a number with its unit inside the range of its key, and the range as the tooltip.
     #[allow(clippy::too_many_arguments)]
     fn set_row(
@@ -325,6 +367,62 @@ mod tests {
             // drawing a section changes nothing by itself
             assert_eq!(d.s, a.settings, "section {section}");
         }
+    }
+
+    #[test]
+    fn the_profiles_are_drawn_at_the_top_of_the_general_section_and_drawing_changes_nothing() {
+        let ctx = egui::Context::default();
+        for with_profiles in [false, true] {
+            let mut a = App::isolated();
+            if with_profiles {
+                a.settings.save_profile("Small mill");
+                a.settings.travel[0] = (0.0, 900.0);
+                a.settings.save_profile("Router");
+            }
+            let mut d = Draft {
+                s: a.settings.clone(),
+                section: 0,
+            };
+            ctx.run_pass(egui::RawInput::default(), |ctx| {
+                egui::Window::new("profiles").show(ctx, |ui| a.set_profiles(ui, &mut d));
+            })
+            .textures_delta
+            .clear();
+            assert_eq!(d.s, a.settings, "{with_profiles}");
+        }
+    }
+
+    #[test]
+    fn a_profile_chosen_in_the_window_reaches_the_settings_only_with_ok() {
+        let mut a = App::isolated();
+        a.settings.save_profile("Small mill");
+        a.settings.travel[0] = (0.0, 900.0);
+        a.settings.save_profile("Router");
+        let mut d = Draft {
+            s: a.settings.clone(),
+            section: 0,
+        };
+        // the click on a name takes the values into the copy of the window
+        assert!(d.s.use_profile("Small mill"));
+        assert_eq!(d.s.travel[0], (0.0, 500.0));
+        assert_eq!(
+            a.settings.travel[0],
+            (0.0, 900.0),
+            "Cancel leaves the settings as they were"
+        );
+        // Ok: the settings take the copy, the machine gets the travel, and the file keeps both
+        a.win = Some(Win::Settings(Box::new(d)));
+        let Some(Win::Settings(d)) = a.win.take() else {
+            panic!("no settings window");
+        };
+        a.settings = d.s;
+        a.apply_settings();
+        a.save_settings();
+        let back = Settings::load(&a.settings_path);
+        assert_eq!(back.profile, "Small mill");
+        assert_eq!(back.profiles.len(), 2);
+        assert_eq!(back.travel[0], (0.0, 500.0));
+        let _ = std::fs::remove_file(&a.settings_path);
     }
 
     #[test]

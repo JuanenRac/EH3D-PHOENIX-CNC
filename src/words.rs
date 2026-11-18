@@ -181,10 +181,16 @@ pub enum Msg {
     EdApplySave,
     EdApplySaveHere,
     EdRunning,
+    SetProfiles,
+    SetProfileNone,
+    SetProfileName,
+    SetProfileSave,
+    SetProfileDelete,
+    SetProfileHelp,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 173] = [
+pub const ALL: [Msg; 179] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -358,6 +364,12 @@ pub const ALL: [Msg; 173] = [
     Msg::EdApplySave,
     Msg::EdApplySaveHere,
     Msg::EdRunning,
+    Msg::SetProfiles,
+    Msg::SetProfileNone,
+    Msg::SetProfileName,
+    Msg::SetProfileSave,
+    Msg::SetProfileDelete,
+    Msg::SetProfileHelp,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2093,6 +2105,66 @@ fn table(m: Msg) -> [&'static str; 8] {
             "程序正在运行：现在无法更改",
             "Há um programa em curso: não pode ser alterado agora",
         ],
+        Msg::SetProfiles => [
+            "Machine profiles",
+            "Perfiles de máquina",
+            "Maschinenprofile",
+            "Profils de machine",
+            "Profili macchina",
+            "マシンプロファイル",
+            "机床配置文件",
+            "Perfis de máquina",
+        ],
+        Msg::SetProfileNone => [
+            "No profile saved yet",
+            "Aún no hay ningún perfil guardado",
+            "Noch kein Profil gespeichert",
+            "Aucun profil enregistré pour l'instant",
+            "Nessun profilo salvato finora",
+            "保存されたプロファイルはまだありません",
+            "尚未保存任何配置文件",
+            "Ainda não há nenhum perfil guardado",
+        ],
+        Msg::SetProfileName => [
+            "Name",
+            "Nombre",
+            "Name",
+            "Nom",
+            "Nome",
+            "名前",
+            "名称",
+            "Nome",
+        ],
+        Msg::SetProfileSave => [
+            "Save the values as a profile",
+            "Guardar los valores como perfil",
+            "Werte als Profil speichern",
+            "Enregistrer les valeurs comme profil",
+            "Salva i valori come profilo",
+            "現在の値をプロファイルとして保存",
+            "将当前值保存为配置文件",
+            "Guardar os valores como perfil",
+        ],
+        Msg::SetProfileDelete => [
+            "Delete the profile",
+            "Borrar el perfil",
+            "Profil löschen",
+            "Supprimer le profil",
+            "Elimina il profilo",
+            "プロファイルを削除",
+            "删除配置文件",
+            "Apagar o perfil",
+        ],
+        Msg::SetProfileHelp => [
+            "A profile holds the travel, the spindle speed, the feeds and the probe of a machine: click one to take its values, then Ok.",
+            "Un perfil guarda el recorrido, la velocidad del husillo, los avances y la sonda de una máquina: pulsa uno para tomar sus valores y luego Aceptar.",
+            "Ein Profil enthält Verfahrweg, Spindeldrehzahl, Vorschübe und Taster einer Maschine: anklicken, um die Werte zu übernehmen, dann OK.",
+            "Un profil garde la course, la vitesse de broche, les avances et la sonde d'une machine : cliquez sur l'un pour prendre ses valeurs, puis OK.",
+            "Un profilo contiene la corsa, la velocità del mandrino, gli avanzamenti e la sonda di una macchina: fai clic su uno per prenderne i valori, poi OK.",
+            "プロファイルは、マシンのストローク、スピンドル回転数、送り速度、プローブを保存します。クリックして値を取り込み、OK を押します。",
+            "配置文件保存一台机床的行程、主轴转速、进给和探针：点击其一以采用其值，然后点击确定。",
+            "Um perfil guarda o curso, a velocidade do fuso, os avanços e a sonda de uma máquina: clique num para tomar os seus valores e depois em OK.",
+        ],
     }
 }
 
@@ -2156,7 +2228,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 173);
+        assert_eq!(seen.len(), 179);
     }
 
     #[test]

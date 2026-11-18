@@ -1060,6 +1060,7 @@ impl App {
                         ui.set_min_width(420.0);
                         match d.section {
                             0 => {
+                                self.set_profiles(ui, &mut d);
                                 ui.label(
                                     RichText::new(self.t(Text::Units).to_uppercase())
                                         .color(col(self.theme.dim)),

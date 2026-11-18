@@ -10,6 +10,7 @@ use eh3d_view::theme::ThemeId;
 use crate::jog::Mode as JogMode;
 use crate::lint::LintCfg;
 use crate::probe::ProbeCfg;
+use crate::profiles::Profile;
 use crate::tuning::Tuning;
 
 /// How many recent files are kept.
@@ -88,6 +89,10 @@ pub struct Settings {
     /// The values of the program tools (second checker, keep-out boxes, repeats and pauses of the queue, macros, session log, statistics).
     /// They live in the same file, so saving the settings writes them back and never drops them.
     pub tuning: Tuning,
+    /// The machine profiles (the travel, the spindle, the feeds and the probe of each machine) and the name of the one in use ("" when the
+    /// values were set by hand).
+    pub profiles: Vec<Profile>,
+    pub profile: String,
 }
 
 impl Default for Settings {
@@ -133,6 +138,8 @@ impl Default for Settings {
             probe_grid_mm: 10.0,
             heightmap_segment_mm: 1.0,
             tuning: Tuning::default(),
+            profiles: Vec::new(),
+            profile: String::new(),
         }
     }
 }
@@ -145,7 +152,7 @@ fn on(v: &str) -> bool {
 }
 
 /// A value on one line: a line break in it could add keys to the file.
-fn one_line(v: &str) -> String {
+pub(crate) fn one_line(v: &str) -> String {
     v.replace(['\r', '\n'], " ").trim().to_string()
 }
 
@@ -332,6 +339,7 @@ impl Settings {
                 _ => {}
             }
         }
+        s.read_profiles(text);
         s
     }
 
@@ -398,6 +406,7 @@ impl Settings {
             self.probe_grid_mm,
             self.heightmap_segment_mm
         ));
+        out.push_str(&self.profiles_text());
         out.push_str(&self.tuning.to_text());
         out
     }
@@ -546,7 +555,12 @@ mod tests {
                 repeat_max: 7,
                 ..Tuning::default()
             },
+            profiles: Vec::new(),
+            profile: String::new(),
         };
+        s.save_profile("Small mill");
+        s.spindle_rpm = 21_000.0;
+        s.save_profile("Router");
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
         let path = std::env::temp_dir().join(format!(
