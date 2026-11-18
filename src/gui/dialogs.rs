@@ -33,6 +33,8 @@ pub(super) enum Win {
     Probe(probe::Ask),
     /// What the checkers find in the program that is loaded.
     Check(Box<check::CheckState>),
+    /// The editor of the keep-out boxes.
+    KeepOut(Box<keepout::KeepState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -93,6 +95,7 @@ impl App {
             }))),
             "keys" => Some(Win::Shortcuts),
             "check" => Some(Win::Check(Box::new(self.check_state()))),
+            "keepout" => Some(Win::KeepOut(Box::default())),
             _ => None,
         };
     }
@@ -292,6 +295,10 @@ impl App {
                 self.open_window("check");
                 ui.close();
             }
+            if ui.button(self.w(Msg::MenuKeepOut)).clicked() {
+                self.open_window("keepout");
+                ui.close();
+            }
         });
     }
 
@@ -394,6 +401,7 @@ impl App {
             Win::Shortcuts => self.shortcuts_window(ctx),
             Win::Probe(a) => self.probe_window(ctx, a),
             Win::Check(c) => self.check_window(ctx, c),
+            Win::KeepOut(k) => self.keepout_window(ctx, k),
         };
     }
 

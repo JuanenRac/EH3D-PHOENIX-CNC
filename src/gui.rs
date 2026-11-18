@@ -24,6 +24,7 @@ mod check;
 mod clipmenu;
 mod dialogs;
 mod icons;
+mod keepout;
 mod keys;
 mod numfield;
 mod probe;

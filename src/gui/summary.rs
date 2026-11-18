@@ -62,7 +62,11 @@ impl App {
         if self.session.program.is_empty() {
             return false;
         }
-        match self.report().refusal(self.lang) {
+        match self
+            .report()
+            .refusal(self.lang)
+            .or_else(|| self.keepout_refusal())
+        {
             Some(why) => {
                 self.session.log.push(why);
                 true
@@ -92,7 +96,10 @@ impl App {
     ) -> Option<Win> {
         let mut go = false;
         let mut cancel = false;
-        let refusal = p.report.refusal(self.lang);
+        let refusal = p
+            .report
+            .refusal(self.lang)
+            .or_else(|| self.keepout_refusal());
         self.window(self.t(Text::SummaryTitle))
             .default_width(520.0)
             .show(ctx, |ui| {

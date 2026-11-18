@@ -21,7 +21,7 @@ pub struct Options {
     pub start: bool,
     /// Says that `--start` with `--grbl` is meant: a real machine starts the program as soon as the window is open.
     pub start_real: bool,
-    /// A window to open at the start (`--window settings|open|save|edit|about|summary|keys|check`): for the pictures.
+    /// A window to open at the start (`--window settings|open|save|edit|about|summary|keys|check|keepout`): for the pictures.
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
     pub view_3d: Option<bool>,
