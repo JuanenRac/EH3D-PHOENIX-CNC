@@ -4,19 +4,29 @@
 
 pub use eh3d_view::{crash, scene, texts, theme};
 
+pub mod boxes;
 pub mod cli;
 pub mod gcode;
 #[cfg(feature = "gui")]
 pub mod gui;
 pub mod heightmap;
+pub mod jobs;
 pub mod jog;
 pub mod link;
 pub mod lint;
+pub mod logbook;
+pub mod macros;
 pub mod plan;
 pub mod probe;
+pub mod progcheck;
 pub mod queue;
 pub mod recovery;
+pub mod report;
 pub mod server;
 pub mod session;
 pub mod settings;
+pub mod sim;
+pub mod stats;
+pub mod tuning;
 pub mod view;
+pub mod words;

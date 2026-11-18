@@ -29,6 +29,8 @@ pub struct Options {
     pub grbl: Option<String>,
     /// Lists the serial ports and leaves (`--ports`).
     pub ports: bool,
+    /// Prints the report of the program (statistics, time, what looks wrong) and leaves (`--report FILE`); no window, nothing moves.
+    pub report: bool,
 }
 
 impl Options {
@@ -69,6 +71,7 @@ impl Options {
                 }
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
+                "--report" => o.report = true,
                 other if !other.starts_with("--") => {
                     if o.file.is_none() {
                         o.file = Some(PathBuf::from(other));
@@ -78,6 +81,9 @@ impl Options {
                 }
                 other => return Err(format!("unknown option '{other}'")),
             }
+        }
+        if o.report && o.file.is_none() {
+            return Err("--report needs a G-code file".to_string());
         }
         if o.start_real && !o.start {
             return Err("--start-real only goes with --start".to_string());
@@ -143,6 +149,15 @@ mod tests {
         assert_eq!(o.file, Some(PathBuf::from("a.nc")));
         assert_eq!(o.more, vec![PathBuf::from("b.nc"), PathBuf::from("c.nc")]);
         assert!(parse("a.nc").unwrap().more.is_empty());
+    }
+
+    #[test]
+    fn the_report_needs_a_file() {
+        assert!(parse("--report").is_err());
+        let o = parse("--report job.nc --lang es").unwrap();
+        assert!(o.report);
+        assert_eq!(o.file, Some(PathBuf::from("job.nc")));
+        assert!(!parse("job.nc").unwrap().report);
     }
 
     #[test]
