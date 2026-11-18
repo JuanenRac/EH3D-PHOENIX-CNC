@@ -11,6 +11,14 @@ fn main() -> eframe::Result {
     eh3d_phoenix_cnc::crash::install("phoenix-cnc", env!("CARGO_PKG_VERSION"));
     attach_console();
     match Options::parse(std::env::args().skip(1)) {
+        Ok(o) if o.version => {
+            println!("phoenix-cnc {}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
+        }
+        Ok(o) if o.help => {
+            print!("{}", eh3d_phoenix_cnc::cli::help_text());
+            std::process::exit(0);
+        }
         Ok(o) if o.report => std::process::exit(print_report(&o)),
         Ok(o) => eh3d_phoenix_cnc::gui::run(&o),
         Err(e) => {

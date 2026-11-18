@@ -31,6 +31,36 @@ pub struct Options {
     pub ports: bool,
     /// Prints the report of the program (statistics, time, what looks wrong) and leaves (`--report FILE`); no window, nothing moves.
     pub report: bool,
+    /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
+    pub version: bool,
+    pub help: bool,
+}
+
+/// The text of `--help`: every option the command line reads.
+pub fn help_text() -> String {
+    format!(
+        "phoenix-cnc {}\n\
+         \n\
+         Usage: phoenix-cnc [OPTIONS] [FILE.NC ...]\n\
+         \n\
+         A G-code file is opened as the program; more files make a queue that runs one after the other.\n\
+         \n\
+         Options:\n\
+         \x20 --report FILE      print the statistics, the time and what looks wrong in a program, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
+         \x20 --theme NAME       the colours\n\
+         \x20 --view plan|3d     how the path is seen at the start\n\
+         \x20 --window NAME      open a window at the start (settings, open, save, edit, about, summary, keys, check, keepout, stats)\n\
+         \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
+         \x20 --wait FRAMES      the frames --shot waits for\n\
+         \x20 --start            start the program as soon as the window is open\n\
+         \x20 --start-real       also needed to --start with a real controller (--grbl)\n\
+         \x20 --grbl PORT[@BAUD] drive a GRBL controller on a serial port (a build with --features serial)\n\
+         \x20 --ports            list the serial ports and leave\n\
+         \x20 --version, -V      print the version and leave\n\
+         \x20 --help, -h         print this text and leave\n",
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 impl Options {
@@ -72,6 +102,8 @@ impl Options {
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
                 "--report" => o.report = true,
+                "--version" | "-V" => o.version = true,
+                "--help" | "-h" => o.help = true,
                 other if !other.starts_with("--") => {
                     if o.file.is_none() {
                         o.file = Some(PathBuf::from(other));
@@ -81,6 +113,10 @@ impl Options {
                 }
                 other => return Err(format!("unknown option '{other}'")),
             }
+        }
+        // the version and the help are answered whatever else was given
+        if o.version || o.help {
+            return Ok(o);
         }
         if o.report && o.file.is_none() {
             return Err("--report needs a G-code file".to_string());
@@ -158,6 +194,48 @@ mod tests {
         assert!(o.report);
         assert_eq!(o.file, Some(PathBuf::from("job.nc")));
         assert!(!parse("job.nc").unwrap().report);
+    }
+
+    #[test]
+    fn the_version_and_the_help_are_asked_for_and_win_over_the_rest() {
+        assert!(parse("--version").unwrap().version);
+        assert!(parse("-V").unwrap().version);
+        assert!(parse("--help").unwrap().help);
+        assert!(parse("-h").unwrap().help);
+        // nothing else is needed or checked
+        assert!(parse("--report --version").unwrap().version);
+        assert!(parse("--grbl COM3 --start --help").unwrap().help);
+        assert!(!parse("job.nc").unwrap().version && !parse("job.nc").unwrap().help);
+    }
+
+    #[test]
+    fn the_help_names_every_option_the_command_line_reads() {
+        let h = help_text();
+        assert!(h.starts_with(&format!("phoenix-cnc {}", env!("CARGO_PKG_VERSION"))));
+        for option in [
+            "--report",
+            "--lang",
+            "--theme",
+            "--view",
+            "--window",
+            "--shot",
+            "--wait",
+            "--start",
+            "--start-real",
+            "--grbl",
+            "--ports",
+            "--version",
+            "--help",
+        ] {
+            assert!(h.contains(option), "{option} is not in the help");
+        }
+        // every window that --window opens is listed
+        for name in [
+            "settings", "open", "save", "edit", "about", "summary", "keys", "check", "keepout",
+            "stats",
+        ] {
+            assert!(h.contains(name), "{name} is not in the help");
+        }
     }
 
     #[test]
