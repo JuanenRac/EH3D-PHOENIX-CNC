@@ -50,8 +50,15 @@ pub(super) struct Draft {
 }
 
 impl App {
-    fn browser(&self, mode: Mode) -> Box<Browser> {
-        let start = if mode == Mode::Save && !self.path.is_empty() {
+    fn browser(&mut self, mode: Mode) -> Box<Browser> {
+        self.browser_for(mode, Purpose::Program)
+    }
+
+    /// A file window for what the file is for: a G-code program, a height map or the session log.
+    pub(super) fn browser_for(&mut self, mode: Mode, purpose: Purpose) -> Box<Browser> {
+        self.file_purpose = purpose;
+        let program = purpose == Purpose::Program;
+        let start = if mode == Mode::Save && program && !self.path.is_empty() {
             Path::new(&self.path).parent().map(Path::to_path_buf)
         } else {
             None
@@ -65,18 +72,33 @@ impl App {
             .ok()
             .and_then(|e| e.parent().map(Path::to_path_buf))
             .unwrap_or_else(|| PathBuf::from("."));
+        let extensions: &[&str] = match purpose {
+            Purpose::Program => &GCODE_EXTENSIONS,
+            Purpose::MapSave | Purpose::MapLoad => &["map", "txt"],
+            Purpose::LogSave => &["txt", "csv", "json", "log"],
+        };
+        let default_ext = match purpose {
+            Purpose::Program => "nc",
+            Purpose::MapSave | Purpose::MapLoad => "map",
+            Purpose::LogSave => "txt",
+        };
         let mut b = Browser::new(
             mode,
             &start,
             &base,
-            vec![Filter::new(&GCODE_EXTENSIONS), Filter::any()],
-            Some("nc"),
+            vec![Filter::new(extensions), Filter::any()],
+            Some(default_ext),
         );
         if mode == Mode::Save {
-            b.name_text = Path::new(&self.path).file_name().map_or_else(
-                || "program.nc".to_string(),
-                |n| n.to_string_lossy().to_string(),
-            );
+            b.name_text = match purpose {
+                Purpose::Program => Path::new(&self.path).file_name().map_or_else(
+                    || "program.nc".to_string(),
+                    |n| n.to_string_lossy().to_string(),
+                ),
+                Purpose::MapSave => "heightmap.map".to_string(),
+                Purpose::LogSave => "session-log.txt".to_string(),
+                Purpose::MapLoad => String::new(),
+            };
         }
         Box::new(b)
     }
@@ -108,7 +130,7 @@ impl App {
     }
 
     /// Saves the program as it is now, as text.
-    fn save_program(&mut self, path: &Path) -> Result<(), String> {
+    pub(super) fn save_program(&mut self, path: &Path) -> Result<(), String> {
         let mut text = self.session.program.join("\n");
         text.push('\n');
         std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -191,6 +213,10 @@ impl App {
             }
             if self.menu_item(ui, self.t(Text::McEditProgram), Shortcut::Edit, true) {
                 self.win = Some(Win::Edit(self.session.program.join("\n")));
+                ui.close();
+            }
+            if ui.button(self.w(Msg::MenuLogExport)).clicked() {
+                self.win = Some(Win::Save(self.browser_for(Mode::Save, Purpose::LogSave)));
                 ui.close();
             }
             ui.separator();
@@ -579,13 +605,10 @@ impl App {
                 });
             });
         match answer {
-            Some(true) => match self.save_program(&path) {
-                Ok(()) => None,
-                Err(e) => {
-                    self.session.log.push(e);
-                    None
-                }
-            },
+            Some(true) => {
+                self.file_chosen(Mode::Save, &path);
+                None
+            }
             Some(false) => Some(Win::Save(b)),
             None => Some(Win::Replace(b, path)),
         }
@@ -603,11 +626,14 @@ impl App {
 
     /// The Open and Save window: the places on the left, the path above, the list of the folder, the file name and the type below.
     fn file_window(&mut self, ctx: &egui::Context, mut b: Box<Browser>, mode: Mode) -> Option<Win> {
-        let title = if mode == Mode::Open {
-            self.t(Text::McOpenTitle)
-        } else {
-            self.t(Text::McSaveTitle)
+        let program = self.file_purpose == Purpose::Program;
+        let open_prog = mode == Mode::Open && program;
+        let title = match self.purpose_title() {
+            Some(t) => t,
+            None if mode == Mode::Open => self.t(Text::McOpenTitle),
+            None => self.t(Text::McSaveTitle),
         };
+        let first_filter = self.first_filter_label();
         let mut done: Option<Chosen> = None;
         // the files picked with Ctrl+click to run one after the other (the Open window only)
         let mut multi: Vec<PathBuf> = std::mem::take(&mut self.open_multi);
@@ -615,7 +641,7 @@ impl App {
         let mut queue_chosen: Option<Vec<PathBuf>> = None;
         let mut cancel = false;
         let mut error: Option<&'static str> = None;
-        let previewing = mode == Mode::Open && self.settings.open_preview;
+        let previewing = open_prog && self.settings.open_preview;
         if previewing {
             self.update_preview(&b);
         }
@@ -667,7 +693,7 @@ impl App {
                             .take(6)
                             .cloned()
                             .collect();
-                        if mode == Mode::Open && !recent.is_empty() {
+                        if open_prog && !recent.is_empty() {
                             ui.add_space(8.0);
                             ui.label(
                                 RichText::new(self.t(Text::Recent).to_uppercase())
@@ -780,7 +806,7 @@ impl App {
                                 .filter(|e| !e.is_dir)
                                 .and_then(|e| b.dir.as_ref().map(|d| d.join(&e.name)));
                             match file {
-                                Some(path) if ctrl_click && mode == Mode::Open => {
+                                Some(path) if ctrl_click && open_prog => {
                                     // the file already chosen with a plain click is the first of the queue
                                     if multi.is_empty() {
                                         if let Some(prev) = Self::previewed_path(&b) {
@@ -827,19 +853,19 @@ impl App {
                     let mut filter = b.filter;
                     egui::ComboBox::from_id_salt("filefilter")
                         .selected_text(if filter == 0 {
-                            self.t(Text::McFilterGcode)
+                            first_filter
                         } else {
                             self.t(Text::FilterAny)
                         })
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut filter, 0, self.t(Text::McFilterGcode));
+                            ui.selectable_value(&mut filter, 0, first_filter);
                             ui.selectable_value(&mut filter, 1, self.t(Text::FilterAny));
                         });
                     if filter != b.filter {
                         b.set_filter(filter);
                     }
                     let preview_label = self.t(Text::PreviewShow);
-                    if mode == Mode::Open
+                    if open_prog
                         && ui
                             .checkbox(&mut self.settings.open_preview, preview_label)
                             .changed()
@@ -851,11 +877,11 @@ impl App {
                     } else {
                         self.t(Text::Save)
                     };
-                    if mode == Mode::Open && multi.len() >= 2 {
+                    if open_prog && multi.len() >= 2 {
                         ui.label(format!("{}: {}", self.t(Text::McQueue), multi.len()));
                     }
                     if ui.button(label).clicked() || enter {
-                        if mode == Mode::Open && multi.len() >= 2 {
+                        if open_prog && multi.len() >= 2 {
                             queue_chosen = Some(multi.clone());
                         } else {
                             match b.confirm() {
@@ -894,16 +920,13 @@ impl App {
         match done {
             Some(Chosen::File(p)) => {
                 self.dialog_error = None;
-                if mode == Mode::Open {
-                    self.open(&p);
-                } else if let Err(e) = self.save_program(&p) {
-                    self.session.log.push(e);
-                }
+                self.file_chosen(mode, &p);
                 None
             }
             Some(Chosen::Overwrite(p)) => {
-                if mode == Mode::Open {
-                    self.open(&p);
+                if mode == Mode::Open || self.file_purpose == Purpose::LogSave {
+                    // the log is never written over a file: the export says so
+                    self.file_chosen(mode, &p);
                     None
                 } else {
                     Some(Win::Replace(b, p))

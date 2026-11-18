@@ -107,6 +107,8 @@ pub struct Session {
     pub paused: bool,
     /// What was said between the program and the controller, the oldest first.
     pub log: Vec<String>,
+    /// How many lines were dropped from the front of `log` to keep it short, so a reader can tell where it was.
+    pub log_dropped: usize,
     pub step_mm: f64,
     pub feed_mm_min: f64,
     /// The codes in force, from the lines the controller took.
@@ -240,6 +242,7 @@ impl Session {
             running: false,
             paused: false,
             log: Vec::new(),
+            log_dropped: 0,
             step_mm: 1.0,
             feed_mm_min: 600.0,
             modal: Modal::default(),
@@ -271,6 +274,7 @@ impl Session {
         self.log.push(line.into());
         if self.log.len() > 500 {
             self.log.drain(..100);
+            self.log_dropped += 100;
         }
     }
 

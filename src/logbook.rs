@@ -183,6 +183,30 @@ impl Logbook {
     }
 }
 
+/// Guesses the kind of a line of the log of a session: what was sent starts with `> `, what came back is `ok`, a line with the words of a
+/// failure is an error, any other line with a colon (the tools say what they did that way) is a warning, and the rest are notes.
+pub fn classify(line: &str) -> Kind {
+    let l = line.trim();
+    if l.starts_with("> ") {
+        return Kind::Sent;
+    }
+    if l.eq_ignore_ascii_case("ok") {
+        return Kind::Received;
+    }
+    let low = l.to_ascii_lowercase();
+    if ["error", "alarm", "emergency", "failed", "refused", "cannot"]
+        .iter()
+        .any(|w| low.contains(w))
+    {
+        return Kind::Error;
+    }
+    if l.contains(':') {
+        Kind::Warning
+    } else {
+        Kind::Note
+    }
+}
+
 fn json_escape(s: &str) -> String {
     let mut o = String::with_capacity(s.len());
     for c in s.chars() {
@@ -199,6 +223,22 @@ fn json_escape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_line_of_the_session_is_given_a_kind() {
+        assert_eq!(classify("> G0 X1"), Kind::Sent);
+        assert_eq!(classify("ok"), Kind::Received);
+        assert_eq!(classify("OK "), Kind::Received);
+        assert_eq!(classify("error:20"), Kind::Error);
+        assert_eq!(classify("EMERGENCY STOP"), Kind::Error);
+        assert_eq!(
+            classify("queue: a.nc cannot be run; the queue stops"),
+            Kind::Error
+        );
+        assert_eq!(classify("queue: all programs are done"), Kind::Warning);
+        assert_eq!(classify("hello"), Kind::Note);
+        assert_eq!(classify(""), Kind::Note);
+    }
 
     fn demo() -> Logbook {
         let mut l = Logbook::new(100);

@@ -23,6 +23,7 @@ use crate::settings::{settings_path, Settings};
 mod check;
 mod clipmenu;
 mod dialogs;
+mod files;
 mod icons;
 mod keepout;
 mod keys;
@@ -41,6 +42,7 @@ use crate::session::{Session, STEPS};
 const PUMP_BATCH: usize = 8;
 use crate::view::{Orbit, Plan2d};
 use dialogs::{lang_name, Win};
+use files::Purpose;
 use keys::Shortcut;
 
 fn col(c: Rgb) -> Color32 {
@@ -205,6 +207,11 @@ pub struct App {
     /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
     focus_line: Option<usize>,
     focus_scroll: bool,
+    /// What the file window that is open is for, the session log kept for export, how much of the log of the session it has taken, and the start of the session.
+    file_purpose: Purpose,
+    logbook: crate::logbook::Logbook,
+    log_seen: usize,
+    started: std::time::Instant,
     /// The estimates of time that are kept, and the line and the point of the path the simulation is at (None: no simulation).
     estimate: crate::estimate::Cache,
     sim_line: Option<usize>,
@@ -247,6 +254,7 @@ impl App {
         if let Some(v) = o.view_3d {
             settings.view_3d = v;
         }
+        let settings_log_max = settings.tuning.log_max;
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;
         session.feed_mm_min = settings.feed_mm_min;
@@ -288,6 +296,10 @@ impl App {
             open_multi: Vec::new(),
             focus_line: None,
             focus_scroll: false,
+            file_purpose: Purpose::Program,
+            logbook: crate::logbook::Logbook::new(settings_log_max),
+            log_seen: 0,
+            started: std::time::Instant::now(),
             estimate: crate::estimate::Cache::new(64),
             sim_line: None,
             sim_pos: None,
@@ -1141,6 +1153,7 @@ impl eframe::App for App {
         }
         self.queue_tick();
         self.queue_persist();
+        self.log_collect();
         if self.queue_gate.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(250));
         }

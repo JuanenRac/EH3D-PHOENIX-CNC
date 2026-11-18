@@ -210,6 +210,7 @@ impl App {
             }
             ui.close();
         }
+        self.map_files_menu(ui);
     }
 
     /// Corrects the program with the map and draws the corrected path.
