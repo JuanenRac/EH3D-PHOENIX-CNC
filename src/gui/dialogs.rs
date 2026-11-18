@@ -39,6 +39,8 @@ pub(super) enum Win {
     Sim(Box<sim::SimState>),
     /// Between two runs of a program of the queue: the operator places the work and confirms.
     Between(usize),
+    /// The question before a macro runs (its name).
+    Macro(String),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -150,6 +152,7 @@ impl App {
                 self.menu_view(ui);
                 self.menu_program(ui);
                 self.menu_machine(ui);
+                self.menu_macros(ui);
                 self.menu_help(ui);
             });
         });
@@ -413,6 +416,7 @@ impl App {
             Win::KeepOut(k) => self.keepout_window(ctx, k),
             Win::Sim(s) => self.sim_window(ctx, s),
             Win::Between(i) => self.between_window(ctx, i),
+            Win::Macro(n) => self.macro_window(ctx, n),
         };
         // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
         if next.is_some() || self.win.is_none() {

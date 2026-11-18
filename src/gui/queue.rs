@@ -10,9 +10,13 @@ use crate::sim::hms;
 use crate::words::Msg;
 use std::time::{Duration, Instant};
 
-/// Where the queue is kept: next to the settings.
+/// Where the queue is kept: next to the settings, with the name of the settings file in front (`phoenix-cnc-queue.state`).
 pub(super) fn queue_state_path(settings: &Path) -> PathBuf {
-    settings.with_file_name("queue.state")
+    let stem = settings.file_stem().map_or_else(
+        || "phoenix-cnc".to_string(),
+        |s| s.to_string_lossy().to_string(),
+    );
+    settings.with_file_name(format!("{stem}-queue.state"))
 }
 
 impl App {

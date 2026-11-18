@@ -26,6 +26,7 @@ mod dialogs;
 mod icons;
 mod keepout;
 mod keys;
+mod macros;
 mod numfield;
 mod probe;
 mod queue;

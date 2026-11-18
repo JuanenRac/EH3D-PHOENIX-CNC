@@ -558,15 +558,22 @@ impl Session {
 
     /// One line typed by the operator.
     pub fn mdi(&mut self, line: &str) {
+        self.mdi_checked(line);
+    }
+
+    /// One line sent like a typed one, saying whether the controller took it (an empty line, a controller that is busy sending a program and a
+    /// line the controller refuses give `false`). A macro stops at the first line that gives `false`.
+    pub fn mdi_checked(&mut self, line: &str) -> bool {
         let line = line.trim();
         if line.is_empty() {
-            return;
+            return false;
         }
         self.say(format!("> {line}"));
         if self.refuse_busy("mdi") {
-            return;
+            return false;
         }
         let r = self.ctl().send_line(line);
+        let taken = r.is_ok();
         match r {
             Ok(()) => {
                 self.modal.apply(line);
@@ -575,6 +582,7 @@ impl Session {
             Err(e) => self.failed("mdi", e),
         }
         self.refresh();
+        taken
     }
 
     /// Takes a program (the lines of a G-code file); a program that was running is stopped.
