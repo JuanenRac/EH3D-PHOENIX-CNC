@@ -31,6 +31,8 @@ pub struct Options {
     pub ports: bool,
     /// Prints the report of the program (statistics, time, what looks wrong) and leaves (`--report FILE`); no window, nothing moves.
     pub report: bool,
+    /// With `--report`: also writes the work report as one page of HTML (`--html FILE`); a file that is there is not written over.
+    pub html: Option<PathBuf>,
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
     pub version: bool,
     pub help: bool,
@@ -68,6 +70,7 @@ pub fn help_text() -> String {
          \n\
          Options:\n\
          \x20 --report FILE      print the statistics, the time and what looks wrong in a program, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --html FILE        with --report, also write the work report as one page of HTML (a file that is there is not written over)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view plan|3d     how the path is seen at the start\n\
@@ -124,6 +127,7 @@ impl Options {
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--ports" => o.ports = true,
                 "--report" => o.report = true,
+                "--html" => o.html = Some(PathBuf::from(value("--html")?)),
                 "--version" | "-V" => o.version = true,
                 "--help" | "-h" => o.help = true,
                 other if !other.starts_with("--") => {
@@ -142,6 +146,9 @@ impl Options {
         }
         if o.report && o.file.is_none() {
             return Err("--report needs a G-code file".to_string());
+        }
+        if o.html.is_some() && !o.report {
+            return Err("--html only goes with --report".to_string());
         }
         if o.start_real && !o.start {
             return Err("--start-real only goes with --start".to_string());
@@ -236,6 +243,7 @@ mod tests {
         assert!(h.starts_with(&format!("phoenix-cnc {}", env!("CARGO_PKG_VERSION"))));
         for option in [
             "--report",
+            "--html",
             "--lang",
             "--theme",
             "--view",
@@ -263,6 +271,16 @@ mod tests {
         for name in WINDOWS {
             assert!(seen.insert(name), "{name} twice");
         }
+    }
+
+    #[test]
+    fn the_html_report_goes_with_the_report() {
+        let o = parse("--report --html out.html job.nc").unwrap();
+        assert_eq!(o.html, Some(PathBuf::from("out.html")));
+        assert!(o.report);
+        assert!(parse("--html out.html job.nc").is_err());
+        assert!(parse("--report job.nc --html").is_err());
+        assert_eq!(parse("--report job.nc").unwrap().html, None);
     }
 
     #[test]

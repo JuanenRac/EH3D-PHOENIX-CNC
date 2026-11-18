@@ -230,9 +230,7 @@ mod tests {
 
     #[test]
     fn the_arcs_and_the_tool_changes_are_part_of_the_estimate_and_of_its_key() {
-        let lines: Vec<String> = "T1 M6
-G1 X60 F600
-G3 X60 Y10 I0 J5"
+        let lines: Vec<String> = "T1 M6\nG1 X60 F600\nG3 X60 Y10 I0 J5"
             .lines()
             .map(str::to_string)
             .collect();
@@ -258,13 +256,7 @@ G3 X60 Y10 I0 J5"
     fn a_file_in_the_queue_counts_its_changes_and_is_measured_again_when_the_time_changes() {
         let d = temp("changes");
         let f = d.join("a.nc");
-        std::fs::write(
-            &f,
-            "T1 M6
-G1 X60 F600
-",
-        )
-        .unwrap();
+        std::fs::write(&f, "T1 M6\nG1 X60 F600\n").unwrap();
         let mut c = Cache::new(4);
         let a = c.file_seconds_with(&f, RATES, 0.0).unwrap();
         let b = c.file_seconds_with(&f, RATES, 30.0).unwrap();

@@ -32,3 +32,4 @@ pub mod stats;
 pub mod tuning;
 pub mod view;
 pub mod words;
+pub mod workreport;

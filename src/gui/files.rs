@@ -17,6 +17,8 @@ pub(super) enum Purpose {
     MapSave,
     MapLoad,
     LogSave,
+    /// The work report (a page of HTML).
+    ReportSave,
 }
 
 /// The biggest height map file read (a grid of 100 x 100 points is a few hundred kilobytes).
@@ -30,6 +32,7 @@ impl App {
             Purpose::MapSave => Msg::MenuMapSave,
             Purpose::MapLoad => Msg::MenuMapLoad,
             Purpose::LogSave => Msg::MenuLogExport,
+            Purpose::ReportSave => Msg::RepMenu,
         };
         Some(self.w(m).trim_end_matches('.'))
     }
@@ -40,6 +43,7 @@ impl App {
             Purpose::Program => self.t(Text::McFilterGcode),
             Purpose::MapSave | Purpose::MapLoad => self.w(Msg::FilterMap),
             Purpose::LogSave => self.w(Msg::FilterLog),
+            Purpose::ReportSave => self.w(Msg::FilterReport),
         }
     }
 
@@ -55,6 +59,7 @@ impl App {
             (Purpose::MapLoad, _) => self.load_height_map(path),
             (Purpose::MapSave, _) => self.save_height_map(path),
             (Purpose::LogSave, _) => self.export_log(path),
+            (Purpose::ReportSave, _) => self.export_work_report(path),
         }
     }
 
@@ -129,6 +134,44 @@ impl App {
         }
     }
 
+    /// Writes the work report of the program that is loaded as one page of HTML, with the height map when there is one. A file that is there is
+    /// never written over.
+    pub(super) fn export_work_report(&mut self, path: &Path) {
+        if self.session.program.is_empty() {
+            let said = self.w(Msg::RepNone).to_string();
+            self.session.log.push(said);
+            return;
+        }
+        let name = Path::new(&self.path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let cfg = self.report_cfg();
+        let page = crate::workreport::html(&crate::workreport::Input {
+            name: &name,
+            lines: &self.session.program,
+            tuning: &self.settings.tuning,
+            lint: &self.settings.lint,
+            cfg: &cfg,
+            height_map: self.session.height_map.as_ref(),
+            version: env!("CARGO_PKG_VERSION"),
+        });
+        match crate::workreport::write_new(path, &page) {
+            Ok(()) => {
+                let said = self.ws(Msg::RepSaved, &[path.display().to_string()]);
+                self.session.log.push(said);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let said = self.ws(Msg::RepExists, &[path.display().to_string()]);
+                self.session.log.push(said);
+            }
+            Err(e) => self
+                .session
+                .log
+                .push(format!("work report: {}: {e}", path.display())),
+        }
+    }
+
     /// Takes the lines the session added to its log since the last call into the log that can be exported, with the time since the
     /// window opened and a kind guessed from the line.
     pub(super) fn log_collect(&mut self) {
@@ -176,6 +219,13 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    impl App {
+        fn file_chosen_for_report(&mut self, path: &Path) {
+            self.file_purpose = Purpose::ReportSave;
+            self.file_chosen(Mode::Save, path);
+        }
     }
 
     fn a_map() -> HeightMap {
@@ -255,6 +305,43 @@ mod tests {
     }
 
     #[test]
+    fn the_work_report_is_written_as_html_and_never_over_a_file() {
+        let d = folder("report");
+        let mut a = App::isolated();
+        let page = d.join("report.html");
+        // no program, no report
+        a.file_chosen_for_report(&page);
+        assert!(!page.exists());
+        assert!(a
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("no program to report")));
+        a.session
+            .load("G21 G90\nM3 S1000\nG0 X10 Y10\nG1 Z-1 F200\nG1 X20\nM5");
+        a.session.height_map = Some(a_map());
+        a.file_chosen_for_report(&page);
+        let text = std::fs::read_to_string(&page).unwrap();
+        assert!(text.starts_with("<!DOCTYPE html>"));
+        assert!(text.contains("Height map") && text.contains("<svg"));
+        assert!(a
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("work report: written to")));
+        // the same name again leaves the file as it was
+        std::fs::write(&page, "mine").unwrap();
+        a.file_chosen_for_report(&page);
+        assert_eq!(std::fs::read_to_string(&page).unwrap(), "mine");
+        assert!(a
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("is not written over")));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
     fn the_window_knows_what_its_file_is_for() {
         let mut a = App::isolated();
         assert_eq!(a.purpose_title(), None);
@@ -264,6 +351,9 @@ mod tests {
         a.file_purpose = Purpose::LogSave;
         assert_eq!(a.purpose_title(), Some("Export the session log"));
         assert_eq!(a.first_filter_label(), "Session logs");
+        a.file_purpose = Purpose::ReportSave;
+        assert_eq!(a.purpose_title(), Some("Export the work report"));
+        assert_eq!(a.first_filter_label(), "Work reports (HTML)");
         // a window for a program resets it
         let _ = a.browser_for(Mode::Open, Purpose::MapLoad);
         assert_eq!(a.file_purpose, Purpose::MapLoad);

@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-366-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-378-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 366 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
+**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 378 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.1.3` |
 | Maturidade | Funcional |
-| Testes | 366 |
+| Testes | 378 |
 | Tecnologias | Rust |
 | Em hardware real | Não: por defeito comanda uma máquina simulada; um controlador GRBL real (`--grbl`) nunca foi experimentado |
 
@@ -47,7 +47,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 | Biblioteca base | 🟡 | Um crate de Rust que reexporta `scene`, `texts` e `theme` do `eh3d-view` com o nome deste programa; precisa da pasta do EH3D-COMMON ao lado. |
 | Cena e vistas | 🟡 | Escrita e testada no EH3D-COMMON; a janela deste programa desenha a trajetória de um programa na mesa e a posição da ferramenta (vista num computador). |
 | Temas e textos | 🟡 | Onze temas e as palavras da interface em 37 idiomas, vistos na janela deste programa. |
-| Testes | 🟡 | Passam 366 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
+| Testes | 🟡 | Passam 378 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
 | Janela e jog | 🟡 | Funciona num computador com o controlador simulado: posição, teclado de jog, passos, avanço, referência, zero, desbloqueio, uma linha de comandos e um registo; sem máquina real. |
 | Controlo de máquina | 🟠 | Só o simulador: um programa corre linha a linha com pausa, paragem e paragem de emergência; ainda não se liga nenhum controlador real a partir daqui. |
 | Documentação | 🟡 | README em oito idiomas, as duas imagens, três programas de exemplo e o changelog. |
@@ -71,6 +71,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 * **Verificações do programa, limites por software do jog e a sonda:** o resumo diz também o que parece errado dentro do programa (um movimento rápido que termina abaixo da superfície, um corte com o fuso parado, um fuso arrancado sem velocidade, uma troca de ferramenta, um programa sem fim, e um avanço ou uma velocidade do fuso acima de `lint_max_feed` ou `lint_max_rpm`, que valem 5000 mm/min e 24000 rpm por defeito e ficam desligados a 0; `lint = no` desliga as verificações e `lint_rapid_floor` define o Z abaixo do qual se avisa de um rápido). Um passo do jog que passaria do curso é encurtado até ao limite e um que sai do limite para fora é recusado (`jog_soft_limits` é `homing` por omissão: o limite só vale depois de fazer homing; `always` aplica-o desde o início e `no` desliga-o). **Máquina > Sondar Z** executa o ciclo numa placa de contacto (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` e `probe_clearance` no ficheiro de definições) e **Máquina > Sondar uma grelha** toca uma grelha sobre os cortes do programa (`probe_grid` mm de afastamento) para construir um mapa de alturas; **Corrigir o programa com o mapa de alturas** corta cada movimento de corte em pedaços de no máximo `heightmap_segment` mm e sobe ou desce cada um conforme a altura por baixo (um programa em milímetros absolutos e sem arcos; um que sai da zona sondada é recusado) e **Anular a correção de altura** devolve o programa ao que era. As duas sondagens perguntam primeiro porque a máquina se move, e um controlador sem sonda recusa-as. Testado apenas com dobles; nada correu numa máquina real.
 * **As ferramentas do programa, na janela e na linha de comandos:** **Programa > Verificar o programa...** lista o que as verificações encontram, linha a linha (o número junto a cada achado mostra essa linha no painel do programa), **Programa > Caixas proibidas...** edita os locais aonde a ferramenta não deve ir (um programa que entre numa delas não arranca, salvo com `keepout_reject = no`) e **Programa > Estatísticas e simulação...** reproduz a trajetória no papel com o cursor na linha, enquanto o painel do programa diz o tempo que falta. A fila repete um programa (uma caixa com o número de passagens), pergunta ao operador ou espera `queue_pause` segundos entre duas passagens, mostra o seu tempo total e fica guardada num ficheiro entre execuções (volta em espera: nada arranca sozinho). O menu **Macros** executa, depois de perguntar, as macros de `phoenix-cnc-macros.txt` (junto ao ficheiro de definições); **Máquina > Guardar o mapa de alturas...** e **Máquina > Carregar um mapa de alturas...** guardam o mapa num ficheiro (nunca escrito por cima sem perguntar) e **Ficheiro > Exportar o registo da sessão...** guarda o registo como texto, CSV ou JSON (nunca por cima de um ficheiro). Os seus valores (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` e `tool_change_time`) estão no ficheiro de definições, e a janela mantém-nos quando guarda as outras definições. `phoenix-cnc --report FICHEIRO` imprime os mesmos achados com as estatísticas e o tempo de um programa sem abrir a janela (código de saída 0 se nada precisa de ser lido, 1 se algo precisa, 2 se o ficheiro não puder ser lido; `--lang` escolhe o idioma), e `--version` e `--help` respondem logo. Experimentado apenas no simulador; nada correu numa máquina real.
 * **A janela de definições tem três secções para as ferramentas do programa:** **Verificações** (o primeiro e o segundo verificador, a margem e a recusa das zonas proibidas, o piso dos movimentos rápidos e o avanço e a velocidade do veio mais altos), **Sonda e mapa de alturas** (a sonda, a grelha, o comprimento dos troços de um corte corrigido e os limites do movimento manual) e **Fila, macros e registo** (as repetições e a pausa da fila, a velocidade da simulação, as entradas do registo de sessão, as macros e o tempo de uma troca de ferramenta). Cada número fica dentro do intervalo que o ficheiro de definições aceita (o intervalo é a sua dica), **Valores por omissão desta secção** repõe uma secção e, ao guardar, todas as outras chaves do ficheiro são mantidas.
+* **Um relatório de trabalho numa só página HTML:** **Ficheiro > Exportar o relatório de trabalho...** (ou `phoenix-cnc --report FICHEIRO.NC --html RELATORIO.html`) escreve uma página que leva tudo dentro, sem script, sem ligações e sem imagens à parte: as estatísticas e o tempo do programa, as ferramentas, o que parece errado com a sua linha, a trajetória vista de cima com as linhas que têm um aviso rodeadas e o mapa de alturas como uma grelha de cores quando foi medido um. Segue o idioma, as cores seguem o modo claro ou escuro do navegador e um ficheiro que já exista nunca é substituído.
 
 ## 🧩 Papel no EH3D
 
@@ -137,7 +138,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testes
 
-`cargo test --features gui` executa 366 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
+`cargo test --features gui` executa 378 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
 
 ## 🏗️ Compilação e publicação
 
@@ -168,6 +169,7 @@ EH3D-PHOENIX-CNC/
 │   ├── macros.rs                                a biblioteca de macros: G-code com nome que pergunta antes de correr
 │   ├── logbook.rs                               registo da sessão em texto, CSV ou JSON, sem pisar ficheiros
 │   ├── report.rs                                o relatório de --report: estatísticas, tempo, o que parece mal
+│   ├── workreport.rs                            o relatório de trabalho numa página HTML: estatísticas, avisos, trajetória, mapa de alturas
 │   ├── tuning.rs                                os valores destas ferramentas no ficheiro de definições
 │   ├── ranges.rs                                o intervalo de cada chave destas ferramentas, comum à janela e ao ficheiro
 │   ├── words.rs                                 as mensagens destas ferramentas nos oito idiomas

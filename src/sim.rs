@@ -394,11 +394,7 @@ mod tests {
     #[test]
     fn an_arc_takes_the_time_of_its_curve_and_not_of_its_chord() {
         // a half circle of radius 5 at 600 mm/min: 15.708 mm take 1.5708 s, the chord of 10 mm would take 1 s
-        let t = timeline_of(
-            "G21 G90
-G3 X10 Y0 I5 J0 F600",
-            0.0,
-        );
+        let t = timeline_of("G21 G90\nG3 X10 Y0 I5 J0 F600", 0.0);
         assert!(
             (t.total_s - 5.0 * std::f64::consts::PI / 10.0).abs() < 1e-9,
             "{}",
@@ -412,14 +408,7 @@ G3 X10 Y0 I5 J0 F600",
 
     #[test]
     fn the_work_of_a_line_begins_before_the_change_of_tool_that_comes_with_it() {
-        let t = timeline_of(
-            "G21 G90
-T1 M6
-G1 X60 F600
-T2 M6
-G1 X0",
-            30.0,
-        );
+        let t = timeline_of("G21 G90\nT1 M6\nG1 X60 F600\nT2 M6\nG1 X0", 30.0);
         // the first change is still to do from the start and from its own line, not from the move that follows it
         assert_eq!(t.begin_of_line(0), 0.0);
         assert_eq!(t.begin_of_line(1), 0.0);
@@ -428,23 +417,14 @@ G1 X0",
         assert!((t.begin_of_line(4) - 66.0).abs() < 1e-9);
         // after the last move
         assert!((t.begin_of_line(99) - t.total_s).abs() < 1e-9);
-        let tail = timeline_of(
-            "T1 M6
-G1 X60 F600
-T2 M6",
-            10.0,
-        );
+        let tail = timeline_of("T1 M6\nG1 X60 F600\nT2 M6", 10.0);
         assert!((tail.begin_of_line(2) - 16.0).abs() < 1e-9);
         assert!((tail.remaining(tail.begin_of_line(2)) - 10.0).abs() < 1e-9);
     }
 
     #[test]
     fn every_tool_change_adds_its_time_before_the_move_of_its_line() {
-        let text = "G21 G90
-T1 M6
-G1 X60 F600
-T2 M6
-G1 X0";
+        let text = "G21 G90\nT1 M6\nG1 X60 F600\nT2 M6\nG1 X0";
         let t = timeline_of(text, 30.0);
         // two changes of 30 s and two moves of 6 s
         assert!((t.total_s - 72.0).abs() < 1e-9, "{}", t.total_s);
@@ -454,30 +434,14 @@ G1 X0";
         let from = t.time_of_line(4).unwrap();
         assert!((t.remaining(from) - 6.0).abs() < 1e-9);
         // a change that is not there, a tool taken again and a negative time add nothing
-        assert!(
-            (timeline_of(
-                "T1 M6
-G1 X60 F600
-T1 M6",
-                30.0
-            )
-            .total_s
-                - 36.0)
-                .abs()
-                < 1e-9
-        );
+        assert!((timeline_of("T1 M6\nG1 X60 F600\nT1 M6", 30.0).total_s - 36.0).abs() < 1e-9);
         assert!((timeline_of(text, -5.0).total_s - 12.0).abs() < 1e-9);
         assert!((timeline_of(text, f64::NAN).total_s - 12.0).abs() < 1e-9);
     }
 
     #[test]
     fn a_change_after_the_last_move_is_added_to_the_total() {
-        let t = timeline_of(
-            "T1 M6
-G1 X60 F600
-T2 M6",
-            10.0,
-        );
+        let t = timeline_of("T1 M6\nG1 X60 F600\nT2 M6", 10.0);
         assert!((t.total_s - 26.0).abs() < 1e-9, "{}", t.total_s);
         // the tool stays where it ended
         assert_eq!(t.position_at(1e9), Some((60.0, 0.0, 0.0)));

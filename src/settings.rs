@@ -750,28 +750,7 @@ mod tests {
     }
     fn changed() -> Settings {
         let mut s = Settings::parse(
-            "lint = no
-lint_max_feed = 100
-progcheck = no
-keepout_margin = 9
-keepout_reject = no
-keepout = clamp 0 0 -5 20 20 40
-             probe_feed = 50
-probe_grid = 40
-heightmap_segment = 5
-jog_soft_limits = always
-             queue_repeat_max = 7
-queue_pause = 60
-queue_confirm_between = no
-queue_remember = no
-sim_speed = 99
-             log_max_entries = 77
-macros_confirm = no
-macros_max_lines = 9
-tool_change_time = 5
-step = 0.1
-server_token = t
-",
+            "lint = no\nlint_max_feed = 100\nprogcheck = no\nkeepout_margin = 9\nkeepout_reject = no\nkeepout = clamp 0 0 -5 20 20 40\n             probe_feed = 50\nprobe_grid = 40\nheightmap_segment = 5\njog_soft_limits = always\n             queue_repeat_max = 7\nqueue_pause = 60\nqueue_confirm_between = no\nqueue_remember = no\nsim_speed = 99\n             log_max_entries = 77\nmacros_confirm = no\nmacros_max_lines = 9\ntool_change_time = 5\nstep = 0.1\nserver_token = t\n",
         );
         s.recent = vec!["a.nc".into()];
         s

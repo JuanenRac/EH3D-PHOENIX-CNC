@@ -60,6 +60,28 @@ fn print_report(o: &Options) -> i32 {
     };
     let r = report::build(&lines, &s.tuning, &s.lint, &cfg);
     print!("{}", r.text);
+    if let Some(out) = o.html.as_ref() {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let page = eh3d_phoenix_cnc::workreport::html(&eh3d_phoenix_cnc::workreport::Input {
+            name: &name,
+            lines: &lines,
+            tuning: &s.tuning,
+            lint: &s.lint,
+            cfg: &cfg,
+            height_map: None,
+            version: env!("CARGO_PKG_VERSION"),
+        });
+        match eh3d_phoenix_cnc::workreport::write_new(out, &page) {
+            Ok(()) => eprintln!("phoenix-cnc: work report written to {}", out.display()),
+            Err(e) => {
+                eprintln!("phoenix-cnc: {}: {e}", out.display());
+                return 2;
+            }
+        }
+    }
     i32::from(r.problems > 0)
 }
 

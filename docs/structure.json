@@ -203,6 +203,19 @@
           }
         },
         {
+          "name": "workreport.rs",
+          "desc": {
+            "en": "the work report as one page of HTML: statistics, warnings, path, height map",
+            "es": "el informe de trabajo en una página HTML: estadísticas, avisos, trayectoria, mapa de alturas",
+            "de": "der Arbeitsbericht als HTML-Seite: Statistik, Warnungen, Bahn, Höhenkarte",
+            "fr": "le rapport de travail en une page HTML : statistiques, avertissements, trajectoire, carte des hauteurs",
+            "it": "il rapporto di lavoro in una pagina HTML: statistiche, avvisi, percorso, mappa delle altezze",
+            "ja": "1ページのHTML作業レポート：統計、警告、経路、高さマップ",
+            "zh": "一页 HTML 作业报告：统计、警告、轨迹、高度图",
+            "pt": "o relatório de trabalho numa página HTML: estatísticas, avisos, trajetória, mapa de alturas"
+          }
+        },
+        {
           "name": "tuning.rs",
           "desc": {
             "en": "the values of these tools in the settings file",

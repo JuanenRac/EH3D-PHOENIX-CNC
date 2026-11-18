@@ -78,11 +78,13 @@ impl App {
             Purpose::Program => &GCODE_EXTENSIONS,
             Purpose::MapSave | Purpose::MapLoad => &["map", "txt"],
             Purpose::LogSave => &["txt", "csv", "json", "log"],
+            Purpose::ReportSave => &["html", "htm"],
         };
         let default_ext = match purpose {
             Purpose::Program => "nc",
             Purpose::MapSave | Purpose::MapLoad => "map",
             Purpose::LogSave => "txt",
+            Purpose::ReportSave => "html",
         };
         let mut b = Browser::new(
             mode,
@@ -99,6 +101,10 @@ impl App {
                 ),
                 Purpose::MapSave => "heightmap.map".to_string(),
                 Purpose::LogSave => "session-log.txt".to_string(),
+                Purpose::ReportSave => Path::new(&self.path).file_stem().map_or_else(
+                    || "work-report.html".to_string(),
+                    |n| format!("{}-report.html", n.to_string_lossy()),
+                ),
                 Purpose::MapLoad => String::new(),
             };
         }
@@ -121,10 +127,7 @@ impl App {
             }
             "open" => Some(Win::Open(self.browser(Mode::Open))),
             "save" => Some(Win::Save(self.browser(Mode::Save))),
-            "edit" => Some(Win::Edit(self.session.program.join(
-                "
-",
-            ))),
+            "edit" => Some(Win::Edit(self.session.program.join("\n"))),
             "about" => Some(Win::About),
             "summary" => Some(Win::Summary(Box::new(summary::PendingStart {
                 report: self.report(),
@@ -239,6 +242,16 @@ impl App {
             }
             if ui.button(self.w(Msg::MenuLogExport)).clicked() {
                 self.win = Some(Win::Save(self.browser_for(Mode::Save, Purpose::LogSave)));
+                ui.close();
+            }
+            if ui
+                .add_enabled(
+                    !self.session.program.is_empty(),
+                    egui::Button::new(self.w(Msg::RepMenu)),
+                )
+                .clicked()
+            {
+                self.win = Some(Win::Save(self.browser_for(Mode::Save, Purpose::ReportSave)));
                 ui.close();
             }
             ui.separator();
@@ -948,8 +961,10 @@ impl App {
                 None
             }
             Some(Chosen::Overwrite(p)) => {
-                if mode == Mode::Open || self.file_purpose == Purpose::LogSave {
-                    // the log is never written over a file: the export says so
+                if mode == Mode::Open
+                    || matches!(self.file_purpose, Purpose::LogSave | Purpose::ReportSave)
+                {
+                    // the log and the report are never written over a file: the export says so
                     self.file_chosen(mode, &p);
                     None
                 } else {

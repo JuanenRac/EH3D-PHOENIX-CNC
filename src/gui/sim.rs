@@ -330,12 +330,8 @@ mod tests {
     #[test]
     fn the_time_left_counts_the_tool_changes_and_the_curve_of_the_arcs() {
         let mut a = App::isolated();
-        a.session.load(
-            "G21 G90
-T1 M6
-G1 X60 F600
-G3 X60 Y10 I0 J5",
-        );
+        a.session
+            .load("G21 G90\nT1 M6\nG1 X60 F600\nG3 X60 Y10 I0 J5");
         a.refresh_path();
         a.settings.tuning.tool_change_s = 30.0;
         // 30 s of change, 6 s of cut and the half circle (1.57 s) instead of its chord (1 s)

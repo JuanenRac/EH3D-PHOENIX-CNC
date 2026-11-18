@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-366-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-378-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 366 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 378 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.3` |
 | Maturity | Functional |
-| Tests | 366 |
+| Tests | 378 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 366 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 378 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -71,6 +71,7 @@ Each line is one part of this repository and the light says how far it is today.
 * **Checks of the program, soft limits of the jog and the probe:** the summary also says what looks wrong inside the program (a rapid move that ends below the surface, a cut with the spindle off, a spindle started with no speed, a tool change, no end of program, and a feed or a spindle speed above `lint_max_feed` or `lint_max_rpm`, which are 5000 mm/min and 24000 rpm by default and off at 0; `lint = no` turns the checks off and `lint_rapid_floor` sets the Z below which a rapid is said). A step of the jog that would pass the travel is shortened to the limit and one from the limit outwards is refused (`jog_soft_limits` is `homing` by default: the limit holds only after the machine was homed; `always` holds it from the start and `no` turns it off). **Machine > Probe Z** runs the cycle on a touch plate (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` and `probe_clearance` in the settings file) and **Machine > Probe a grid** touches a grid over the cuts of the program (`probe_grid` mm apart) to build a height map; **Correct the program with the height map** cuts every cutting move into pieces of at most `heightmap_segment` mm and raises or lowers each one by the height under it (a program in absolute millimetres without arcs; one that leaves the probed area is refused) and **Undo the height correction** puts the program back. Both probes ask first because the machine moves, and a controller without a probe refuses them. Tried against stand-ins only; nothing has run on a real machine.
 * **The program tools, in the window and on the command line:** **Program > Check the program...** lists what the checks find, line by line (the number beside each finding shows that line in the program panel), **Program > Keep-out boxes...** edits the places the tool must not go (a program that enters one is not started unless `keepout_reject = no`) and **Program > Statistics and simulation...** plays the path on paper with the cursor on the line, while the program panel says the time left. The queue repeats a program (a box with the number of runs), asks the operator or waits `queue_pause` seconds between two runs of it, shows its total time and is kept in a file between runs (it comes back waiting: nothing starts by itself). The **Macros** menu runs the macros of `phoenix-cnc-macros.txt` (next to the settings file) after asking; **Machine > Save the height map...** and **Machine > Load a height map...** keep the map in a file (never written over without asking) and **File > Export the session log...** saves the log as text, CSV or JSON (never over a file). Their values (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` and `tool_change_time`) are in the settings file, and the window keeps them when it saves the other settings. `phoenix-cnc --report FILE` prints the same findings with the statistics and the time of a program without opening the window (exit code 0 when nothing needs reading, 1 when something does, 2 when the file cannot be read; `--lang` chooses the language), and `--version` and `--help` answer at once. Tried against the simulator only; nothing has run on a real machine.
 * **The settings window has three sections for the program tools:** **Checks** (the first and the second checker, the margin and the refusal of the keep-out boxes, the floor of the rapid moves and the highest feed and spindle speed), **Probe and height map** (the probe, the grid, the length of the pieces of a corrected cut and the limits of the jog) and **Queue, macros and log** (the repeats and the pause of the queue, the speed of the simulation, the entries of the session log, the macros and the time of a tool change). Every number stays inside the range the settings file accepts (the range is its tooltip), **Defaults of this section** puts a section back, and saving keeps every other key of the file.
+* **A work report as one page of HTML:** **File > Export the work report...** (or `phoenix-cnc --report FILE.NC --html REPORT.html`) writes a page that holds everything in it, with no script, no link and no separate picture: the statistics and the time of the program, the tools, what looks wrong with its line, the path seen from above with the lines that have a warning ringed, and the height map as a grid of colours when one was measured. It follows the language, the colours follow the light or dark setting of the browser, and a file that is there is never written over.
 
 ## 🧩 Role in EH3D
 
@@ -137,7 +138,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 366 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 378 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -168,6 +169,7 @@ EH3D-PHOENIX-CNC/
 │   ├── macros.rs                                the library of macros: named G-code that asks before it runs
 │   ├── logbook.rs                               the session log, saved as text, CSV or JSON, never over a file
 │   ├── report.rs                                the report of --report: statistics, time, what looks wrong
+│   ├── workreport.rs                            the work report as one page of HTML: statistics, warnings, path, height map
 │   ├── tuning.rs                                the values of these tools in the settings file
 │   ├── ranges.rs                                the range of each key of these tools, shared by the window and the file
 │   ├── words.rs                                 the messages of these tools in the eight languages
