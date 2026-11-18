@@ -5,6 +5,8 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - **The CI and the release build take the shared library at its newest release:** the pin of the shared library is raised to the release that the program now needs, so the binaries of a release build again.
+- **The summary before the start counts the arcs and the tool changes:** the check made before a program runs measured only the straight moves and warned that arcs were left out; it now measures an arc along its curve (a helix with its rise) in the cutting distance and the time, adds the tool-change time of the settings (`tool_change_time`) once for every change of tool, and says in its facts how many arcs and how many changes there are (in the eight languages of the program tools). The warning about arcs is gone, since they are counted; the one about cuts before any feed stays. The numbers are those of the time shown while a program runs and of the queue, and `src/plan.rs` tests them with a half circle and a change.
+
 ## [0.1.4] - A settings window for the program tools, a path viewer with colours, a work report in one page, arcs and tool changes in the time and Tab completion
 
 - **Tab finishes the code in the command box:** while the box at the bottom of the window has the keyboard, Tab finishes the G, M or `$` code being typed (`G38` gives `G38.`, `M30` gives `M30 `, `$J` gives `$J=`) or, when several fit, writes the start they share and lists them beside the box (`G5` lists `G53` to `G59`). It works on the last word of the line, ignores capitals and small letters, puts the cursor at the end and sends nothing (the line still goes with Enter); the list of codes and the rules are in `src/complete.rs`.

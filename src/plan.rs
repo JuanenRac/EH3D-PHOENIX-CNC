@@ -1,6 +1,7 @@
 //! The check before a program starts on a machine that moves: the moves of the program are followed on paper (how far each axis goes, how
 //! long the moves take at the speeds of the settings, whether any of them leaves the travel of the machine) and what looks wrong is said
-//! (a program that is tiny, far from the corner, bigger than the table, with arcs the estimate leaves out or with cuts before any feed).
+//! (a program that is tiny, far from the corner, bigger than the table or with cuts before any feed). The arcs are measured along their
+//! curve and every tool change adds its time, as in the rest of the screens.
 //!
 //! The measure, the warnings, the clock and the refusal are those of `eh3d-summary` (the same words as in the drilling and routing programs);
 //! this module only feeds them with the path of a G-code program. It knows nothing of the window, so it is tested on its own.
@@ -11,6 +12,8 @@ use eh3d_view::texts::{tr, Lang, Text};
 
 use crate::gcode::{arc_moves, toolpath};
 use crate::lint::{lint, Finding, LintCfg};
+use crate::sim::{Extras, Rates, Timeline};
+use crate::words::{say, Msg};
 
 /// What the check needs to know about the machine and the operator (all of it comes from the settings).
 #[derive(Debug, Clone, PartialEq)]
@@ -23,6 +26,8 @@ pub struct Checks {
     /// The feed used for a cut that comes before any `F`, and the speed of the rapid moves, in mm per minute.
     pub default_feed: f64,
     pub rapid_mm_min: f64,
+    /// The seconds a tool change adds to the time (the tool-change time of the settings).
+    pub change_s: f64,
     /// The thresholds of the sanity checks and whether a program that leaves the travel is refused.
     pub limits: Limits,
     /// Which of the checks of the program itself are made (see `lint`).
@@ -35,8 +40,10 @@ pub struct Report {
     pub rapid_moves: usize,
     pub cut_moves: usize,
     pub cut_mm: f64,
-    /// Arc moves (`G2`/`G3`) that the estimate leaves out, and cuts that come before any feed rate.
+    /// Arc moves (`G2`/`G3`), which are measured along their curve, the tool changes, whose time is in the total, and cuts that come
+    /// before any feed rate.
     pub arcs: usize,
+    pub tool_changes: usize,
     pub cuts_without_feed: usize,
     pub summary: Summary,
     pub limits: Limits,
@@ -50,34 +57,42 @@ fn axis_of(i: usize) -> Axis {
 
 /// Follows the program and measures it.
 pub fn analyse(lines: &[String], c: &Checks) -> Report {
-    // an arc is only its chord in the path: it is counted apart and left out of the measure
-    let path: Vec<_> = toolpath(lines).into_iter().filter(|s| !s.arc).collect();
+    // an arc is as long as its curve when that can be worked out (its chord otherwise), and a tool change adds its time
+    let path = toolpath(lines);
+    let extras = Extras::of(lines);
+    let timeline = Timeline::build_with(
+        &path,
+        Rates {
+            rapid: c.rapid_mm_min,
+            default_feed: c.default_feed,
+        },
+        &extras,
+        c.change_s,
+    );
     let (mut rapid_moves, mut cut_moves, mut cut_mm) = (0, 0, 0.0);
-    let (mut seconds, mut cuts_without_feed) = (0.0, 0);
+    let mut cuts_without_feed = 0;
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
     let mut violations: Vec<Violation> = Vec::new();
     let mut end = (0.0, 0.0, 0.0);
     for s in &path {
-        let len = ((s.to.0 - s.from.0).powi(2)
+        let chord = ((s.to.0 - s.from.0).powi(2)
             + (s.to.1 - s.from.1).powi(2)
             + (s.to.2 - s.from.2).powi(2))
         .sqrt();
-        let rate = if s.rapid {
+        let len = if s.arc {
+            extras.arc_len(s.line).unwrap_or(chord)
+        } else {
+            chord
+        };
+        if s.rapid {
             rapid_moves += 1;
-            c.rapid_mm_min
         } else {
             cut_moves += 1;
             cut_mm += len;
             if s.feed <= 0.0 {
                 cuts_without_feed += 1;
-                c.default_feed
-            } else {
-                s.feed
             }
-        };
-        if rate > 0.0 {
-            seconds += len / rate * 60.0;
         }
         let to = [s.to.0, s.to.1, s.to.2];
         for i in 0..3 {
@@ -121,7 +136,7 @@ pub fn analyse(lines: &[String], c: &Checks) -> Report {
         max_mm: (max[0], max[1], max[2]),
         end_mm: end,
         steps: 0,
-        seconds,
+        seconds: timeline.total_s,
         items: path.len(),
         swallowed_steps: 0,
         violations,
@@ -160,6 +175,7 @@ pub fn analyse(lines: &[String], c: &Checks) -> Report {
         cut_moves,
         cut_mm,
         arcs: arc_moves(lines),
+        tool_changes: extras.changes.len(),
         cuts_without_feed,
         summary: Summary::new(path.len(), 0, program_bounds, dry, course, warnings),
         limits: c.limits,
@@ -197,9 +213,6 @@ impl Report {
             .iter()
             .map(|w| w.message(lang))
             .collect();
-        if self.arcs > 0 {
-            out.push(fill(tr(lang, Text::McSumArcs), &self.arcs.to_string()));
-        }
         if self.cuts_without_feed > 0 {
             out.push(fill(
                 tr(lang, Text::McSumNoFeed),
@@ -212,10 +225,7 @@ impl Report {
 
     /// Whether anything is worth the operator's second look before the start.
     pub fn has_warnings(&self) -> bool {
-        !self.summary.warnings.is_empty()
-            || self.arcs > 0
-            || self.cuts_without_feed > 0
-            || !self.findings.is_empty()
+        !self.summary.warnings.is_empty() || self.cuts_without_feed > 0 || !self.findings.is_empty()
     }
 
     /// The lines of the summary, ready to show: the facts, the reach of the axes, the verdict of the dry run and the warnings.
@@ -238,6 +248,16 @@ impl Report {
                 tr(lang, Text::SummarySize),
                 mm(x1 - x0),
                 mm(y1 - y0)
+            ));
+        }
+        if self.arcs > 0 {
+            out.push(say(lang.code(), Msg::PlanArcs, &[self.arcs.to_string()]));
+        }
+        if self.tool_changes > 0 {
+            out.push(say(
+                lang.code(),
+                Msg::PlanChanges,
+                &[self.tool_changes.to_string()],
             ));
         }
         out.push(format!(
@@ -278,6 +298,7 @@ mod tests {
             offset: [0.0; 3],
             default_feed: 600.0,
             rapid_mm_min: 3000.0,
+            change_s: 0.0,
             limits: Limits {
                 tiny_mm: 5.0,
                 far_mm: 1000.0,
@@ -350,21 +371,19 @@ mod tests {
             .warnings
             .iter()
             .any(|w| matches!(w, Warning::TooBig { .. })));
-        // arcs and cuts before a feed
-        let r = analyse(&lines("G1 X10\nG2 X20 Y10 I5 J0"), &c);
-        assert_eq!((r.arcs, r.cuts_without_feed), (1, 1));
+        // a cut before a feed is said (an arc is not a fault)
+        let r = analyse(&lines("G1 X10\nG2 X20 Y0 I5 J0"), &c);
+        assert_eq!((r.arcs, r.cuts_without_feed), (1, 2));
         assert!(r.has_warnings());
         let text = r.warnings(Lang::En);
         assert!(
-            text.iter().any(|l| l.starts_with("1 arc moves")),
+            text.iter().any(|l| l.starts_with("2 cutting moves")),
             "{text:?}"
         );
-        assert!(
-            text.iter().any(|l| l.starts_with("1 cutting moves")),
-            "{text:?}"
-        );
-        // a cut with no feed is timed at the default one: 10 mm at 600 mm/min
-        assert!((r.summary.dry.seconds - 1.0).abs() < 1e-9);
+        assert!(!text.iter().any(|l| l.contains("arc")), "{text:?}");
+        // a cut with no feed is timed at the default one: 10 mm at 600 mm/min, then the half circle of 15.7 mm
+        let half = 5.0 * std::f64::consts::PI;
+        assert!((r.summary.dry.seconds - (10.0 + half) / 600.0 * 60.0).abs() < 1e-9);
     }
 
     #[test]
@@ -391,6 +410,46 @@ mod tests {
         let mut off = checks();
         off.lint.enabled = false;
         assert!(analyse(&lines("G1 X10 F100"), &off).findings.is_empty());
+    }
+
+    #[test]
+    fn the_arcs_are_measured_along_their_curve_and_the_tool_changes_add_their_time() {
+        // 10 mm of line, then a half circle of radius 5 (15.7 mm) at 600 mm/min, with one change of tool of 20 s
+        let p = lines("M3 S1000\nT1 M6\nG1 X10 F600\nG2 X20 Y0 I5 J0\nM30");
+        let mut c = checks();
+        let plain = analyse(&p, &c);
+        let half = 5.0 * std::f64::consts::PI;
+        assert_eq!((plain.arcs, plain.tool_changes), (1, 1));
+        assert!(
+            (plain.cut_mm - (10.0 + half)).abs() < 1e-9,
+            "{}",
+            plain.cut_mm
+        );
+        assert!((plain.summary.dry.seconds - (10.0 + half) / 10.0).abs() < 1e-9);
+        assert!(!plain.warnings(Lang::En).iter().any(|l| l.contains("arc")));
+        c.change_s = 20.0;
+        let with = analyse(&p, &c);
+        assert!((with.summary.dry.seconds - plain.summary.dry.seconds - 20.0).abs() < 1e-9);
+        // the facts say how many arcs and changes there are, in the language asked
+        let text = with.lines(Lang::En);
+        assert!(
+            text.contains(&"Arc moves (counted along the curve): 1".to_string()),
+            "{text:?}"
+        );
+        assert!(
+            text.iter()
+                .any(|l| l.starts_with("Tool changes") && l.ends_with(": 1")),
+            "{text:?}"
+        );
+        assert!(with
+            .lines(Lang::De)
+            .iter()
+            .any(|l| l.starts_with("Werkzeugwechsel")));
+        // a program with neither says nothing of them
+        let none = analyse(&lines("G1 X10 F100"), &checks()).lines(Lang::En);
+        assert!(!none
+            .iter()
+            .any(|l| l.starts_with("Arc moves") || l.starts_with("Tool changes")));
     }
 
     #[test]

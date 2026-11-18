@@ -160,10 +160,12 @@ pub enum Msg {
     VwSel,
     VwPlunge,
     VwArc,
+    PlanArcs,
+    PlanChanges,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 152] = [
+pub const ALL: [Msg; 154] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -316,6 +318,8 @@ pub const ALL: [Msg; 152] = [
     Msg::VwSel,
     Msg::VwPlunge,
     Msg::VwArc,
+    Msg::PlanArcs,
+    Msg::PlanChanges,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -1841,6 +1845,26 @@ fn table(m: Msg) -> [&'static str; 8] {
             "圆弧（按弦显示）",
             "Arco (pela corda)",
         ],
+        Msg::PlanArcs => [
+            "Arc moves (counted along the curve): {0}",
+            "Movimientos en arco (contados por la curva): {0}",
+            "Kreisbewegungen (entlang der Kurve gezählt): {0}",
+            "Mouvements en arc (comptés le long de la courbe) : {0}",
+            "Movimenti ad arco (contati lungo la curva): {0}",
+            "円弧移動（曲線の長さで計上）: {0}",
+            "圆弧移动（按曲线长度计算）：{0}",
+            "Movimentos em arco (contados ao longo da curva): {0}",
+        ],
+        Msg::PlanChanges => [
+            "Tool changes (their time is added): {0}",
+            "Cambios de herramienta (se suma su tiempo): {0}",
+            "Werkzeugwechsel (ihre Zeit wird addiert): {0}",
+            "Changements d'outil (leur durée est ajoutée) : {0}",
+            "Cambi utensile (il loro tempo è aggiunto): {0}",
+            "工具交換（その時間を加算）: {0}",
+            "换刀（计入其时间）：{0}",
+            "Trocas de ferramenta (o seu tempo é somado): {0}",
+        ],
     }
 }
 
@@ -1904,7 +1928,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 152);
+        assert_eq!(seen.len(), 154);
     }
 
     #[test]
