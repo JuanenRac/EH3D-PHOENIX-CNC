@@ -86,6 +86,136 @@
           }
         },
         {
+          "name": "progcheck.rs",
+          "desc": {
+            "en": "second check of a program: units, offsets, probing, planes",
+            "es": "segunda revisión de un programa: unidades, desplazamientos, palpado, planos",
+            "de": "zweite Programmprüfung: Einheiten, Versätze, Antasten, Ebenen",
+            "fr": "second contrôle d'un programme : unités, décalages, palpage, plans",
+            "it": "seconda verifica di un programma: unità, offset, tastatura, piani",
+            "ja": "第 2 のプログラム検査：単位、オフセット、プローブ、平面",
+            "zh": "程序第二项检查：单位、偏置、探测、平面",
+            "pt": "segunda verificação de um programa: unidades, desvios, apalpação, planos"
+          }
+        },
+        {
+          "name": "boxes.rs",
+          "desc": {
+            "en": "keep-out boxes and travel limits, move by move",
+            "es": "cajas prohibidas y límites de recorrido, movimiento a movimiento",
+            "de": "Sperrboxen und Verfahrgrenzen, Bewegung für Bewegung",
+            "fr": "boîtes interdites et limites de course, mouvement par mouvement",
+            "it": "riquadri vietati e limiti di corsa, movimento per movimento",
+            "ja": "進入禁止ボックスとストローク限界の検査",
+            "zh": "禁区盒与行程限位检查",
+            "pt": "caixas proibidas e limites de curso, movimento a movimento"
+          }
+        },
+        {
+          "name": "sim.rs",
+          "desc": {
+            "en": "the path in time: the tool at any moment, the time left",
+            "es": "la trayectoria en el tiempo: la herramienta en cada instante",
+            "de": "der Pfad in der Zeit: Werkzeug zu jedem Zeitpunkt, Restzeit",
+            "fr": "la trajectoire dans le temps : l'outil à chaque instant",
+            "it": "il percorso nel tempo: l'utensile in ogni istante",
+            "ja": "時間軸上の経路：各時点の工具と残り時間",
+            "zh": "时间轴上的路径：各时刻的刀具与剩余时间",
+            "pt": "o trajeto no tempo: a ferramenta em cada instante"
+          }
+        },
+        {
+          "name": "stats.rs",
+          "desc": {
+            "en": "statistics of a program: distances, time, tool changes",
+            "es": "estadísticas de un programa: distancias, tiempo, cambios de herramienta",
+            "de": "Programmstatistik: Strecken, Zeit, Werkzeugwechsel",
+            "fr": "statistiques d'un programme : distances, temps, changements d'outil",
+            "it": "statistiche di un programma: distanze, tempo, cambi utensile",
+            "ja": "プログラム統計：距離、時間、工具交換",
+            "zh": "程序统计：距离、时间、换刀",
+            "pt": "estatísticas de um programa: distâncias, tempo, trocas de ferramenta"
+          }
+        },
+        {
+          "name": "jobs.rs",
+          "desc": {
+            "en": "repeats and pauses between the programs of the queue",
+            "es": "repeticiones y pausas entre los programas de la cola",
+            "de": "Wiederholungen und Pausen zwischen Warteschlangenprogrammen",
+            "fr": "répétitions et pauses entre les programmes de la file",
+            "it": "ripetizioni e pause tra i programmi della coda",
+            "ja": "キュー内プログラムの繰り返しと待機",
+            "zh": "队列中程序的重复与间隔",
+            "pt": "repetições e pausas entre os programas da fila"
+          }
+        },
+        {
+          "name": "macros.rs",
+          "desc": {
+            "en": "the library of macros: named G-code that asks before it runs",
+            "es": "la biblioteca de macros: G-code con nombre que pregunta antes de ejecutarse",
+            "de": "die Makrobibliothek: benannter G-Code, der vor dem Start fragt",
+            "fr": "la bibliothèque de macros : G-code nommé qui demande avant de s'exécuter",
+            "it": "la libreria di macro: G-code con nome che chiede prima di partire",
+            "ja": "マクロライブラリ：実行前に確認する G-code",
+            "zh": "宏库：执行前会询问的命名 G-code",
+            "pt": "a biblioteca de macros: G-code com nome que pergunta antes de correr"
+          }
+        },
+        {
+          "name": "logbook.rs",
+          "desc": {
+            "en": "the session log, saved as text, CSV or JSON, never over a file",
+            "es": "el registro de la sesión, en texto, CSV o JSON, sin pisar ficheros",
+            "de": "Sitzungsprotokoll als Text, CSV oder JSON, nie über eine Datei",
+            "fr": "journal de session en texte, CSV ou JSON, sans écraser de fichier",
+            "it": "registro della sessione in testo, CSV o JSON, senza sovrascrivere",
+            "ja": "セッションログ（テキスト/CSV/JSON、上書きなし）",
+            "zh": "会话日志（文本/CSV/JSON，不覆盖文件）",
+            "pt": "registo da sessão em texto, CSV ou JSON, sem pisar ficheiros"
+          }
+        },
+        {
+          "name": "report.rs",
+          "desc": {
+            "en": "the report of --report: statistics, time, what looks wrong",
+            "es": "el informe de --report: estadísticas, tiempo, lo que parece mal",
+            "de": "der Bericht von --report: Statistik, Zeit, Auffälliges",
+            "fr": "le rapport de --report : statistiques, temps, anomalies",
+            "it": "il rapporto di --report: statistiche, tempo, anomalie",
+            "ja": "--report のレポート：統計、時間、問題点",
+            "zh": "--report 的报告：统计、时间、可疑之处",
+            "pt": "o relatório de --report: estatísticas, tempo, o que parece mal"
+          }
+        },
+        {
+          "name": "tuning.rs",
+          "desc": {
+            "en": "the values of these tools in the settings file",
+            "es": "los valores de estas herramientas en el fichero de ajustes",
+            "de": "die Werte dieser Werkzeuge in der Einstellungsdatei",
+            "fr": "les valeurs de ces outils dans le fichier de réglages",
+            "it": "i valori di questi strumenti nel file delle impostazioni",
+            "ja": "これらの機能の設定ファイル上の値",
+            "zh": "这些工具在设置文件中的取值",
+            "pt": "os valores destas ferramentas no ficheiro de definições"
+          }
+        },
+        {
+          "name": "words.rs",
+          "desc": {
+            "en": "the messages of these tools in the eight languages",
+            "es": "los mensajes de estas herramientas en los ocho idiomas",
+            "de": "die Meldungen dieser Werkzeuge in acht Sprachen",
+            "fr": "les messages de ces outils en huit langues",
+            "it": "i messaggi di questi strumenti in otto lingue",
+            "ja": "これらの機能のメッセージ（8 言語）",
+            "zh": "这些工具的消息（八种语言）",
+            "pt": "as mensagens destas ferramentas nos oito idiomas"
+          }
+        },
+        {
           "name": "gcode.rs",
           "desc": {
             "en": "the straight moves of a G-code program, to draw its path",

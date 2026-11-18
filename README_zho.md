@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-191-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-283-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。191 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
+**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。283 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.1.2` |
 | 成熟度 | 可用 |
-| 测试 | 191 |
+| 测试 | 283 |
 | 技术栈 | Rust |
 | 真实硬件 | 否：默认驱动模拟机床；真实的 GRBL 控制器（`--grbl`）从未试过 |
 
@@ -47,7 +47,7 @@
 | 基础库 | 🟡 | 一个 Rust crate，以本程序的名称重新导出 `eh3d-view` 的 `scene`、`texts` 和 `theme`；需要旁边有 EH3D-COMMON 文件夹。 |
 | 场景与视图 | 🟡 | 在 EH3D-COMMON 中编写并测试；本程序的窗口在工作台上绘制程序路径和刀具位置（已在电脑上看过）。 |
 | 主题与文本 | 🟡 | 十一种主题和 37 种语言的界面文字，已在本程序的窗口中看过。 |
-| 测试 | 🟡 | 电脑上通过 191 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
+| 测试 | 🟡 | 电脑上通过 283 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
 | 窗口与点动 | 🟡 | 在电脑上配合模拟控制器运行：位置、点动面板、步长、进给、回零、清零、解锁、命令行和日志；没有真实机床。 |
 | 机床控制 | 🟠 | 只有模拟器：程序逐行运行，可暂停、停止和急停；这里还没有连接任何真实控制器。 |
 | 文档 | 🟡 | 八种语言的 README、两张图片、三个示例程序和更新日志。 |
@@ -135,7 +135,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 测试
 
-`cargo test --features gui` 运行 191 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
+`cargo test --features gui` 运行 283 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
 
 ## 🏗️ 构建与发布
 
@@ -157,6 +157,16 @@ EH3D-PHOENIX-CNC/
 │   ├── gui.rs                                   窗口：位置、点动、程序、路径、命令和日志
 │   ├── session.rs                               对控制器所做的事：点动、清零、回零、逐行运行程序、暂停、停止、报警
 │   ├── queue.rs                                 程序队列：顺序、状态、跳过、移除、重排，失败时停止
+│   ├── progcheck.rs                             程序第二项检查：单位、偏置、探测、平面
+│   ├── boxes.rs                                 禁区盒与行程限位检查
+│   ├── sim.rs                                   时间轴上的路径：各时刻的刀具与剩余时间
+│   ├── stats.rs                                 程序统计：距离、时间、换刀
+│   ├── jobs.rs                                  队列中程序的重复与间隔
+│   ├── macros.rs                                宏库：执行前会询问的命名 G-code
+│   ├── logbook.rs                               会话日志（文本/CSV/JSON，不覆盖文件）
+│   ├── report.rs                                --report 的报告：统计、时间、可疑之处
+│   ├── tuning.rs                                这些工具在设置文件中的取值
+│   ├── words.rs                                 这些工具的消息（八种语言）
 │   ├── gcode.rs                                 G 代码程序的直线移动，用于绘制其路径
 │   ├── heightmap.rs                             材料的高度图以及程序校正
 │   ├── jog.rs                                   点动的软限位：超出行程的步进会被缩短或拒绝

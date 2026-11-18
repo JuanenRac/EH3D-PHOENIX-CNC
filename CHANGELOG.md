@@ -23,6 +23,7 @@ All notable changes to this project are documented here.
 - **A library of macros (`macros`):** short pieces of G-code with a name, kept in a text file, that ask before they run (every macro does unless `macros_confirm = no`, and one that moves or that the checker warns about always does); a line for the controller itself (`$...`) drops the whole macro, and the problems of the file are listed with their line.
 - **A session log that can be saved (`logbook`):** each entry has the time, a kind (note, sent, received, warning, error) and one clean line, up to `log_max_entries`; it is exported as text, CSV (a cell that a spreadsheet would take for a formula is defused) or JSON, and a file that exists is never overwritten.
 - **The words of these tools in the eight languages (`words`) and their values in the settings file (`tuning`):** every message exists in English, Spanish, German, French, Italian, Japanese, Chinese and Portuguese of Portugal, with the same holes in each, and the example of the settings equals the defaults.
+- **`--report FILE` prints what looks wrong in a program without opening the window:** the statistics, the time of the path, the findings of the summary check and of the second checker, the keep-out boxes entered and the moves past the travel, in the language of the settings or of `--lang`; the exit code is 1 when something needs reading, 0 when nothing does and 2 when the file cannot be read. Nothing moves.
 
 ## [0.1.2] - A safer start and resume, a stop heard while a line waits for its ok and a limit on the server answer
 
