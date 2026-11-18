@@ -317,9 +317,11 @@ mod tests {
                 s: a.settings.clone(),
                 section,
             };
-            let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+            ctx.run_pass(egui::RawInput::default(), |ctx| {
                 egui::Window::new("tools").show(ctx, |ui| a.settings_tools(ui, &mut d));
-            });
+            })
+            .textures_delta
+            .clear();
             // drawing a section changes nothing by itself
             assert_eq!(d.s, a.settings, "section {section}");
         }

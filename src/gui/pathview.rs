@@ -293,7 +293,7 @@ mod tests {
                 a.viewer.selected = Some(2);
                 a.settings.view_3d = three;
                 let t = a.theme.clone();
-                let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+                ctx.run_pass(egui::RawInput::default(), |ctx| {
                     egui::Window::new("v").show(ctx, |ui| a.viewer_bar(ui));
                     let p = ctx.layer_painter(egui::LayerId::background());
                     let click = Some(Pos2::new(5.0, 5.0));
@@ -303,7 +303,9 @@ mod tests {
                         a.paint_plan(&p, rect, &t, click)
                     };
                     assert!(picked.is_none_or(|i| i < a.path_toolpath.len()));
-                });
+                })
+                .textures_delta
+                .clear();
                 assert_eq!(a.viewer.color_by, mode);
             }
         }
@@ -324,28 +326,36 @@ mod tests {
             .apply(fitted, (f64::from(centre.x), f64::from(centre.y)));
         let click = Some(Pos2::new(sx as f32, sy as f32 + 2.0));
         let mut picked = None;
-        let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+        ctx.run_pass(egui::RawInput::default(), |ctx| {
             let p = ctx.layer_painter(egui::LayerId::background());
             picked = a.paint_plan(&p, rect, &t, click);
-        });
+        })
+        .textures_delta
+        .clear();
         assert_eq!(picked, Some(2));
         // far from every move, nothing; no click, nothing
-        let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+        ctx.run_pass(egui::RawInput::default(), |ctx| {
             let p = ctx.layer_painter(egui::LayerId::background());
             picked = a.paint_plan(&p, rect, &t, Some(Pos2::new(700.0, 20.0)));
-        });
+        })
+        .textures_delta
+        .clear();
         assert_eq!(picked, None);
-        let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+        ctx.run_pass(egui::RawInput::default(), |ctx| {
             let p = ctx.layer_painter(egui::LayerId::background());
             picked = a.paint_plan(&p, rect, &t, None);
-        });
+        })
+        .textures_delta
+        .clear();
         assert_eq!(picked, None);
         // the tool 1 layer is hidden: its move is not picked
         a.viewer.toggle(Some(1));
-        let _ = ctx.run_pass(egui::RawInput::default(), |ctx| {
+        ctx.run_pass(egui::RawInput::default(), |ctx| {
             let p = ctx.layer_painter(egui::LayerId::background());
             picked = a.paint_plan(&p, rect, &t, click);
-        });
+        })
+        .textures_delta
+        .clear();
         assert_eq!(picked, None);
     }
 }
