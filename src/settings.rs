@@ -10,6 +10,7 @@ use eh3d_view::theme::ThemeId;
 use crate::jog::Mode as JogMode;
 use crate::lint::LintCfg;
 use crate::probe::ProbeCfg;
+use crate::tuning::Tuning;
 
 /// How many recent files are kept.
 pub const RECENT_MAX: usize = 8;
@@ -84,6 +85,9 @@ pub struct Settings {
     /// The distance between the points of a grid of the height map (mm), and the longest piece a cut is divided into when the program is corrected (mm).
     pub probe_grid_mm: f64,
     pub heightmap_segment_mm: f64,
+    /// The values of the program tools (second checker, keep-out boxes, repeats and pauses of the queue, macros, session log, statistics).
+    /// They live in the same file, so saving the settings writes them back and never drops them.
+    pub tuning: Tuning,
 }
 
 impl Default for Settings {
@@ -128,6 +132,7 @@ impl Default for Settings {
             probe: ProbeCfg::default(),
             probe_grid_mm: 10.0,
             heightmap_segment_mm: 1.0,
+            tuning: Tuning::default(),
         }
     }
 }
@@ -155,7 +160,10 @@ fn yes(b: bool) -> &'static str {
 impl Settings {
     /// The text of the file: `key = value` lines; what is not known or not valid keeps its default.
     pub fn parse(text: &str) -> Settings {
-        let mut s = Settings::default();
+        let mut s = Settings {
+            tuning: Tuning::parse(text),
+            ..Settings::default()
+        };
         // a file saved by an editor that writes a byte order mark still has its first line read
         for line in text.trim_start_matches('\u{feff}').lines() {
             let Some((k, v)) = line.split_once('=') else {
@@ -390,6 +398,7 @@ impl Settings {
             self.probe_grid_mm,
             self.heightmap_segment_mm
         ));
+        out.push_str(&self.tuning.to_text());
         out
     }
 
@@ -439,6 +448,7 @@ pub fn settings_path() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::boxes::KeepOut;
 
     #[test]
     fn the_settings_are_written_and_read_back() {
@@ -493,6 +503,16 @@ mod tests {
             },
             probe_grid_mm: 5.0,
             heightmap_segment_mm: 0.5,
+            tuning: Tuning {
+                progcheck: false,
+                keepouts: vec![KeepOut {
+                    name: "clamp".into(),
+                    min: [0.0, 0.0, -5.0],
+                    max: [20.0, 20.0, 40.0],
+                }],
+                repeat_max: 7,
+                ..Tuning::default()
+            },
         };
         s.remember_recent("C:/jobs/a.nc");
         s.remember_recent("C:/jobs/b.nc");
@@ -507,6 +527,38 @@ mod tests {
             Settings::default()
         );
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn saving_the_settings_keeps_the_keys_of_the_program_tools() {
+        let file = "lang = de\nqueue_repeat_max = 9\nqueue_pause = 12\nkeepout = vise 0 0 0 10 10 10\nprogcheck = no\n";
+        let mut s = Settings::parse(file);
+        assert_eq!(s.tuning.repeat_max, 9);
+        // the window changes the language and saves: the other group of keys must still be in the file
+        s.lang = Lang::Fr;
+        let path = std::env::temp_dir().join(format!(
+            "eh3d-phoenix-cnc-tuning-keep-{}.cfg",
+            std::process::id()
+        ));
+        s.save(&path).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert!(text.contains("queue_repeat_max = 9") && text.contains("keepout = vise"));
+        let back = Settings::parse(&text);
+        assert_eq!(back.lang, Lang::Fr);
+        assert_eq!(back.tuning, s.tuning);
+        assert!(!back.tuning.progcheck);
+        assert_eq!(back.tuning.pause_s, 12.0);
+        assert_eq!(back.tuning.keepouts.len(), 1);
+    }
+
+    #[test]
+    fn the_keys_of_the_two_groups_are_not_mixed_up() {
+        // a key of the tools does not touch a setting and the other way round
+        let s = Settings::parse("step = 3\nqueue_pause = 4\n");
+        assert_eq!(s.step_mm, 3.0);
+        assert_eq!(s.tuning.pause_s, 4.0);
+        assert_eq!(Settings::default().tuning, Tuning::default());
     }
 
     #[test]

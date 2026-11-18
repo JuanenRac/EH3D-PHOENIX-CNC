@@ -23,7 +23,7 @@ fn main() -> eframe::Result {
 /// `--report FILE`: prints the report of the program and returns the exit code (0 when nothing needs reading, 1 when something does, 2 when
 /// the file cannot be read). The settings come from the settings file, as in the window.
 fn print_report(o: &Options) -> i32 {
-    use eh3d_phoenix_cnc::{report, settings, tuning::Tuning};
+    use eh3d_phoenix_cnc::{report, settings};
     let Some(path) = o.file.as_ref() else {
         return 2;
     };
@@ -50,7 +50,7 @@ fn print_report(o: &Options) -> i32 {
         default_feed: s.feed_mm_min,
         lang: o.lang.unwrap_or(s.lang).code().to_string(),
     };
-    let r = report::build(&lines, &Tuning::parse(&file), &s.lint, &cfg);
+    let r = report::build(&lines, &s.tuning, &s.lint, &cfg);
     print!("{}", r.text);
     i32::from(r.problems > 0)
 }
