@@ -1087,7 +1087,7 @@ impl App {
                 ui.horizontal(|ui| {
                     ui.label(self.t(Text::McMdi));
                     // Tab finishes the code being typed (`complete`), only while the box has the keyboard
-                    let id = egui::Id::new("command-box");
+                    let id = egui::Id::unique("command-box");
                     let completed = ui.memory(|m| m.has_focus(id))
                         && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab))
                         && self.complete_command();
