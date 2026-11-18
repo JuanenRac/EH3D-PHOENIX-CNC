@@ -411,6 +411,19 @@
           }
         },
         {
+          "name": "transform.rs",
+          "desc": {
+            "en": "shift, turn, scale and mirror a program, with its rules and refusals",
+            "es": "desplazar, girar, escalar y reflejar un programa, con sus reglas",
+            "de": "Programm verschieben, drehen, skalieren, spiegeln, mit Regeln",
+            "fr": "décaler, tourner, mettre à l'échelle et en miroir un programme",
+            "it": "sposta, ruota, scala e specchia un programma, con le sue regole",
+            "ja": "プログラムの移動・回転・拡大縮小・反転と、その規則",
+            "zh": "程序的平移、旋转、缩放和镜像及其规则",
+            "pt": "deslocar, rodar, escalar e espelhar um programa, com as suas regras"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
@@ -525,6 +538,19 @@
             "ja": "エディタのウィンドウ：行番号、検索と置換、注記、保存",
             "zh": "编辑器窗口：行号、查找替换、提示、保存",
             "pt": "a janela do editor: números de linha, procurar, notas, guardar"
+          }
+        },
+        {
+          "name": "gui/xform.rs",
+          "desc": {
+            "en": "the Transform window and Undo of the Program menu",
+            "es": "la ventana Transformar y Deshacer del menú Programa",
+            "de": "das Transformationsfenster und Rückgängig im Programm-Menü",
+            "fr": "la fenêtre Transformer et Annuler du menu Programme",
+            "it": "la finestra Trasforma e Annulla del menu Programma",
+            "ja": "プログラムメニューの変換ウィンドウと元に戻す",
+            "zh": "程序菜单的变换窗口和撤销",
+            "pt": "a janela Transformar e Anular do menu Programa"
           }
         },
         {

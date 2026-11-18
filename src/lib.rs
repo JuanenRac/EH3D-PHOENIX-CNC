@@ -32,6 +32,7 @@ pub mod session;
 pub mod settings;
 pub mod sim;
 pub mod stats;
+pub mod transform;
 pub mod tuning;
 pub mod view;
 pub mod viewer;

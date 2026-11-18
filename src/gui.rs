@@ -38,6 +38,7 @@ mod remote;
 mod sim;
 mod summary;
 mod views;
+mod xform;
 use crate::gcode::{self, Segment};
 use crate::session::{Session, STEPS};
 
@@ -188,6 +189,8 @@ pub struct App {
     path_toolpath: Vec<Segment>,
     /// The length of the arcs and the tool changes of the program, which the estimate of time adds to the path.
     path_extras: crate::sim::Extras,
+    /// The program as it was before the last transformation and as the transformation left it, for Undo.
+    transform_undo: Option<(Vec<String>, Vec<String>)>,
     /// How the viewer of the path colours it, which tools it shows and which move is selected.
     viewer: crate::viewer::State,
     frame: u32,
@@ -290,6 +293,7 @@ impl App {
             path: String::new(),
             path_toolpath: Vec::new(),
             path_extras: crate::sim::Extras::default(),
+            transform_undo: None,
             viewer: crate::viewer::State::default(),
             frame: 0,
             start_at: o.start.then_some(4),

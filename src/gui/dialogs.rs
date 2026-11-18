@@ -43,6 +43,8 @@ pub(super) enum Win {
     Macro(String),
     /// The list of the macros.
     Macros,
+    /// Shift, turn, scale and mirror the program.
+    Transform(Box<xform::XformState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -138,6 +140,7 @@ impl App {
             "keepout" => Some(Win::KeepOut(Box::default())),
             "stats" => Some(Win::Sim(Box::new(self.sim_state()))),
             "macros" => Some(Win::Macros),
+            "transform" => Some(Win::Transform(Box::default())),
             "probe" => Some(Win::Probe(probe::Ask::Z)),
             "probe-grid" => Some(Win::Probe(probe::Ask::Grid {
                 area: [0.0, 0.0, 50.0, 40.0],
@@ -374,6 +377,21 @@ impl App {
                 self.open_window("stats");
                 ui.close();
             }
+            ui.separator();
+            if ui.button(self.w(Msg::MenuTransform)).clicked() {
+                self.open_window("transform");
+                ui.close();
+            }
+            if ui
+                .add_enabled(
+                    self.can_undo_transform(),
+                    egui::Button::new(self.w(Msg::MenuUndoTransform)),
+                )
+                .clicked()
+            {
+                self.undo_transform();
+                ui.close();
+            }
         });
     }
 
@@ -481,6 +499,7 @@ impl App {
             Win::Between(i) => self.between_window(ctx, i),
             Win::Macro(n) => self.macro_window(ctx, n),
             Win::Macros => self.macros_list_window(ctx),
+            Win::Transform(s) => self.xform_window(ctx, s),
         };
         // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
         if next.is_some() || self.win.is_none() {
