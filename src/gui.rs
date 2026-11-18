@@ -29,6 +29,7 @@ mod keepout;
 mod keys;
 mod macros;
 mod numfield;
+mod pathview;
 mod prefs;
 mod probe;
 mod queue;
@@ -184,6 +185,8 @@ pub struct App {
     path_toolpath: Vec<Segment>,
     /// The length of the arcs and the tool changes of the program, which the estimate of time adds to the path.
     path_extras: crate::sim::Extras,
+    /// How the viewer of the path colours it, which tools it shows and which move is selected.
+    viewer: crate::viewer::State,
     frame: u32,
     start_at: Option<u32>,
     shot: Option<Shot>,
@@ -283,6 +286,7 @@ impl App {
             path: String::new(),
             path_toolpath: Vec::new(),
             path_extras: crate::sim::Extras::default(),
+            viewer: crate::viewer::State::default(),
             frame: 0,
             start_at: o.start.then_some(4),
             recovery_saved: None,

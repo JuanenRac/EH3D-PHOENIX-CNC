@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-378-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-397-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 378 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
+**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 397 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.1.3` |
 | Madurez | Funcional |
-| Pruebas | 378 |
+| Pruebas | 397 |
 | Pila tecnológica | Rust |
 | En hardware real | No: por defecto maneja una máquina simulada; un controlador GRBL real (`--grbl`) nunca se ha probado |
 
@@ -47,7 +47,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 | Biblioteca base | 🟡 | Un crate de Rust que reexporta `scene`, `texts` y `theme` de `eh3d-view` con el nombre de este programa; necesita la carpeta de EH3D-COMMON al lado. |
 | Escena y vistas | 🟡 | Escrita y probada en EH3D-COMMON; la ventana de este programa dibuja la trayectoria de un programa en la mesa y la posición de la herramienta (vista en un ordenador). |
 | Temas y textos | 🟡 | Once temas y las palabras de la interfaz en 37 idiomas, vistos en la ventana de este programa. |
-| Pruebas | 🟡 | Pasan 378 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
+| Pruebas | 🟡 | Pasan 397 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
 | Ventana y jog | 🟡 | Funciona en un ordenador con el controlador simulado: posición, teclado de jog, pasos, avance, referencia, cero, desbloqueo, una línea de órdenes y un registro; sin máquina real. |
 | Control de máquina | 🟠 | Solo el simulador: un programa se ejecuta línea a línea con pausa, parada y parada de emergencia; aún no se conecta ningún controlador real desde aquí. |
 | Documentación | 🟡 | README en ocho idiomas, las dos imágenes, tres programas de ejemplo y el changelog. |
@@ -72,6 +72,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 * **Las herramientas del programa, en la ventana y en la línea de órdenes:** **Programa > Comprobar el programa...** lista lo que encuentran las comprobaciones, línea por línea (el número junto a cada hallazgo muestra esa línea en el panel del programa), **Programa > Cajas prohibidas...** edita los lugares a los que la herramienta no debe ir (un programa que entra en una no se inicia salvo con `keepout_reject = no`) y **Programa > Estadísticas y simulación...** reproduce la trayectoria sobre el papel con el cursor en la línea, mientras el panel del programa dice el tiempo que falta. La cola repite un programa (una casilla con el número de pasadas), pregunta al operador o espera `queue_pause` segundos entre dos pasadas, muestra su tiempo total y se guarda en un archivo entre ejecuciones (vuelve en espera: nada empieza solo). El menú **Macros** ejecuta las macros de `phoenix-cnc-macros.txt` (junto al archivo de ajustes) tras preguntar; **Máquina > Guardar el mapa de alturas...** y **Máquina > Cargar un mapa de alturas...** guardan el mapa en un archivo (nunca se escribe encima de otro sin preguntar) y **Archivo > Exportar el registro de la sesión...** guarda el registro como texto, CSV o JSON (nunca sobre un archivo). Sus valores (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` y `tool_change_time`) están en el archivo de ajustes, y la ventana los conserva cuando guarda los demás ajustes. `phoenix-cnc --report FICHERO` imprime los mismos hallazgos con las estadísticas y el tiempo de un programa sin abrir la ventana (código de salida 0 si nada requiere lectura, 1 si algo la requiere, 2 si no se puede leer el archivo; `--lang` elige el idioma), y `--version` y `--help` responden al instante. Probado solo contra el simulador; nada se ha ejecutado en una máquina real.
 * **La ventana de ajustes tiene tres secciones para las herramientas del programa:** **Revisiones** (el primer y el segundo revisor, el margen y el rechazo de las zonas prohibidas, el suelo de los movimientos rápidos y el avance y la velocidad del husillo más altos), **Sonda y mapa de alturas** (la sonda, la rejilla, el largo de los trozos de un corte corregido y los límites del movimiento manual) y **Cola, macros y registro** (las repeticiones y la pausa de la cola, la velocidad de la simulación, las entradas del registro de sesión, las macros y el tiempo de un cambio de herramienta). Cada número se queda dentro del rango que acepta el fichero de ajustes (el rango es su ayuda emergente), **Valores por defecto de esta sección** devuelve una sección a su estado inicial y al guardar se conservan todas las demás claves del fichero.
 * **Un informe de trabajo en una sola página HTML:** **Archivo > Exportar el informe de trabajo...** (o `phoenix-cnc --report FICHERO.NC --html INFORME.html`) escribe una página que lo lleva todo dentro, sin script, sin enlaces y sin imágenes aparte: las estadísticas y el tiempo del programa, las herramientas, lo que parece mal con su línea, la trayectoria vista desde arriba con las líneas que tienen un aviso rodeadas y el mapa de alturas como una rejilla de colores cuando se midió uno. Sigue el idioma, los colores siguen el modo claro u oscuro del navegador y nunca se escribe sobre un fichero que ya existe.
+* **La trayectoria se puede colorear, filtrar por herramienta y pulsar:** bajo el título de la trayectoria (en el plano y en 3D) una fila elige cómo se colorea (**hecho / por hacer**, **tipo de movimiento**: rápido, corte, penetración y arco; **avance del programa**, de azul a rojo a lo largo del recorrido; **herramienta**; o **velocidad de corte**, de la más lenta a la más rápida), muestra una casilla por cada herramienta del programa (una herramienta se oculta o se muestra con su casilla y la última visible se queda) y tiene **Ampliar a la selección** para el plano. Pulsar un movimiento lo selecciona (se dibuja grueso), el panel del programa muestra su línea y la fila dice la línea, su código, el tipo de movimiento, su longitud, su avance y su herramienta. El plano y la vista 3D conservan el arrastre, la rueda y el doble clic.
 
 ## 🧩 Papel en EH3D
 
@@ -138,7 +139,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Pruebas
 
-`cargo test --features gui` ejecuta 378 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
+`cargo test --features gui` ejecuta 397 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
 
 ## 🏗️ Compilación y publicación
 
@@ -179,6 +180,7 @@ EH3D-PHOENIX-CNC/
 │   ├── lint.rs                                  lo que parece mal en un programa: rápidos, husillo, avance y velocidad
 │   ├── probe.rs                                 la sonda: el ciclo de Z sobre una placa de contacto y la rejilla de toques para el mapa de alturas
 │   ├── view.rs                                  el plano que se arrastra y se amplía y la vista 3D que se gira, como números
+│   ├── viewer.rs                                el visor de la trayectoria: tipos, herramientas, avance, colores, clics
 │   ├── plan.rs                                  la revisión antes de empezar: tiempo, alcance y recorrido de los movimientos
 │   ├── cli.rs                                   la línea de comandos: el fichero, el idioma, el tema y las opciones de imagen
 │   ├── bin/phoenix-cnc.rs                       el programa que abre la ventana
@@ -188,6 +190,7 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/prefs.rs                             las secciones de ajustes de las herramientas: revisiones, sonda, cola
 │   ├── gui/remote.rs                            el programa en el servidor: Iniciar, Pausa, Detener y seguir
 │   ├── gui/views.rs                             el centro de la ventana: la trayectoria vista desde arriba o en 3D, con la herramienta
+│   ├── gui/pathview.rs                          la fila del visor: colores, capas, ampliar, línea pulsada
 │   ├── gui/summary.rs                           la ventana de resumen antes de empezar y la lista de teclas
 │   ├── gui/probe.rs                             la sonda en la ventana: preguntas y entradas del mapa de alturas
 │   ├── gui/numfield.rs                          un número que se fija con los botones menos y más o escribiéndolo

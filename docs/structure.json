@@ -333,6 +333,19 @@
           }
         },
         {
+          "name": "viewer.rs",
+          "desc": {
+            "en": "the viewer of the path: kinds, tools, progress, colours, clicks",
+            "es": "el visor de la trayectoria: tipos, herramientas, avance, colores, clics",
+            "de": "der Bahnbetrachter: Arten, Werkzeuge, Fortschritt, Farben, Klicks",
+            "fr": "le visualiseur : types, outils, avancement, couleurs, clics",
+            "it": "il visualizzatore: tipi, utensili, avanzamento, colori, clic",
+            "ja": "経路ビューア：種類、工具、進捗、色、クリック",
+            "zh": "轨迹查看器：类型、工具、进度、颜色、点击",
+            "pt": "o visualizador: tipos, ferramentas, progresso, cores, cliques"
+          }
+        },
+        {
           "name": "plan.rs",
           "desc": {
             "en": "the check before a start: time, reach and travel of the moves",
@@ -447,6 +460,19 @@
             "ja": "ウィンドウの中央：上から見た、または 3D の経路と工具",
             "zh": "窗口中央：俯视或 3D 的路径与刀具",
             "pt": "o centro da janela: a trajetória vista de cima ou em 3D, com a ferramenta"
+          }
+        },
+        {
+          "name": "gui/pathview.rs",
+          "desc": {
+            "en": "the row of the viewer: colours, tool layers, zoom, the clicked line",
+            "es": "la fila del visor: colores, capas, ampliar, línea pulsada",
+            "de": "die Zeile des Betrachters: Farben, Ebenen, Zoom, angeklickte Zeile",
+            "fr": "la ligne du visualiseur : couleurs, calques, zoom, ligne cliquée",
+            "it": "la riga del visualizzatore: colori, livelli, zoom, riga cliccata",
+            "ja": "ビューアの行：色、レイヤー、ズーム、クリックした行",
+            "zh": "查看器的一行：颜色、图层、缩放、被点击的行",
+            "pt": "a linha do visualizador: cores, camadas, ampliar, linha clicada"
           }
         },
         {

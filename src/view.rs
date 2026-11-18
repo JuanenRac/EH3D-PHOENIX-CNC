@@ -51,6 +51,19 @@ impl Plan2d {
         self.pan = (self.pan.0 + dx, self.pan.1 + dy);
     }
 
+    /// Zooms and shifts the view so that `target` (a rectangle of the fitted view, in pixels: left, top, right, bottom) is in the middle of
+    /// an area of `size` pixels about `centre`, filling most of it (a tiny one is magnified no more than the limit of the zoom).
+    pub fn zoom_to(&mut self, target: (f64, f64, f64, f64), centre: (f64, f64), size: (f64, f64)) {
+        let w = (target.2 - target.0).abs().max(1.0);
+        let h = (target.3 - target.1).abs().max(1.0);
+        let zoom = (size.0 * 0.7 / w)
+            .min(size.1 * 0.7 / h)
+            .clamp(ZOOM_MIN, ZOOM_MAX);
+        let middle = ((target.0 + target.2) / 2.0, (target.1 + target.3) / 2.0);
+        self.zoom = zoom;
+        self.pan = (-(middle.0 - centre.0) * zoom, -(middle.1 - centre.1) * zoom);
+    }
+
     pub fn reset(&mut self) {
         *self = Plan2d::default();
     }
@@ -128,6 +141,31 @@ impl Orbit {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zooming_to_a_rectangle_puts_it_in_the_middle_and_fills_most_of_the_area() {
+        let mut v = Plan2d::default();
+        let (centre, size) = ((400.0, 300.0), (800.0, 600.0));
+        v.zoom_to((100.0, 100.0, 200.0, 150.0), centre, size);
+        // the middle of the rectangle is the middle of the area
+        let m = v.apply((150.0, 125.0), centre);
+        assert!(
+            (m.0 - 400.0).abs() < 1e-9 && (m.1 - 300.0).abs() < 1e-9,
+            "{m:?}"
+        );
+        // 100 px wide in 800 px: the width limits it to 0.7 * 800 / 100
+        assert!((v.zoom - 5.6).abs() < 1e-9, "{}", v.zoom);
+        let (a, b) = (
+            v.apply((100.0, 100.0), centre),
+            v.apply((200.0, 150.0), centre),
+        );
+        assert!(a.0 > 0.0 && b.0 < 800.0 && a.1 > 0.0 && b.1 < 600.0);
+        // a point or a thin line is not magnified past the limit, and a huge one not below it
+        v.zoom_to((10.0, 10.0, 10.0, 10.0), centre, size);
+        assert_eq!(v.zoom, ZOOM_MAX);
+        v.zoom_to((0.0, 0.0, 1e9, 1e9), centre, size);
+        assert_eq!(v.zoom, ZOOM_MIN);
+    }
 
     #[test]
     fn the_wheel_zooms_about_the_pointer_and_keeps_the_point_under_it() {

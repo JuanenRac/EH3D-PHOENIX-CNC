@@ -33,6 +33,8 @@ impl App {
     pub(super) fn refresh_path(&mut self) {
         self.path_toolpath = gcode::toolpath(&self.session.program);
         self.path_extras = crate::sim::Extras::of(&self.session.program);
+        self.viewer
+            .refresh(&self.session.program, &self.path_toolpath);
     }
 
     pub(super) fn sim_rates(&self) -> Rates {

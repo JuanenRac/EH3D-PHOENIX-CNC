@@ -67,6 +67,7 @@ impl App {
                     .color(col(t.dim)),
                 );
             });
+            self.viewer_bar(ui);
             let (rect, resp) =
                 ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
             let p = ui.painter_at(rect);
@@ -98,15 +99,26 @@ impl App {
             if resp.double_clicked() {
                 self.reset_view();
             }
-            if self.settings.view_3d {
-                self.paint_3d(&p, rect, &t);
+            self.zoom_to_selection(rect);
+            // a click (not a drag) selects the move under it and shows its line in the program panel
+            let pick = if resp.clicked() {
+                resp.interact_pointer_pos()
             } else {
-                self.paint_plan(&p, rect, &t);
+                None
+            };
+            let picked = if self.settings.view_3d {
+                self.paint_3d(&p, rect, &t, pick)
+            } else {
+                self.paint_plan(&p, rect, &t, pick)
+            };
+            if pick.is_some() {
+                self.select_segment(picked);
             }
         });
     }
 
-    fn paint_plan(&self, p: &egui::Painter, rect: Rect, t: &Theme) {
+    /// How the plan fits the table (or the program) into the area: the corner, the scale and the inner rectangle.
+    pub(super) fn plan_frame(&self, rect: Rect) -> PlanFrame {
         let off = self.work_offset();
         let ((tx0, tx1), (ty0, ty1)) = (
             (self.settings.travel[0].0, self.settings.travel[0].1),
@@ -128,12 +140,33 @@ impl App {
         let (w, h) = ((maxx - minx).max(1.0), (maxy - miny).max(1.0));
         let inner = rect.shrink(18.0);
         let k = ((inner.width() as f64) / w).min((inner.height() as f64) / h);
+        PlanFrame {
+            minx,
+            miny,
+            w,
+            h,
+            k,
+            inner,
+        }
+    }
+
+    pub(super) fn paint_plan(
+        &self,
+        p: &egui::Painter,
+        rect: Rect,
+        t: &Theme,
+        pick: Option<Pos2>,
+    ) -> Option<usize> {
+        let off = self.work_offset();
+        let ((tx0, tx1), (ty0, ty1)) = (
+            (self.settings.travel[0].0, self.settings.travel[0].1),
+            (self.settings.travel[1].0, self.settings.travel[1].1),
+        );
+        let fr = self.plan_frame(rect);
+        let (w, h) = (fr.w, fr.h);
         let centre = rect.center();
         let at = |x: f64, y: f64| {
-            let fitted = (
-                inner.left() as f64 + (x - minx) * k,
-                inner.bottom() as f64 - (y - miny) * k,
-            );
+            let fitted = fr.fitted(x, y);
             let (sx, sy) = self
                 .plan2d
                 .apply(fitted, (centre.x as f64, centre.y as f64));
@@ -165,23 +198,28 @@ impl App {
             StrokeKind::Inside,
         );
         let next = self.sim_line.unwrap_or(self.session.next);
-        for s in &self.path_toolpath {
-            if s.rapid && !self.settings.show_rapids {
+        let mut best: Option<(usize, f32)> = None;
+        for (i, s) in self.path_toolpath.iter().enumerate() {
+            if (s.rapid && !self.settings.show_rapids) || !self.viewer.visible(i) {
                 continue;
             }
-            let done = s.line < next;
-            let color = match (s.rapid, done) {
-                (true, _) => alpha(col(t.dim), 140),
-                (false, true) => col(t.ok),
-                (false, false) => col(t.accent),
-            };
-            p.line_segment(
-                [
+            let (color, width) = self.seg_style(i, s, t, next);
+            let (a, b) = (
+                at(s.from.0 + off[0], s.from.1 + off[1]),
+                at(s.to.0 + off[0], s.to.1 + off[1]),
+            );
+            p.line_segment([a, b], Stroke::new(width, color));
+            best = nearer(best, i, pick, a, b);
+        }
+        if let Some(i) = self.viewer.selected {
+            if let Some(s) = self.path_toolpath.get(i) {
+                self.paint_selected(
+                    p,
+                    t,
                     at(s.from.0 + off[0], s.from.1 + off[1]),
                     at(s.to.0 + off[0], s.to.1 + off[1]),
-                ],
-                Stroke::new(if s.rapid { 1.0 } else { 2.0 }, color),
-            );
+                );
+            }
         }
         // the tool, where the machine is
         let m = self.session.status.machine_mm;
@@ -206,11 +244,18 @@ impl App {
             egui::FontId::proportional(12.0),
             col(t.dim),
         );
+        best.map(|(i, _)| i)
     }
 
     /// The machine in 3D: the floor of the table with its grid, the edges of the volume the axes reach, the path of the program with the
     /// part that is done, and the tool with its line down to the table.
-    fn paint_3d(&self, p: &egui::Painter, rect: Rect, t: &Theme) {
+    pub(super) fn paint_3d(
+        &self,
+        p: &egui::Painter,
+        rect: Rect,
+        t: &Theme,
+        pick: Option<Pos2>,
+    ) -> Option<usize> {
         let off = self.work_offset();
         let tr = self.settings.travel;
         let (x0, y0, z0) = (tr[0].0, tr[1].0, tr[2].0);
@@ -260,22 +305,28 @@ impl App {
             p.line_segment([top[i], top[(i + 1) % 4]], edge);
         }
         let next = self.sim_line.unwrap_or(self.session.next);
-        for s in &self.path_toolpath {
-            if s.rapid && !self.settings.show_rapids {
+        let mut best: Option<(usize, f32)> = None;
+        for (i, s) in self.path_toolpath.iter().enumerate() {
+            if (s.rapid && !self.settings.show_rapids) || !self.viewer.visible(i) {
                 continue;
             }
-            let color = match (s.rapid, s.line < next) {
-                (true, _) => alpha(col(t.dim), 140),
-                (false, true) => col(t.ok),
-                (false, false) => col(t.accent),
-            };
-            p.line_segment(
-                [
+            let (color, width) = self.seg_style(i, s, t, next);
+            let (a, b) = (
+                at(s.from.0 + off[0], s.from.1 + off[1], s.from.2 + off[2]),
+                at(s.to.0 + off[0], s.to.1 + off[1], s.to.2 + off[2]),
+            );
+            p.line_segment([a, b], Stroke::new(width, color));
+            best = nearer(best, i, pick, a, b);
+        }
+        if let Some(i) = self.viewer.selected {
+            if let Some(s) = self.path_toolpath.get(i) {
+                self.paint_selected(
+                    p,
+                    t,
                     at(s.from.0 + off[0], s.from.1 + off[1], s.from.2 + off[2]),
                     at(s.to.0 + off[0], s.to.1 + off[1], s.to.2 + off[2]),
-                ],
-                Stroke::new(if s.rapid { 1.0 } else { 2.0 }, color),
-            );
+                );
+            }
         }
         // the tool: a ring on the table under it, the line down from it, and the tool itself
         let m = self.session.status.machine_mm;
@@ -298,6 +349,49 @@ impl App {
             egui::FontId::proportional(12.0),
             col(t.dim),
         );
+        best.map(|(i, _)| i)
+    }
+}
+
+/// How the plan fits into its area: the corner of what is shown (mm), its size, the pixels per mm and the rectangle it is drawn in.
+pub(super) struct PlanFrame {
+    minx: f64,
+    miny: f64,
+    w: f64,
+    h: f64,
+    k: f64,
+    inner: Rect,
+}
+
+impl PlanFrame {
+    /// A point of the machine (mm) to the fitted view, in pixels, before the zoom and the shift of the operator.
+    pub(super) fn fitted(&self, x: f64, y: f64) -> (f64, f64) {
+        (
+            self.inner.left() as f64 + (x - self.minx) * self.k,
+            self.inner.bottom() as f64 - (y - self.miny) * self.k,
+        )
+    }
+}
+
+/// How near a click has to be to a move to select it, in pixels.
+const PICK_TOLERANCE: f32 = 7.0;
+
+/// Keeps the move nearest to the click: `best` is the nearest so far (its number and its distance), `a` and `b` the ends of move `i` on the screen.
+fn nearer(
+    best: Option<(usize, f32)>,
+    i: usize,
+    pick: Option<Pos2>,
+    a: Pos2,
+    b: Pos2,
+) -> Option<(usize, f32)> {
+    let Some(c) = pick else {
+        return best;
+    };
+    let d = crate::viewer::distance_to_segment([c.x, c.y], [a.x, a.y], [b.x, b.y]);
+    match best {
+        Some((_, bd)) if bd <= d => best,
+        _ if d <= PICK_TOLERANCE => Some((i, d)),
+        _ => best,
     }
 }
 

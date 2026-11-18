@@ -31,5 +31,6 @@ pub mod sim;
 pub mod stats;
 pub mod tuning;
 pub mod view;
+pub mod viewer;
 pub mod words;
 pub mod workreport;

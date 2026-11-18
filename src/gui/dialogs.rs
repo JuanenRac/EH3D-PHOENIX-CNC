@@ -358,6 +358,7 @@ impl App {
                 self.session.clear_program();
                 self.path_toolpath.clear();
                 self.path_extras = crate::sim::Extras::default();
+                self.viewer.refresh(&[], &[]);
                 ui.close();
             }
             ui.separator();

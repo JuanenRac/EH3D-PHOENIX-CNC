@@ -148,10 +148,22 @@ pub enum Msg {
     RepExists,
     RepNone,
     FilterReport,
+    VwColor,
+    VwByState,
+    VwByKind,
+    VwByProgress,
+    VwByTool,
+    VwByFeed,
+    VwTools,
+    VwZoomSel,
+    VwSelHint,
+    VwSel,
+    VwPlunge,
+    VwArc,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 140] = [
+pub const ALL: [Msg; 152] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -292,6 +304,18 @@ pub const ALL: [Msg; 140] = [
     Msg::RepExists,
     Msg::RepNone,
     Msg::FilterReport,
+    Msg::VwColor,
+    Msg::VwByState,
+    Msg::VwByKind,
+    Msg::VwByProgress,
+    Msg::VwByTool,
+    Msg::VwByFeed,
+    Msg::VwTools,
+    Msg::VwZoomSel,
+    Msg::VwSelHint,
+    Msg::VwSel,
+    Msg::VwPlunge,
+    Msg::VwArc,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -1697,6 +1721,126 @@ fn table(m: Msg) -> [&'static str; 8] {
             "作业报告（HTML）",
             "Relatórios de trabalho (HTML)",
         ],
+        Msg::VwColor => [
+            "Colour by",
+            "Colorear por",
+            "Einfärben nach",
+            "Colorer par",
+            "Colora per",
+            "色分け",
+            "着色依据",
+            "Colorir por",
+        ],
+        Msg::VwByState => [
+            "done / to do",
+            "hecho / por hacer",
+            "erledigt / offen",
+            "fait / à faire",
+            "fatto / da fare",
+            "完了／未了",
+            "已完成／待完成",
+            "feito / por fazer",
+        ],
+        Msg::VwByKind => [
+            "type of move",
+            "tipo de movimiento",
+            "Art der Bewegung",
+            "type de mouvement",
+            "tipo di movimento",
+            "移動の種類",
+            "移动类型",
+            "tipo de movimento",
+        ],
+        Msg::VwByProgress => [
+            "progress of the program",
+            "avance del programa",
+            "Fortschritt des Programms",
+            "avancement du programme",
+            "avanzamento del programma",
+            "プログラムの進捗",
+            "程序进度",
+            "progresso do programa",
+        ],
+        Msg::VwByTool => [
+            "tool",
+            "herramienta",
+            "Werkzeug",
+            "outil",
+            "utensile",
+            "工具",
+            "工具",
+            "ferramenta",
+        ],
+        Msg::VwByFeed => [
+            "feed rate",
+            "velocidad de corte",
+            "Vorschub",
+            "vitesse d'avance",
+            "velocità di taglio",
+            "送り速度",
+            "进给速度",
+            "velocidade de corte",
+        ],
+        Msg::VwTools => [
+            "Tools",
+            "Herramientas",
+            "Werkzeuge",
+            "Outils",
+            "Utensili",
+            "工具",
+            "工具",
+            "Ferramentas",
+        ],
+        Msg::VwZoomSel => [
+            "Zoom to the selection",
+            "Ampliar a la selección",
+            "Auf die Auswahl zoomen",
+            "Zoomer sur la sélection",
+            "Zoom sulla selezione",
+            "選択範囲にズーム",
+            "缩放到所选内容",
+            "Ampliar à seleção",
+        ],
+        Msg::VwSelHint => [
+            "Click a move to select it and show its line",
+            "Pulse un movimiento para elegirlo y ver su línea",
+            "Eine Bewegung anklicken, um sie auszuwählen und ihre Zeile zu zeigen",
+            "Cliquez sur un mouvement pour le choisir et voir sa ligne",
+            "Fare clic su un movimento per sceglierlo e vederne la riga",
+            "移動をクリックすると選択され、その行が表示されます",
+            "单击一段移动即可选中并显示其所在行",
+            "Clique num movimento para o escolher e ver a sua linha",
+        ],
+        Msg::VwSel => [
+            "Line {0}: {1}  [{2}]",
+            "Línea {0}: {1}  [{2}]",
+            "Zeile {0}: {1}  [{2}]",
+            "Ligne {0} : {1}  [{2}]",
+            "Riga {0}: {1}  [{2}]",
+            "{0} 行目：{1}  [{2}]",
+            "第 {0} 行：{1}  [{2}]",
+            "Linha {0}: {1}  [{2}]",
+        ],
+        Msg::VwPlunge => [
+            "Plunge",
+            "Penetración",
+            "Eintauchen",
+            "Plongée",
+            "Penetrazione",
+            "突っ込み",
+            "下刀",
+            "Penetração",
+        ],
+        Msg::VwArc => [
+            "Arc (by its chord)",
+            "Arco (por su cuerda)",
+            "Bogen (als Sehne)",
+            "Arc (par sa corde)",
+            "Arco (per la corda)",
+            "円弧（弦で表示）",
+            "圆弧（按弦显示）",
+            "Arco (pela corda)",
+        ],
     }
 }
 
@@ -1760,7 +1904,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 140);
+        assert_eq!(seen.len(), 152);
     }
 
     #[test]

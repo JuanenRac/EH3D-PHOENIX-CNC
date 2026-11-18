@@ -57,6 +57,11 @@ fn tools_by_line(lines: &[String]) -> (Vec<Option<u32>>, Vec<usize>) {
     (out, changes)
 }
 
+/// The tool in force after each line of the program (nothing before the first tool is taken).
+pub fn tool_by_line(lines: &[String]) -> Vec<Option<u32>> {
+    tools_by_line(lines).0
+}
+
 /// The lines (from 0) where a different tool is taken (`T` then `M6`), in order.
 pub fn change_lines(lines: &[String]) -> Vec<usize> {
     tools_by_line(lines).1
