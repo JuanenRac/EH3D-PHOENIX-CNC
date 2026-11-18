@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use eh3d_view::texts::Lang;
 use eh3d_view::theme::ThemeId;
 
+use crate::jog::Mode as JogMode;
 use crate::lint::LintCfg;
 use crate::probe::ProbeCfg;
 
@@ -73,8 +74,9 @@ pub struct Settings {
     /// When a program goes on after a failure it is taken up this many lines before the last one that was sent, because the controller keeps
     /// some lines in its buffer and may not have run them.
     pub resume_backoff_lines: u32,
-    /// A step of the jog that would take an axis past the travel is shortened to the limit, and one from the limit outwards is refused.
-    pub jog_soft_limits: bool,
+    /// A step of the jog that would take an axis past the travel is shortened to the limit, and one from the limit outwards is refused:
+    /// always, only after the machine was homed (the default) or never.
+    pub jog_soft_limits: JogMode,
     /// What looks wrong in a program besides the travel is said in the summary (`lint`), and the floor under which a rapid move is said.
     pub lint: LintCfg,
     /// The probe: speed, depth, retract, thickness of the plate and the height it travels at.
@@ -121,7 +123,7 @@ impl Default for Settings {
             busy_wait_s: 4.0 * 3600.0,
             resume_plunge_feed_mm_min: 100.0,
             resume_backoff_lines: 16,
-            jog_soft_limits: true,
+            jog_soft_limits: JogMode::AfterHoming,
             lint: LintCfg::default(),
             probe: ProbeCfg::default(),
             probe_grid_mm: 10.0,
@@ -241,7 +243,9 @@ impl Settings {
                         .filter(|x| *x <= 1000)
                         .unwrap_or(s.resume_backoff_lines)
                 }
-                "jog_soft_limits" => s.jog_soft_limits = on(v),
+                "jog_soft_limits" => {
+                    s.jog_soft_limits = JogMode::from_key(v).unwrap_or(s.jog_soft_limits)
+                }
                 "lint" => s.lint.enabled = on(v),
                 "lint_rapid_floor" => {
                     s.lint.rapid_floor_mm = num(v)
@@ -373,7 +377,7 @@ impl Settings {
         );
         out.push_str(&format!(
             "jog_soft_limits = {}\nlint = {}\nlint_rapid_floor = {}\nlint_max_feed = {}\nlint_max_rpm = {}\nprobe_feed = {}\nprobe_depth = {}\nprobe_retract = {}\nprobe_plate = {}\nprobe_clearance = {}\nprobe_grid = {}\nheightmap_segment = {}\n",
-            yes(self.jog_soft_limits),
+            self.jog_soft_limits.key(),
             yes(self.lint.enabled),
             self.lint.rapid_floor_mm,
             self.lint.max_feed_mm_min,
@@ -473,7 +477,7 @@ mod tests {
             busy_wait_s: 600.0,
             resume_plunge_feed_mm_min: 60.0,
             resume_backoff_lines: 4,
-            jog_soft_limits: false,
+            jog_soft_limits: JogMode::Off,
             lint: LintCfg {
                 enabled: false,
                 rapid_floor_mm: -1.5,
@@ -592,13 +596,22 @@ mod tests {
     #[test]
     fn the_probe_the_height_map_the_jog_limits_and_the_checks_are_in_the_settings_file() {
         let d = Settings::default();
-        assert!(d.jog_soft_limits && d.lint.enabled);
+        assert!(d.jog_soft_limits == JogMode::AfterHoming && d.lint.enabled);
         assert_eq!(d.probe, ProbeCfg::default());
         assert_eq!((d.probe_grid_mm, d.heightmap_segment_mm), (10.0, 1.0));
         let s = Settings::parse(
             "jog_soft_limits = no\nlint = off\nlint_rapid_floor = -2\nlint_max_feed = 1800\nlint_max_rpm = 18000\nprobe_feed = 12\nprobe_depth = 4\nprobe_retract = 1\nprobe_plate = 1.2\nprobe_clearance = 6\nprobe_grid = 8\nheightmap_segment = 0.25\n",
         );
-        assert!(!s.jog_soft_limits && !s.lint.enabled);
+        assert!(s.jog_soft_limits == JogMode::Off && !s.lint.enabled);
+        assert_eq!(
+            Settings::parse("jog_soft_limits = always\n").jog_soft_limits,
+            JogMode::Always
+        );
+        // a word that is not one keeps the default
+        assert_eq!(
+            Settings::parse("jog_soft_limits = maybe\n").jog_soft_limits,
+            JogMode::AfterHoming
+        );
         assert_eq!(s.lint.rapid_floor_mm, -2.0);
         assert_eq!((s.lint.max_feed_mm_min, s.lint.max_rpm), (1800.0, 18_000.0));
         assert_eq!(

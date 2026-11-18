@@ -127,6 +127,10 @@ pub struct Session {
     pub allow_system_lines: bool,
     /// The travel of X, Y and Z in the coordinates of the machine: a step of the jog past it is shortened and one from the limit outwards is refused (`None`: no limit).
     pub soft_limits: Option<[(f64, f64); 3]>,
+    /// The soft limits hold only after the machine was homed (before that its coordinates mean nothing).
+    pub limits_need_homing: bool,
+    /// The machine was homed since it was last reset or in alarm.
+    homed: bool,
     /// The height map measured with the probe, and the program as it was before the map corrected it (to put it back).
     pub height_map: Option<HeightMap>,
     uncorrected: Option<Vec<String>>,
@@ -247,6 +251,8 @@ impl Session {
             travel_asked: false,
             allow_system_lines: false,
             soft_limits: None,
+            limits_need_homing: false,
+            homed: false,
             height_map: None,
             uncorrected: None,
             samples: Arc::new(Mutex::new(Vec::new())),
@@ -299,7 +305,13 @@ impl Session {
         }
         let r = self.ctl().status();
         match r {
-            Ok(s) => self.status = s,
+            Ok(s) => {
+                // an alarm may have lost the position
+                if s.state == State::Alarm {
+                    self.homed = false;
+                }
+                self.status = s;
+            }
             Err(e) => self.failed("status", e),
         }
     }
@@ -318,7 +330,8 @@ impl Session {
             return;
         }
         let mut distance_mm = dir * self.step_mm;
-        if let (Some(limits), true) = (self.soft_limits, axis < 3) {
+        let holds = !self.limits_need_homing || self.homed;
+        if let (Some(limits), true, true) = (self.soft_limits, axis < 3, holds) {
             match limit_step(self.status.machine_mm[axis], distance_mm, limits[axis]) {
                 JogStep::Go(d) => distance_mm = d,
                 JogStep::Shorten(d) => {
@@ -328,7 +341,7 @@ impl Session {
                     ));
                 }
                 JogStep::Refuse => {
-                    self.say("jog: the axis is at the end of its travel (jog_soft_limits = no in the settings file turns the limit off)");
+                    self.say("jog: the axis is at the end of its travel (jog_soft_limits in the settings file: always, homing or no)");
                     return;
                 }
             }
@@ -484,7 +497,20 @@ impl Session {
     }
 
     pub fn home(&mut self) {
-        self.order("home", Command::Home(Vec::new()));
+        if self.refuse_busy("home") {
+            return;
+        }
+        let r = self.ctl().command(Command::Home(Vec::new()));
+        match r {
+            Ok(()) => self.homed = true,
+            Err(e) => self.failed("home", e),
+        }
+        self.refresh();
+    }
+
+    /// Whether the machine was homed since it was last reset or in alarm.
+    pub fn homed(&self) -> bool {
+        self.homed
     }
 
     /// Makes the work position here zero on X, Y and Z.
@@ -515,6 +541,7 @@ impl Session {
 
     /// Stops everything at once; the controller stays in alarm until it is unlocked. It does not wait for the line that is waiting for its `ok`.
     pub fn estop(&mut self) {
+        self.homed = false;
         self.running = false;
         self.paused = false;
         self.resume_preamble.clear();
@@ -1771,6 +1798,29 @@ G0 X2",
         // and the way back is free
         s.jog(0, -1.0);
         assert_eq!(s.status.machine_mm[0], 5.0);
+    }
+
+    #[test]
+    fn the_limits_that_need_homing_hold_only_after_the_machine_was_homed() {
+        let mut s = session();
+        s.step_mm = 10.0;
+        s.soft_limits = Some([(0.0, 15.0), (0.0, 100.0), (-50.0, 50.0)]);
+        s.limits_need_homing = true;
+        assert!(!s.homed());
+        // before homing nothing stops the step past the limit
+        s.jog(0, 1.0);
+        s.jog(0, 1.0);
+        assert_eq!(s.status.machine_mm[0], 20.0);
+        s.jog(0, -1.0);
+        s.jog(0, -1.0);
+        s.home();
+        assert!(s.homed());
+        s.jog(0, 1.0);
+        s.jog(0, 1.0);
+        assert_eq!(s.status.machine_mm[0], 15.0);
+        // a reset takes the homing away
+        s.estop();
+        assert!(!s.homed());
     }
 
     #[test]

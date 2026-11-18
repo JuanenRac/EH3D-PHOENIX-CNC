@@ -2,6 +2,38 @@
 //! starts at the limit is refused. A machine already outside its travel (the zero was lost, the machine was not homed) may still be moved
 //! towards the inside. It knows nothing of the controller, so it is tested on its own.
 
+/// When the soft limits of the jog hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// From the start, whatever the machine knows of its position.
+    Always,
+    /// Only after the machine was homed: before that its coordinates mean nothing.
+    AfterHoming,
+    /// Never.
+    Off,
+}
+
+impl Mode {
+    /// The word of the settings file.
+    pub fn key(self) -> &'static str {
+        match self {
+            Mode::Always => "always",
+            Mode::AfterHoming => "homing",
+            Mode::Off => "no",
+        }
+    }
+
+    /// Reads the word of the settings file (`yes` is `always`, what it meant before there were modes); `None` for anything else.
+    pub fn from_key(v: &str) -> Option<Mode> {
+        match v.trim().to_ascii_lowercase().as_str() {
+            "always" | "yes" | "on" | "true" | "1" => Some(Mode::Always),
+            "homing" | "after_homing" | "after-homing" => Some(Mode::AfterHoming),
+            "no" | "off" | "false" | "0" | "never" => Some(Mode::Off),
+            _ => None,
+        }
+    }
+}
+
 /// What to do with a step.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Step {
@@ -50,6 +82,17 @@ mod tests {
     use super::*;
 
     const R: (f64, f64) = (0.0, 100.0);
+
+    #[test]
+    fn the_mode_is_read_from_the_settings_word_and_written_back() {
+        for m in [Mode::Always, Mode::AfterHoming, Mode::Off] {
+            assert_eq!(Mode::from_key(m.key()), Some(m));
+        }
+        assert_eq!(Mode::from_key(" YES "), Some(Mode::Always));
+        assert_eq!(Mode::from_key("After_Homing"), Some(Mode::AfterHoming));
+        assert_eq!(Mode::from_key("off"), Some(Mode::Off));
+        assert_eq!(Mode::from_key("sometimes"), None);
+    }
 
     #[test]
     fn a_step_inside_the_travel_goes_whole() {

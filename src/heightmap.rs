@@ -2,7 +2,8 @@
 //! must keep a constant depth over a board that is not flat (a printed circuit, a sheet of wood) is cut into short moves and the Z of each is
 //! raised or lowered by the height the map has under it (bilinear between the four nearest points).
 //!
-//! The map holds heights relative to the first point probed, so the Z of the work is zeroed there. It knows nothing of the controller or the
+//! The map holds heights relative to the point probed that is nearest to the zero of the work (the first of the grid when two are equally near),
+//! so the Z of the work is zeroed there. It knows nothing of the controller or the
 //! window: the readings come in as numbers (the report `[PRB:x,y,z:1]` of GRBL read by [`parse_probe_report`], or a closure in the probe
 //! module), and it is tested on its own.
 
@@ -26,7 +27,7 @@ pub struct HeightMap {
     /// How many points along X and along Y.
     pub nx: usize,
     pub ny: usize,
-    /// The heights relative to the first point probed (mm), row by row from the smallest Y; `z[j * nx + i]`.
+    /// The heights relative to the point nearest to the zero of the work (mm), row by row from the smallest Y; `z[j * nx + i]`.
     pub z: Vec<f64>,
 }
 
@@ -91,7 +92,8 @@ pub fn parse_probe_report(text: &str) -> Vec<Option<f64>> {
 }
 
 impl HeightMap {
-    /// Builds the map from the readings (machine Z of each contact) in the order of [`probe_points`]. The heights are taken relative to the first.
+    /// Builds the map from the readings (machine Z of each contact) in the order of [`probe_points`]. The heights are taken relative to the
+    /// reading of the point nearest to the zero of the work (the first in that order when two are equally near).
     pub fn from_readings(
         area: [f64; 4],
         nx: usize,
@@ -110,7 +112,14 @@ impl HeightMap {
             return Err("a reading is not a finite number".to_string());
         }
         let (dx, dy) = steps(area, nx, ny);
-        let reference = readings[0];
+        let mut nearest = (f64::INFINITY, 0);
+        for (k, (x, y)) in probe_points(area, nx, ny)?.iter().enumerate() {
+            let d = x.hypot(*y);
+            if d < nearest.0 {
+                nearest = (d, k);
+            }
+        }
+        let reference = readings[nearest.1];
         let mut z = vec![0.0; nx * ny];
         for (k, r) in readings.iter().enumerate() {
             let (j, c) = (k / nx, k % nx);
@@ -425,6 +434,33 @@ mod tests {
         assert_eq!(m.z, vec![0.0, 1.0, 2.0, 0.0, 1.0, 2.0]);
         assert_eq!(m.span(), (0.0, 2.0));
         assert_eq!(m.area(), [0.0, 0.0, 20.0, 10.0]);
+    }
+
+    #[test]
+    fn the_heights_are_relative_to_the_point_nearest_to_the_zero_of_the_work() {
+        // a 3 x 3 grid over -10..10 has the zero at its centre, where the surface is at 5.0 and rises 0.1 mm per mm along X
+        let area = [-10.0, -10.0, 10.0, 10.0];
+        let readings: Vec<f64> = probe_points(area, 3, 3)
+            .unwrap()
+            .iter()
+            .map(|p| 5.0 + p.0 * 0.1)
+            .collect();
+        let m = HeightMap::from_readings(area, 3, 3, &readings).unwrap();
+        assert!(m.offset_at(0.0, 0.0).abs() < 1e-9);
+        assert!((m.offset_at(10.0, 0.0) - 1.0).abs() < 1e-9);
+        assert!((m.offset_at(-10.0, 5.0) + 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn two_points_equally_near_the_zero_take_the_first_of_the_grid() {
+        // four corners, all at the same distance: the first probed is the reference
+        let m =
+            HeightMap::from_readings([-5.0, -5.0, 5.0, 5.0], 2, 2, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+        assert_eq!(m.z, vec![0.0, 1.0, 3.0, 2.0]);
+        // a grid that does not hold the zero takes its nearest corner, the one at (10, 10)
+        let m = HeightMap::from_readings([10.0, 10.0, 30.0, 30.0], 2, 2, &[7.0, 8.0, 9.0, 6.0])
+            .unwrap();
+        assert_eq!(m.z[0], 0.0);
     }
 
     #[test]
