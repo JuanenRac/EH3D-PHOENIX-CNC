@@ -21,7 +21,7 @@ pub(super) enum Win {
     Save(Box<Browser>),
     /// Save: the file is there already and the operator is asked whether to replace it.
     Replace(Box<Browser>, PathBuf),
-    Edit(String),
+    Edit(Box<crate::editor::EditState>),
     About,
     /// A program was left in the middle: go on from its line or leave it.
     Resume(crate::recovery::Recovery),
@@ -52,7 +52,7 @@ pub(super) struct Draft {
 }
 
 impl App {
-    fn browser(&mut self, mode: Mode) -> Box<Browser> {
+    pub(super) fn browser(&mut self, mode: Mode) -> Box<Browser> {
         self.browser_for(mode, Purpose::Program)
     }
 
@@ -127,7 +127,7 @@ impl App {
             }
             "open" => Some(Win::Open(self.browser(Mode::Open))),
             "save" => Some(Win::Save(self.browser(Mode::Save))),
-            "edit" => Some(Win::Edit(self.session.program.join("\n"))),
+            "edit" => Some(Win::Edit(self.edit_state())),
             "about" => Some(Win::About),
             "summary" => Some(Win::Summary(Box::new(summary::PendingStart {
                 report: self.report(),
@@ -237,7 +237,7 @@ impl App {
                 ui.close();
             }
             if self.menu_item(ui, self.t(Text::McEditProgram), Shortcut::Edit, true) {
-                self.win = Some(Win::Edit(self.session.program.join("\n")));
+                self.win = Some(Win::Edit(self.edit_state()));
                 ui.close();
             }
             if ui.button(self.w(Msg::MenuLogExport)).clicked() {
@@ -469,7 +469,7 @@ impl App {
             Win::Open(b) => self.file_window(ctx, b, Mode::Open),
             Win::Save(b) => self.file_window(ctx, b, Mode::Save),
             Win::Replace(b, p) => self.replace_window(ctx, b, p),
-            Win::Edit(t) => self.edit_window(ctx, t),
+            Win::Edit(s) => self.edit_window(ctx, s),
             Win::About => self.about_window(ctx),
             Win::Resume(r) => self.resume_window(ctx, r),
             Win::Summary(p) => self.summary_window(ctx, p),
@@ -577,44 +577,6 @@ impl App {
                 ui.hyperlink("https://github.com/JuanenRac/EH3D-PHOENIX-CNC");
             });
         open.then_some(Win::About)
-    }
-
-    fn edit_window(&mut self, ctx: &egui::Context, mut text: String) -> Option<Win> {
-        let mut keep = true;
-        let mut apply = false;
-        self.window(self.t(Text::McEditProgram))
-            .default_size([620.0, 460.0])
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(380.0)
-                    .show(ui, |ui| {
-                        super::clipmenu::text_box(
-                            ui,
-                            egui::TextEdit::multiline(&mut text)
-                                .font(egui::TextStyle::Monospace)
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(20),
-                        );
-                    });
-                ui.horizontal(|ui| {
-                    if ui.button(self.t(Text::Apply)).clicked() {
-                        apply = true;
-                    }
-                    if ui.button(self.t(Text::Close)).clicked() {
-                        keep = false;
-                    }
-                    ui.label(format!(
-                        "{} {}",
-                        text.lines().count(),
-                        self.t(Text::McLine).to_lowercase()
-                    ));
-                });
-            });
-        if apply {
-            self.session.load(&text);
-            self.refresh_path();
-        }
-        keep.then_some(Win::Edit(text))
     }
 
     fn replace_window(

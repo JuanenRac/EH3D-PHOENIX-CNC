@@ -23,6 +23,7 @@ use crate::settings::{settings_path, Settings};
 mod check;
 mod clipmenu;
 mod dialogs;
+mod editwin;
 mod files;
 mod icons;
 mod keepout;

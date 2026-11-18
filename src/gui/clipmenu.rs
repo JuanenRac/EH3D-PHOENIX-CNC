@@ -44,6 +44,14 @@ pub(super) fn start_frame(ctx: &egui::Context, lang: Lang) {
 
 /// A text box with the menu of the right button.
 pub(super) fn text_box(ui: &mut egui::Ui, edit: egui::TextEdit<'_>) -> egui::Response {
+    text_box_out(ui, edit).response.response
+}
+
+/// The same, giving everything the box says of itself (its state, to move the cursor, and where the cursor is).
+pub(super) fn text_box_out(
+    ui: &mut egui::Ui,
+    edit: egui::TextEdit<'_>,
+) -> egui::text_edit::TextEditOutput {
     let out = edit.show(ui);
     let r = out.response.response.clone();
     let ctx = ui.ctx().clone();
@@ -122,5 +130,5 @@ pub(super) fn text_box(ui: &mut egui::Ui, edit: egui::TextEdit<'_>) -> egui::Res
             ui.close();
         }
     });
-    r
+    out
 }

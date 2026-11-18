@@ -7,6 +7,7 @@ pub use eh3d_view::{crash, scene, texts, theme};
 pub mod boxes;
 pub mod cli;
 pub mod complete;
+pub mod editor;
 pub mod estimate;
 pub mod gcode;
 #[cfg(feature = "gui")]

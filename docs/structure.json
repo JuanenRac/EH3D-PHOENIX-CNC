@@ -385,6 +385,19 @@
           }
         },
         {
+          "name": "editor.rs",
+          "desc": {
+            "en": "the editor of the program: find, replace, go to a line, notes",
+            "es": "el editor del programa: buscar, reemplazar, ir a línea, notas",
+            "de": "der Programmeditor: Suchen, Ersetzen, Zeile, Hinweise",
+            "fr": "l'éditeur du programme : rechercher, remplacer, ligne, notes",
+            "it": "l'editor del programma: cerca, sostituisci, riga, note",
+            "ja": "プログラムエディタ：検索、置換、行移動、注記",
+            "zh": "程序编辑器：查找、替换、转到行、提示",
+            "pt": "o editor do programa: procurar, substituir, linha, notas"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
@@ -486,6 +499,19 @@
             "ja": "ビューアの行：色、レイヤー、ズーム、クリックした行",
             "zh": "查看器的一行：颜色、图层、缩放、被点击的行",
             "pt": "a linha do visualizador: cores, camadas, ampliar, linha clicada"
+          }
+        },
+        {
+          "name": "gui/editwin.rs",
+          "desc": {
+            "en": "the editor window: line numbers, find and replace, notes, Save",
+            "es": "la ventana del editor: números de línea, buscar, notas, Guardar",
+            "de": "das Editorfenster: Zeilennummern, Suchen, Hinweise, Speichern",
+            "fr": "la fenêtre de l'éditeur : numéros de ligne, recherche, notes, enregistrer",
+            "it": "la finestra dell'editor: numeri di riga, cerca, note, salva",
+            "ja": "エディタのウィンドウ：行番号、検索と置換、注記、保存",
+            "zh": "编辑器窗口：行号、查找替换、提示、保存",
+            "pt": "a janela do editor: números de linha, procurar, notas, guardar"
           }
         },
         {

@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-409-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-426-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 409 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 426 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.4` |
 | Reifegrad | Funktionsfähig |
-| Tests | 409 |
+| Tests | 426 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
@@ -47,7 +47,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche in 37 Sprachen, im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 409 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 426 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur der Simulator: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt; von hier ist noch keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -73,6 +73,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 * **Das Einstellungsfenster hat drei Gruppen für die Programmwerkzeuge:** **Prüfungen** (die erste und die zweite Prüfung, der Abstand und die Ablehnung der Sperrzonen, die Untergrenze der Eilgangbewegungen sowie der höchste Vorschub und die höchste Spindeldrehzahl), **Taster und Höhenkarte** (der Taster, das Raster, die Länge der Stücke eines korrigierten Schnitts und die Grenzen des Handfahrens) und **Warteschlange, Makros und Protokoll** (die Wiederholungen und die Pause der Warteschlange, die Geschwindigkeit der Simulation, die Einträge des Sitzungsprotokolls, die Makros und die Zeit eines Werkzeugwechsels). Jede Zahl bleibt im Bereich, den die Einstellungsdatei annimmt (der Bereich steht im Tooltip), **Standardwerte dieser Gruppe** setzt eine Gruppe zurück, und beim Speichern bleiben alle anderen Schlüssel der Datei erhalten.
 * **Ein Arbeitsbericht als eine HTML-Seite:** **Datei > Arbeitsbericht exportieren...** (oder `phoenix-cnc --report DATEI.NC --html BERICHT.html`) schreibt eine Seite, die alles in sich trägt, ohne Skript, ohne Links und ohne getrennte Bilder: die Statistik und die Zeit des Programms, die Werkzeuge, was auffällig ist mit seiner Zeile, die Bahn von oben mit umkreisten Zeilen, die eine Warnung haben, und die Höhenkarte als Farbraster, wenn eine gemessen wurde. Sie folgt der Sprache, die Farben folgen der hellen oder dunklen Einstellung des Browsers, und eine vorhandene Datei wird nie überschrieben.
 * **Die Bahn lässt sich einfärben, nach Werkzeug filtern und anklicken:** unter dem Titel der Bahn (im Plan und in 3D) wählt eine Zeile, wie eingefärbt wird (**erledigt / offen**, **Art der Bewegung**: Eilgang, Schnitt, Eintauchen und Bogen; **Fortschritt des Programms**, von Blau nach Rot entlang der Strecke; **Werkzeug**; oder **Vorschub**, vom langsamsten zum schnellsten), zeigt ein Kästchen für jedes Werkzeug des Programms (ein Werkzeug wird mit seinem Kästchen aus- oder eingeblendet, das letzte sichtbare bleibt) und bietet **Auf die Auswahl zoomen** für den Plan und für 3D (in 3D rückt die Bewegung in die Mitte der Ansicht, mit der jeweiligen Drehung). Ein Klick auf eine Bewegung wählt sie aus (sie wird dick gezeichnet), das Programmfeld zeigt ihre Zeile, und die Zeile nennt die Zeilennummer, ihren Code, die Art der Bewegung, ihre Länge, ihren Vorschub und ihr Werkzeug. Plan und 3D-Ansicht behalten Ziehen, Rad und Doppelklick. Für Bilder starten `--color MODUS` (`state`, `kind`, `progress`, `tool` oder `feed`) und `--select ZEILE` (eine Zeile des Programms, ab 1) das Fenster mit dieser Einfärbung und dieser ausgewählten Bewegung, zusammen mit `--shot`.
+* **Ein Editor für das Programm:** der Programmeditor (Strg+E) zeigt den Text mit den **Zeilennummern** am Rand (Zeilen, zu denen die Prüfung etwas zu sagen hat, sind eingefärbt), **Suchen und Ersetzen** (mit oder ohne Groß-/Kleinschreibung; Enter sucht das nächste; eines oder alle ersetzen, die Anzahl wird genannt), **Gehe zu Zeile**, die **Hinweise der Prüfung für den Text, wie er gerade geschrieben ist** (ein Klick auf die Nummer eines Hinweises springt zu seiner Zeile) und **Anwenden**, das den Text ins Programm übernimmt (nicht während ein Programm läuft). **Anwenden und speichern** und **Anwenden und speichern unter ...** laufen über das Speichern-Fenster, das vor dem Ersetzen einer vorhandenen Datei fragt. Die Regeln (`src/editor.rs`) werden ohne Fenster getestet.
 * **Tab vervollständigt den Code im Befehlsfeld:** solange das Feld unten im Fenster die Tastatur hat, vervollständigt Tab den Code, der gerade getippt wird (`G38` ergibt `G38.`, `M30` ergibt `M30 `, `$J` ergibt `$J=`) oder schreibt, wenn mehrere passen, was sie gemeinsam haben, und listet sie neben dem Feld auf (`G5` listet `G53` bis `G59`). Es wirkt auf das letzte Wort der Zeile, unterscheidet nicht zwischen Groß- und Kleinschreibung und sendet nichts: Die Zeile geht weiter mit der Eingabetaste ab.
 
 ## 🧩 Rolle in EH3D
@@ -140,7 +141,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 409 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 426 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -185,6 +186,7 @@ EH3D-PHOENIX-CNC/
 │   ├── plan.rs                                  die Prüfung vor dem Start: Zeit, Reichweite und Verfahrweg der Bewegungen
 │   ├── cli.rs                                   die Befehlszeile: die Datei, die Sprache, das Thema und die Bildoptionen
 │   ├── complete.rs                              Tab im Befehlsfeld: vervollständigt die G-, M- und $-Codes
+│   ├── editor.rs                                der Programmeditor: Suchen, Ersetzen, Zeile, Hinweise
 │   ├── bin/phoenix-cnc.rs                       das Programm, das das Fenster öffnet
 │   ├── server.rs                                die Verbindung zum EH3D-Server: senden, verfolgen, anhalten, stoppen
 │   ├── settings.rs                              was zwischen Läufen gemerkt wird
@@ -193,6 +195,7 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/remote.rs                            das Programm auf dem Server: Start, Pause, Stopp und Fortsetzen
 │   ├── gui/views.rs                             die Fenstermitte: die Bahn von oben oder in 3D, mit dem Werkzeug
 │   ├── gui/pathview.rs                          die Zeile des Betrachters: Farben, Ebenen, Zoom, angeklickte Zeile
+│   ├── gui/editwin.rs                           das Editorfenster: Zeilennummern, Suchen, Hinweise, Speichern
 │   ├── gui/summary.rs                           das Zusammenfassungsfenster vor dem Start und die Tastenliste
 │   ├── gui/probe.rs                             der Taster im Fenster: Rückfragen und Höhenkarten-Einträge
 │   ├── gui/numfield.rs                          eine Zahl, die mit den Tasten Minus und Plus oder durch Eintippen gesetzt wird
