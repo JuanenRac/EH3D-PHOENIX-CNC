@@ -7,6 +7,7 @@ use eh3d_filedialog::{
 
 use super::*;
 use crate::settings::Settings;
+use crate::words::Msg;
 
 /// The extensions a G-code program usually has.
 const GCODE_EXTENSIONS: [&str; 11] = [
@@ -30,6 +31,8 @@ pub(super) enum Win {
     Shortcuts,
     /// The question before the probe moves the machine.
     Probe(probe::Ask),
+    /// What the checkers find in the program that is loaded.
+    Check(Box<check::CheckState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -89,6 +92,7 @@ impl App {
                 server: false,
             }))),
             "keys" => Some(Win::Shortcuts),
+            "check" => Some(Win::Check(Box::new(self.check_state()))),
             _ => None,
         };
     }
@@ -283,6 +287,11 @@ impl App {
                 self.path_toolpath.clear();
                 ui.close();
             }
+            ui.separator();
+            if ui.button(self.w(Msg::MenuCheck)).clicked() {
+                self.open_window("check");
+                ui.close();
+            }
         });
     }
 
@@ -384,6 +393,7 @@ impl App {
             Win::Summary(p) => self.summary_window(ctx, p),
             Win::Shortcuts => self.shortcuts_window(ctx),
             Win::Probe(a) => self.probe_window(ctx, a),
+            Win::Check(c) => self.check_window(ctx, c),
         };
     }
 

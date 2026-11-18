@@ -20,6 +20,7 @@ use crate::queue::Queue;
 use crate::recovery::{self, Recovery};
 use crate::settings::{settings_path, Settings};
 
+mod check;
 mod clipmenu;
 mod dialogs;
 mod icons;
@@ -195,6 +196,9 @@ pub struct App {
     queue_seen: bool,
     /// The files picked with Ctrl+click in the Open window.
     open_multi: Vec<PathBuf>,
+    /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
+    focus_line: Option<usize>,
+    focus_scroll: bool,
     /// Whether a box of text, or any widget, had the keyboard at the end of the last frame.
     typing_prev: bool,
     focus_prev: bool,
@@ -270,6 +274,8 @@ impl App {
             queue: Queue::default(),
             queue_seen: false,
             open_multi: Vec::new(),
+            focus_line: None,
+            focus_scroll: false,
             typing_prev: false,
             focus_prev: false,
             shot: o.shot.clone().map(|file| Shot {
@@ -354,6 +360,7 @@ impl App {
             Ok(bytes) => {
                 let text: String = bytes.iter().map(|&b| b as char).collect();
                 self.session.load(&text);
+                self.focus_line = None;
                 self.path_toolpath = gcode::toolpath(&self.session.program);
                 self.path = path.display().to_string();
                 self.remember(path);
@@ -976,12 +983,15 @@ impl App {
                 self.queue_panel(ui);
                 let next = self.program_line();
                 let running = self.session.running || self.server_busy();
+                let (focus, scroll_to_focus) = (self.focus_line, self.focus_scroll);
+                let mut scrolled = false;
                 egui::ScrollArea::vertical()
                     .id_salt("program")
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         for (n, line) in self.session.program.iter().enumerate() {
                             let current = running && n == next;
+                            let marked = focus == Some(n);
                             let text = RichText::new(format!("{:>4}  {line}", n + 1)).monospace();
                             let text = if n < next {
                                 text.color(col(self.theme.ok))
@@ -990,12 +1000,25 @@ impl App {
                             } else {
                                 text.color(col(self.theme.dim))
                             };
+                            // a line that a window asked to show is marked until another one is
+                            let text = if marked {
+                                text.strong()
+                                    .background_color(alpha(col(self.theme.accent), 70))
+                            } else {
+                                text
+                            };
                             let r = ui.label(text);
                             if current {
                                 r.scroll_to_me(None);
+                            } else if marked && scroll_to_focus {
+                                r.scroll_to_me(None);
+                                scrolled = true;
                             }
                         }
                     });
+                if scrolled {
+                    self.focus_scroll = false;
+                }
             });
     }
 
