@@ -111,6 +111,64 @@ impl App {
         }
     }
 
+    /// The list of the macros in a window: the name, what it says of itself and its lines, with a button to run each one (which asks first when
+    /// it has to). Opened by `--window macros` for the pictures.
+    pub(super) fn macros_list_window(&mut self, ctx: &egui::Context) -> Option<Win> {
+        let lib = self.macro_library();
+        let idle = self.macros_idle();
+        let mut open = true;
+        let mut chosen: Option<String> = None;
+        self.window(self.w(Msg::MenuMacros))
+            .open(&mut open)
+            .default_width(460.0)
+            .show(ctx, |ui| {
+                if lib.macros.is_empty() {
+                    let file = macros_path(&self.settings_path).display().to_string();
+                    ui.label(self.ws(Msg::MacroNone, &[file]));
+                }
+                if !lib.problems.is_empty() {
+                    ui.colored_label(
+                        col(self.theme.warn),
+                        self.ws(Msg::MacroProblems, &[lib.problems.len().to_string()]),
+                    );
+                    for p in lib.problems.iter().take(5) {
+                        ui.label(
+                            RichText::new(p.text(self.lang.code())).color(col(self.theme.dim)),
+                        );
+                    }
+                }
+                egui::ScrollArea::vertical()
+                    .id_salt("macrolist")
+                    .max_height(300.0)
+                    .show(ui, |ui| {
+                        for m in &lib.macros {
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .add_enabled(idle, egui::Button::new(m.name.as_str()))
+                                    .clicked()
+                                {
+                                    chosen = Some(m.name.clone());
+                                }
+                                if !m.info.is_empty() {
+                                    ui.label(
+                                        RichText::new(m.info.as_str()).color(col(self.theme.dim)),
+                                    );
+                                }
+                            });
+                            for l in m.lines.iter().take(6) {
+                                ui.label(RichText::new(l).monospace());
+                            }
+                            ui.add_space(4.0);
+                        }
+                    });
+            });
+        if let Some(n) = chosen {
+            self.request_macro(&n);
+            return None;
+        }
+        open.then_some(Win::Macros)
+    }
+
     /// The question before a macro runs: its lines, what the checker says about them, and Run or Cancel.
     pub(super) fn macro_window(&mut self, ctx: &egui::Context, name: String) -> Option<Win> {
         let lib = self.macro_library();
@@ -216,6 +274,17 @@ mod tests {
         a.request_macro("nothing");
         assert!(a.win.is_none());
         clean(&a);
+    }
+
+    #[test]
+    fn the_list_of_macros_opens_by_its_name_and_a_chosen_macro_goes_through_the_same_question() {
+        let mut a = app();
+        a.open_window("macros");
+        assert!(matches!(a.win, Some(Win::Macros)));
+        // a window with no file opens too
+        clean(&a);
+        a.open_window("macros");
+        assert!(matches!(a.win, Some(Win::Macros)));
     }
 
     #[test]

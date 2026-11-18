@@ -21,7 +21,7 @@ pub struct Options {
     pub start: bool,
     /// Says that `--start` with `--grbl` is meant: a real machine starts the program as soon as the window is open.
     pub start_real: bool,
-    /// A window to open at the start (`--window settings|settings-checks|settings-probe|settings-queue|open|save|edit|about|summary|keys|check|keepout|stats`): for the pictures.
+    /// A window to open at the start (`--window NAME`, one of `WINDOWS`): for the pictures.
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
     pub view_3d: Option<bool>,
@@ -35,6 +35,27 @@ pub struct Options {
     pub version: bool,
     pub help: bool,
 }
+
+/// The windows that `--window` opens, in the order of the help.
+pub const WINDOWS: [&str; 17] = [
+    "settings",
+    "settings-checks",
+    "settings-probe",
+    "settings-queue",
+    "open",
+    "save",
+    "edit",
+    "about",
+    "summary",
+    "keys",
+    "check",
+    "keepout",
+    "stats",
+    "macros",
+    "probe",
+    "probe-grid",
+    "resume",
+];
 
 /// The text of `--help`: every option the command line reads.
 pub fn help_text() -> String {
@@ -50,7 +71,7 @@ pub fn help_text() -> String {
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view plan|3d     how the path is seen at the start\n\
-         \x20 --window NAME      open a window at the start (settings, settings-checks, settings-probe, settings-queue, open, save, edit, about, summary, keys, check, keepout, stats)\n\
+         \x20 --window NAME      open a window at the start ({})\n\
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
          \x20 --start            start the program as soon as the window is open\n\
@@ -59,7 +80,8 @@ pub fn help_text() -> String {
          \x20 --ports            list the serial ports and leave\n\
          \x20 --version, -V      print the version and leave\n\
          \x20 --help, -h         print this text and leave\n",
-        env!("CARGO_PKG_VERSION")
+        env!("CARGO_PKG_VERSION"),
+        WINDOWS.join(", ")
     )
 }
 
@@ -230,22 +252,16 @@ mod tests {
             assert!(h.contains(option), "{option} is not in the help");
         }
         // every window that --window opens is listed
-        for name in [
-            "settings",
-            "settings-checks",
-            "settings-probe",
-            "settings-queue",
-            "open",
-            "save",
-            "edit",
-            "about",
-            "summary",
-            "keys",
-            "check",
-            "keepout",
-            "stats",
-        ] {
+        for name in WINDOWS {
             assert!(h.contains(name), "{name} is not in the help");
+        }
+    }
+
+    #[test]
+    fn no_window_is_named_twice() {
+        let mut seen = std::collections::HashSet::new();
+        for name in WINDOWS {
+            assert!(seen.insert(name), "{name} twice");
         }
     }
 

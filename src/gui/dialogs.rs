@@ -41,6 +41,8 @@ pub(super) enum Win {
     Between(usize),
     /// The question before a macro runs (its name).
     Macro(String),
+    /// The list of the macros.
+    Macros,
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -132,6 +134,19 @@ impl App {
             "check" => Some(Win::Check(Box::new(self.check_state()))),
             "keepout" => Some(Win::KeepOut(Box::default())),
             "stats" => Some(Win::Sim(Box::new(self.sim_state()))),
+            "macros" => Some(Win::Macros),
+            "probe" => Some(Win::Probe(probe::Ask::Z)),
+            "probe-grid" => Some(Win::Probe(probe::Ask::Grid {
+                area: [0.0, 0.0, 50.0, 40.0],
+                nx: 6,
+                ny: 5,
+            })),
+            "resume" => Some(Win::Resume(crate::recovery::Recovery {
+                file: "job.nc".to_string(),
+                next: 120,
+                total: 400,
+                ..Default::default()
+            })),
             _ => None,
         };
     }
@@ -451,6 +466,7 @@ impl App {
             Win::Sim(s) => self.sim_window(ctx, s),
             Win::Between(i) => self.between_window(ctx, i),
             Win::Macro(n) => self.macro_window(ctx, n),
+            Win::Macros => self.macros_list_window(ctx),
         };
         // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
         if next.is_some() || self.win.is_none() {
@@ -1337,6 +1353,16 @@ mod tests {
             _ => panic!("the save window did not open"),
         }
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn every_window_the_command_line_names_opens() {
+        let mut a = App::isolated();
+        for name in crate::cli::WINDOWS {
+            a.win = None;
+            a.open_window(name);
+            assert!(a.win.is_some(), "{name} did not open");
+        }
     }
 
     #[test]
