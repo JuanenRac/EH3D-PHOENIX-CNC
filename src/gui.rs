@@ -181,6 +181,8 @@ pub struct App {
     quit: bool,
     dialog_error: Option<&'static str>,
     mdi: String,
+    /// The codes that fit what was typed in the command box when Tab found several (shown beside the box).
+    mdi_options: Vec<&'static str>,
     path: String,
     path_toolpath: Vec<Segment>,
     /// The length of the arcs and the tool changes of the program, which the estimate of time adds to the path.
@@ -283,6 +285,7 @@ impl App {
             quit: false,
             dialog_error: None,
             mdi: String::new(),
+            mdi_options: Vec::new(),
             path: String::new(),
             path_toolpath: Vec::new(),
             path_extras: crate::sim::Extras::default(),
@@ -413,6 +416,16 @@ impl App {
                 false
             }
         }
+    }
+
+    /// Tab in the command box: finishes the code being typed as far as it is certain and keeps the codes that fit, to be listed. Says whether
+    /// the text of the box changed.
+    fn complete_command(&mut self) -> bool {
+        let c = crate::complete::complete(&self.mdi);
+        self.mdi_options = c.options;
+        let changed = c.text != self.mdi;
+        self.mdi = c.text;
+        changed
     }
 
     fn state_text(&self) -> &'static str {
@@ -1073,18 +1086,44 @@ impl App {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     ui.label(self.t(Text::McMdi));
+                    // Tab finishes the code being typed (`complete`), only while the box has the keyboard
+                    let id = egui::Id::new("command-box");
+                    let completed = ui.memory(|m| m.has_focus(id))
+                        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab))
+                        && self.complete_command();
                     let r = clipmenu::text_box(
                         ui,
                         egui::TextEdit::singleline(&mut self.mdi)
+                            .id(id)
                             .desired_width(420.0)
                             .font(egui::TextStyle::Monospace)
                             .hint_text("G0 X10 Y10"),
                     );
+                    if completed {
+                        // the cursor goes to the end of the text that was finished
+                        if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
+                            let end = egui::text::CCursor::new(self.mdi.chars().count());
+                            state
+                                .cursor
+                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
+                            state.store(ui.ctx(), id);
+                        }
+                    } else if r.changed() {
+                        self.mdi_options.clear();
+                    }
                     let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                     if ui.button(self.t(Text::McSend)).clicked() || enter {
                         let line = std::mem::take(&mut self.mdi);
+                        self.mdi_options.clear();
                         self.session.mdi(&line);
                         r.request_focus();
+                    }
+                    if !self.mdi_options.is_empty() {
+                        ui.label(
+                            RichText::new(self.mdi_options.join("  "))
+                                .monospace()
+                                .color(col(self.theme.dim)),
+                        );
                     }
                 });
                 if !self.settings.show_log {

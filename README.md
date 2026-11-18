@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-397-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-404-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 397 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 404 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.3` |
 | Maturity | Functional |
-| Tests | 397 |
+| Tests | 404 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 397 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 404 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -73,6 +73,7 @@ Each line is one part of this repository and the light says how far it is today.
 * **The settings window has three sections for the program tools:** **Checks** (the first and the second checker, the margin and the refusal of the keep-out boxes, the floor of the rapid moves and the highest feed and spindle speed), **Probe and height map** (the probe, the grid, the length of the pieces of a corrected cut and the limits of the jog) and **Queue, macros and log** (the repeats and the pause of the queue, the speed of the simulation, the entries of the session log, the macros and the time of a tool change). Every number stays inside the range the settings file accepts (the range is its tooltip), **Defaults of this section** puts a section back, and saving keeps every other key of the file.
 * **A work report as one page of HTML:** **File > Export the work report...** (or `phoenix-cnc --report FILE.NC --html REPORT.html`) writes a page that holds everything in it, with no script, no link and no separate picture: the statistics and the time of the program, the tools, what looks wrong with its line, the path seen from above with the lines that have a warning ringed, and the height map as a grid of colours when one was measured. It follows the language, the colours follow the light or dark setting of the browser, and a file that is there is never written over.
 * **The path can be coloured, filtered by tool and clicked:** under the title of the path (in the plan and in 3D) a row chooses how it is coloured (**done / to do**, **type of move**: rapid, cutting, plunge and arc; **progress of the program**, from blue to red along the length travelled; **tool**; or **feed rate**, from the slowest to the fastest), shows a box for each tool of the program (a tool is hidden or shown with its box, and the last one shown stays) and has **Zoom to the selection** for the plan. A click on a move selects it (it is drawn thick), the program panel shows its line, and the row says the line, its code, the kind of move, its length, its feed and its tool. The plan and the 3D view keep their drag, wheel and double click.
+* **Tab finishes the code in the command box:** while the box under the window has the keyboard, Tab finishes the code being typed (`G38` gives `G38.`, `M30` gives `M30 `, `$J` gives `$J=`) or, when several fit, writes what they share and lists them beside the box (`G5` lists `G53` to `G59`). It works on the last word of the line, ignores capitals and small letters, and sends nothing: the line still goes with Enter.
 
 ## 🧩 Role in EH3D
 
@@ -139,7 +140,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 397 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 404 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -183,6 +184,7 @@ EH3D-PHOENIX-CNC/
 │   ├── viewer.rs                                the viewer of the path: kinds, tools, progress, colours, clicks
 │   ├── plan.rs                                  the check before a start: time, reach and travel of the moves
 │   ├── cli.rs                                   the command line: the file, the language, the theme and the picture options
+│   ├── complete.rs                              Tab in the command box: finishes the G, M and $ codes
 │   ├── bin/phoenix-cnc.rs                       the program that opens the window
 │   ├── server.rs                                the link to the EH3D server: send, follow, hold, stop
 │   ├── settings.rs                              what is kept between runs

@@ -1372,6 +1372,27 @@ mod tests {
     }
 
     #[test]
+    fn tab_in_the_command_box_finishes_the_code_and_lists_the_ones_that_fit() {
+        let mut a = App::isolated();
+        a.mdi = "G38".to_string();
+        assert!(a.complete_command());
+        assert_eq!(a.mdi, "G38.");
+        assert_eq!(a.mdi_options, ["G38.2", "G38.3", "G38.4", "G38.5"]);
+        // nothing to add: the box is the same and the list stays for the operator to read
+        a.mdi = "G5".to_string();
+        assert!(!a.complete_command());
+        assert_eq!(a.mdi_options.len(), 7);
+        // one code that fits is written in full and the list goes
+        a.mdi = "M30".to_string();
+        assert!(a.complete_command());
+        assert_eq!((a.mdi.as_str(), a.mdi_options.len()), ("M30 ", 0));
+        // nothing is sent by completing
+        assert!(a.session.log.iter().all(|l| !l.contains("M30")));
+        a.mdi = String::new();
+        assert!(!a.complete_command());
+    }
+
+    #[test]
     fn every_window_the_command_line_names_opens() {
         let mut a = App::isolated();
         for name in crate::cli::WINDOWS {

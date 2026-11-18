@@ -372,6 +372,19 @@
           }
         },
         {
+          "name": "complete.rs",
+          "desc": {
+            "en": "Tab in the command box: finishes the G, M and $ codes",
+            "es": "Tab en el cuadro de órdenes: completa los códigos G, M y $",
+            "de": "Tab im Befehlsfeld: vervollständigt die G-, M- und $-Codes",
+            "fr": "Tab dans la zone de commande : complète les codes G, M et $",
+            "it": "Tab nella casella dei comandi: completa i codici G, M e $",
+            "ja": "コマンド欄の Tab：G、M、$ コードを補完",
+            "zh": "命令框中的 Tab：补全 G、M 和 $ 代码",
+            "pt": "Tab na caixa de comandos: completa os códigos G, M e $"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
