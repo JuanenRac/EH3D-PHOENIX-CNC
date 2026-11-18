@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-283-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-344-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 283 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
+**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 344 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.2` |
 | Maturité | Fonctionnel |
-| Tests | 283 |
+| Tests | 344 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non : par défaut il pilote une machine simulée ; un vrai contrôleur GRBL (`--grbl`) n'a jamais été essayé |
 
@@ -47,7 +47,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Bibliothèque de base | 🟡 | Un crate Rust qui réexporte `scene`, `texts` et `theme` d'`eh3d-view` sous le nom de ce programme ; il a besoin du dossier d'EH3D-COMMON à côté. |
 | Scène et vues | 🟡 | Écrite et testée dans EH3D-COMMON ; la fenêtre de ce programme dessine la trajectoire d'un programme sur la table et la position de l'outil (vue sur un ordinateur). |
 | Thèmes et textes | 🟡 | Onze thèmes et les mots de l'interface en 37 langues, vus dans la fenêtre de ce programme. |
-| Tests | 🟡 | 283 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
+| Tests | 🟡 | 344 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
 | Fenêtre et jog | 🟡 | Fonctionne sur un ordinateur avec le contrôleur simulé : position, pavé de jog, pas, avance, prise d'origine, zéro, déverrouillage, une ligne de commandes et un journal ; pas de vraie machine. |
 | Commande de machine | 🟠 | Seulement le simulateur : un programme s'exécute ligne par ligne avec pause, arrêt et arrêt d'urgence ; aucun vrai contrôleur n'est encore connecté d'ici. |
 | Documentation | 🟡 | README en huit langues, les deux images, trois programmes d'exemple et le changelog. |
@@ -69,6 +69,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 * **Les aides de la fenêtre :** un **résumé avant le démarrage d'un programme** (les mouvements, la distance de coupe, la durée aux vitesses des réglages, la portée des axes et une vérification par rapport à la course de la machine, avec les avertissements que la suite partage : un programme minuscule ou loin du coin, plus grand que la table, des arcs que l'estimation laisse de côté et des coupes avant toute avance ; **Démarrer quand même**, ou un refus quand le programme sort de la course, que `reject_out_of_travel = no` transforme en avertissement, et `confirm_start = no` désactive le résumé) ; des **touches du clavier** (Ctrl+O ouvrir, Ctrl+S enregistrer, Ctrl+E modifier, F5 démarrer, Espace pause, Échap arrêter (avec une fenêtre ouverte Échap la ferme, et avec le clavier dans une zone de texte Espace et Échap restent à la zone), F1 les liste ; `shortcuts = no` les désactive) ; une **barre d'outils** avec des dessins et leurs noms ; des nombres qu'on règle avec moins et plus ou qu'on **écrit** ; la trajectoire **déplacée et zoomée de dessus ou tournée et zoomée en 3D** avec l'outil ; un **aperçu du fichier G-code** dans la fenêtre Ouvrir ; le **journal d'un plantage** (`eh3d-crash.log`) ; et une section Sécurité dans les réglages (`rapid`, `summary_tiny`, `summary_far` et `summary_margin` dans le fichier des réglages).
 * **Une file de programmes et la course du contrôleur :** plusieurs fichiers choisis dans la fenêtre Ouvrir avec Ctrl+clic, déposés ensemble ou donnés sur la ligne de commande (`phoenix-cnc a.nc b.nc`) s'exécutent l'un après l'autre, chacun après son propre résumé ; la fenêtre les liste avec leur état, permet de retirer, ignorer et réordonner ceux qui attendent, et la file s'arrête quand un programme ne se termine pas. Avec un contrôleur GRBL, le programme lit `$130`, `$131` et `$132` (la plus grande course de X, Y et Z) à la connexion et prend la plus petite entre cela et `travel_x`, `travel_y` et `travel_z` pour le résumé et le refus ; si le contrôleur ne répond pas ou ne les donne pas, les réglages sont utilisés et le journal le dit (`read_controller_travel = no` désactive la lecture).
 * **Vérifications du programme, limites logicielles du jog et sonde :** le résumé dit aussi ce qui semble faux dans le programme (un déplacement rapide qui finit sous la surface, une coupe broche arrêtée, une broche démarrée sans vitesse, un changement d'outil, un programme sans fin, et une avance ou une vitesse de broche au-dessus de `lint_max_feed` ou `lint_max_rpm`, qui valent 5000 mm/min et 24000 tr/min par défaut et sont désactivées à 0 ; `lint = no` coupe les vérifications et `lint_rapid_floor` fixe le Z sous lequel un rapide est signalé). Un pas du jog qui dépasserait la course est raccourci jusqu'à la limite et un pas qui part de la limite vers l'extérieur est refusé (`jog_soft_limits` vaut `homing` par défaut : la limite ne vaut qu'après la prise d'origine ; `always` l'applique dès le début et `no` la désactive). **Machine > Palper Z** exécute le cycle sur une plaque de contact (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` et `probe_clearance` dans le fichier de réglages) et **Machine > Palper une grille** touche une grille sur les coupes du programme (`probe_grid` mm d'écart) pour construire une carte des hauteurs ; **Corriger le programme avec la carte des hauteurs** découpe chaque déplacement de coupe en morceaux d'au plus `heightmap_segment` mm et monte ou descend chacun selon la hauteur dessous (un programme en millimètres absolus sans arcs ; celui qui sort de la zone palpée est refusé) et **Annuler la correction de hauteur** remet le programme tel qu'il était. Les deux palpages demandent d'abord confirmation car la machine bouge, et un contrôleur sans sonde les refuse. Essayé seulement avec des doublures ; rien n'a tourné sur une machine réelle.
+* **Les outils du programme, dans la fenêtre et en ligne de commande :** **Programme > Vérifier le programme...** liste ce que trouvent les vérifications, ligne par ligne (le numéro à côté de chaque constat montre cette ligne dans le panneau du programme), **Programme > Boîtes interdites...** modifie les endroits où l'outil ne doit pas aller (un programme qui entre dans l'une n'est pas démarré, sauf avec `keepout_reject = no`) et **Programme > Statistiques et simulation...** joue la trajectoire sur le papier avec le curseur sur la ligne, pendant que le panneau du programme indique le temps restant. La file répète un programme (une case avec le nombre de passes), demande à l'opérateur ou attend `queue_pause` secondes entre deux passes, montre son temps total et est gardée dans un fichier entre deux exécutions (elle revient en attente : rien ne démarre seul). Le menu **Macros** exécute après confirmation les macros de `phoenix-cnc-macros.txt` (à côté du fichier de réglages) ; **Machine > Enregistrer la carte des hauteurs...** et **Machine > Charger une carte des hauteurs...** gardent la carte dans un fichier (jamais écrasé sans demander) et **Fichier > Exporter le journal de session...** enregistre le journal en texte, CSV ou JSON (jamais par-dessus un fichier). Leurs valeurs (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` et `tool_change_time`) sont dans le fichier de réglages, et la fenêtre les conserve quand elle enregistre les autres réglages. `phoenix-cnc --report FICHIER` affiche les mêmes constats avec les statistiques et le temps d'un programme sans ouvrir la fenêtre (code de sortie 0 si rien n'est à lire, 1 si quelque chose l'est, 2 si le fichier est illisible ; `--lang` choisit la langue), et `--version` et `--help` répondent aussitôt. Essayé seulement sur le simulateur ; rien n'a tourné sur une vraie machine.
 
 ## 🧩 Rôle dans EH3D
 
@@ -116,7 +117,7 @@ Comment les parties s'assemblent : qui l'utilisera, ce que contient ce dépôt e
 
 ## 🔒 Sécurité et protection
 
-Ce programme n'ouvre un port série que s'il est lancé pour GRBL (`--grbl`, une compilation avec `--features serial`) et une connexion réseau que vers le serveur EH3D dont l'adresse est dans les réglages, quand l'opérateur lui envoie un programme ; le jeton est gardé comme texte dans le fichier de réglages. Il n'ouvre aucun fichier d'autres personnes, sauf le fichier G-code que choisit l'opérateur (lu comme du texte, jamais exécuté de lui-même), et n'est pas un système de sécurité. Voir [SECURITY.md](SECURITY.md).
+Ce programme n'ouvre un port série que s'il est lancé pour GRBL (`--grbl`, une compilation avec `--features serial`) et une connexion réseau que vers le serveur EH3D dont l'adresse est dans les réglages, quand l'opérateur lui envoie un programme ; le jeton est gardé comme texte dans le fichier de réglages. Il n'ouvre aucun fichier d'autres personnes, sauf le fichier G-code et la carte des hauteurs que choisit l'opérateur (lus comme du texte, jamais exécutés d'eux-mêmes) et ses propres fichiers à côté des réglages (les macros, la file gardée entre deux exécutions, la ligne qu'un programme avait atteinte) ; il n'écrit un fichier que là où l'opérateur le dit (le programme, la carte des hauteurs, le journal exporté) et n'écrit jamais le journal par-dessus un fichier. Les macros qu'il exécute sont des lignes de G-code sur lesquelles il demande d'abord, et la file qui revient ne démarre jamais seule. Ce n'est pas un système de sécurité. Voir [SECURITY.md](SECURITY.md).
 
 ## 🚀 Démarrage rapide
 
@@ -135,7 +136,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` lance 283 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
+`cargo test --features gui` lance 344 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
 
 ## 🏗️ Compilation et publication
 
@@ -156,10 +157,11 @@ EH3D-PHOENIX-CNC/
 │   ├── lib.rs                                   les modules et la vue d'eh3d-view réexportée sous le nom de ce programme
 │   ├── gui.rs                                   la fenêtre : position, jog, programme, trajectoire, commandes et journal
 │   ├── session.rs                               ce qu'on fait avec un contrôleur : jog, zéro, prise d'origine, un programme ligne par ligne, pause, arrêt, alarmes
-│   ├── queue.rs                                 la file de programmes : ordre, état, ignorer, retirer, réordonner, arrêt si échec
+│   ├── queue.rs                                 la file : ordre, état, passes, sauter, retirer, arrêt sur échec, fichier d'état
 │   ├── progcheck.rs                             second contrôle d'un programme : unités, décalages, palpage, plans
 │   ├── boxes.rs                                 boîtes interdites et limites de course, mouvement par mouvement
 │   ├── sim.rs                                   la trajectoire dans le temps : l'outil à chaque instant
+│   ├── estimate.rs                              le temps d'un programme mesuré une fois et gardé : la trajectoire chargée et les fichiers de la file
 │   ├── stats.rs                                 statistiques d'un programme : distances, temps, changements d'outil
 │   ├── jobs.rs                                  répétitions et pauses entre les programmes de la file
 │   ├── macros.rs                                la bibliothèque de macros : G-code nommé qui demande avant de s'exécuter
@@ -185,7 +187,12 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/probe.rs                             la sonde dans la fenêtre : questions et entrées de la carte
 │   ├── gui/numfield.rs                          un nombre réglé avec les boutons moins et plus ou en l'écrivant
 │   ├── gui/keys.rs                              les touches du clavier et le tableau que lisent les menus et la liste des touches
-│   ├── gui/queue.rs                             la file dans la fenêtre : fichiers l'un après l'autre, chacun après son résumé
+│   ├── gui/queue.rs                             la file dans la fenêtre : passes, répétitions, une question ou une attente entre passes
+│   ├── gui/check.rs                             la fenêtre de vérification : ce que trouvent les vérifications, ligne par ligne
+│   ├── gui/keepout.rs                           l'éditeur des boîtes interdites et le refus d'un programme qui entre dans l'une
+│   ├── gui/sim.rs                               statistiques et simulation : l'outil sur la trajectoire, la ligne, le temps restant
+│   ├── gui/macros.rs                            le menu des macros et la question avant de lancer une macro
+│   ├── gui/files.rs                             la carte des hauteurs et le journal de session en fichiers, par les fenêtres de fichiers
 │   └── gui/icons.rs                             les dessins des boutons, tracés avec des lignes, et le bouton de la barre d'outils
 ├── examples/                                    trois programmes G-code d'exemple, d'un carré à une longue spirale
 ├── tests/                                       d'autres tests du G-code et des réglages

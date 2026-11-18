@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-283-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-344-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 283 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 344 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.2` |
 | Maturity | Functional |
-| Tests | 283 |
+| Tests | 344 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 283 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 344 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -69,6 +69,7 @@ Each line is one part of this repository and the light says how far it is today.
 * **The helpers of the window:** a **summary before a program starts** (the moves, the cutting distance, the time at the speeds of the settings, the reach of the axes and a check against the travel of the machine, with the warnings the suite shares: a program that is tiny or far from the corner, bigger than the table, arcs the estimate leaves out and cuts before any feed; **Start anyway**, or a refusal when the program leaves the travel, which `reject_out_of_travel = no` turns into a warning, and `confirm_start = no` turns the summary off); **keys of the keyboard** (Ctrl+O open, Ctrl+S save, Ctrl+E edit, F5 start, Space pause, Esc stop (with a window open Esc closes it, and with the keyboard in a box of text Space and Esc are left to the box), F1 lists them; `shortcuts = no` turns them off); a **toolbar** with drawn pictures and their names; numbers that are stepped with minus and plus or **written**; the path **dragged and zoomed from above or turned and zoomed in 3D** with the tool; a **picture of the G-code file** in the Open window; the **record of a crash** (`eh3d-crash.log`); and a Safety section in the settings (`rapid`, `summary_tiny`, `summary_far` and `summary_margin` in the settings file).
 * **A queue of programs and the travel of the controller:** several files chosen in the Open window with Ctrl+click, dropped together or given on the command line (`phoenix-cnc a.nc b.nc`) run one after the other, each after its own summary; the window lists them with their state, lets you remove, skip and reorder the ones that wait, and the queue stops when a program does not finish. With a GRBL controller the program reads `$130`, `$131` and `$132` (the longest travel of X, Y and Z) when it connects and uses the smaller of that and `travel_x`, `travel_y` and `travel_z` for the summary and the refusal; if the controller does not answer or does not give them, the settings are used and the log says so (`read_controller_travel = no` turns the reading off).
 * **Checks of the program, soft limits of the jog and the probe:** the summary also says what looks wrong inside the program (a rapid move that ends below the surface, a cut with the spindle off, a spindle started with no speed, a tool change, no end of program, and a feed or a spindle speed above `lint_max_feed` or `lint_max_rpm`, which are 5000 mm/min and 24000 rpm by default and off at 0; `lint = no` turns the checks off and `lint_rapid_floor` sets the Z below which a rapid is said). A step of the jog that would pass the travel is shortened to the limit and one from the limit outwards is refused (`jog_soft_limits` is `homing` by default: the limit holds only after the machine was homed; `always` holds it from the start and `no` turns it off). **Machine > Probe Z** runs the cycle on a touch plate (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` and `probe_clearance` in the settings file) and **Machine > Probe a grid** touches a grid over the cuts of the program (`probe_grid` mm apart) to build a height map; **Correct the program with the height map** cuts every cutting move into pieces of at most `heightmap_segment` mm and raises or lowers each one by the height under it (a program in absolute millimetres without arcs; one that leaves the probed area is refused) and **Undo the height correction** puts the program back. Both probes ask first because the machine moves, and a controller without a probe refuses them. Tried against stand-ins only; nothing has run on a real machine.
+* **The program tools, in the window and on the command line:** **Program > Check the program...** lists what the checks find, line by line (the number beside each finding shows that line in the program panel), **Program > Keep-out boxes...** edits the places the tool must not go (a program that enters one is not started unless `keepout_reject = no`) and **Program > Statistics and simulation...** plays the path on paper with the cursor on the line, while the program panel says the time left. The queue repeats a program (a box with the number of runs), asks the operator or waits `queue_pause` seconds between two runs of it, shows its total time and is kept in a file between runs (it comes back waiting: nothing starts by itself). The **Macros** menu runs the macros of `phoenix-cnc-macros.txt` (next to the settings file) after asking; **Machine > Save the height map...** and **Machine > Load a height map...** keep the map in a file (never written over without asking) and **File > Export the session log...** saves the log as text, CSV or JSON (never over a file). Their values (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` and `tool_change_time`) are in the settings file, and the window keeps them when it saves the other settings. `phoenix-cnc --report FILE` prints the same findings with the statistics and the time of a program without opening the window (exit code 0 when nothing needs reading, 1 when something does, 2 when the file cannot be read; `--lang` chooses the language), and `--version` and `--help` answer at once. Tried against the simulator only; nothing has run on a real machine.
 
 ## 🧩 Role in EH3D
 
@@ -116,7 +117,7 @@ How the parts fit together: who will use it, what this repository holds and what
 
 ## 🔒 Security & Safety
 
-This program opens a serial port only when it is started for GRBL (`--grbl`, a build with `--features serial`) and a network connection only to the EH3D server whose address is in its settings, when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file the operator chooses (read as text, never run by itself) and it is not a safety system. See [SECURITY.md](SECURITY.md).
+This program opens a serial port only when it is started for GRBL (`--grbl`, a build with `--features serial`) and a network connection only to the EH3D server whose address is in its settings, when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file and the height map the operator chooses (read as text, never run by itself) and its own files next to the settings (the macros, the queue kept between runs, the line a program had reached); it writes a file only where the operator says (the program, the height map, the exported log) and never writes the log over a file. The macros it runs are lines of G-code that it asks about first, and the queue that comes back never starts by itself. It is not a safety system. See [SECURITY.md](SECURITY.md).
 
 ## 🚀 Quick start
 
@@ -135,7 +136,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 283 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 344 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -156,10 +157,11 @@ EH3D-PHOENIX-CNC/
 │   ├── lib.rs                                   the modules, and the view of eh3d-view re-exported under this program's name
 │   ├── gui.rs                                   the window: position, jog, program, path, commands and log
 │   ├── session.rs                               what is done with a controller: jog, zero, home, a program, pause, stop, alarms
-│   ├── queue.rs                                 the queue of programs: order, state, skip, remove, reorder, stop on failure
+│   ├── queue.rs                                 the queue: order, state, runs, skip, remove, reorder, stop on failure, state file
 │   ├── progcheck.rs                             second check of a program: units, offsets, probing, planes
 │   ├── boxes.rs                                 keep-out boxes and travel limits, move by move
 │   ├── sim.rs                                   the path in time: the tool at any moment, the time left
+│   ├── estimate.rs                              the time of a program measured once and kept: the loaded path and the files of the queue
 │   ├── stats.rs                                 statistics of a program: distances, time, tool changes
 │   ├── jobs.rs                                  repeats and pauses between the programs of the queue
 │   ├── macros.rs                                the library of macros: named G-code that asks before it runs
@@ -185,7 +187,12 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/probe.rs                             the probe in the window: questions and height-map entries
 │   ├── gui/numfield.rs                          a number set with the minus and plus buttons or by writing it
 │   ├── gui/keys.rs                              the keys of the keyboard and the table the menus and the list of keys read
-│   ├── gui/queue.rs                             the queue in the window: files run one after the other, each after its summary
+│   ├── gui/queue.rs                             the queue in the window: runs, repeats, a question or a wait between runs
+│   ├── gui/check.rs                             the Check window: what the checkers find, line by line
+│   ├── gui/keepout.rs                           the editor of the keep-out boxes and the refusal of a program that enters one
+│   ├── gui/sim.rs                               statistics and simulation: the tool on the path, the line, the time left
+│   ├── gui/macros.rs                            the Macros menu and the question before a macro runs
+│   ├── gui/files.rs                             the height map and the session log as files, through the file windows
 │   └── gui/icons.rs                             the pictures of the buttons, drawn with lines, and the toolbar button
 ├── examples/                                    three sample G-code programs, from a square to a long spiral
 ├── tests/                                       more tests of the G-code and the settings

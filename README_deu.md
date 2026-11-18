@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-283-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-344-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 283 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 344 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.2` |
 | Reifegrad | Funktionsfähig |
-| Tests | 283 |
+| Tests | 344 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
@@ -47,7 +47,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche in 37 Sprachen, im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 283 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 344 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur der Simulator: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt; von hier ist noch keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -69,6 +69,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 * **Die Hilfen des Fensters:** eine **Zusammenfassung vor dem Start eines Programms** (die Bewegungen, der Schnittweg, die Zeit bei den Geschwindigkeiten der Einstellungen, die Reichweite der Achsen und eine Prüfung gegen den Verfahrweg der Maschine, mit den Warnungen, die sich die Suite teilt: ein winziges oder weit von der Ecke entferntes Programm, größer als der Tisch, Bögen, die die Schätzung auslässt, und Schnitte vor jedem Vorschub; **Trotzdem starten**, oder eine Ablehnung, wenn das Programm den Verfahrweg verlässt, die `reject_out_of_travel = no` zur Warnung macht, und `confirm_start = no` schaltet die Zusammenfassung ab); **Tasten der Tastatur** (Strg+O öffnen, Strg+S speichern, Strg+E bearbeiten, F5 Start, Leertaste Pause, Esc Stopp (bei offenem Fenster schließt Esc es, und mit der Tastatur in einem Textfeld bleiben Leertaste und Esc dem Feld), F1 listet sie auf; `shortcuts = no` schaltet sie ab); eine **Werkzeugleiste** mit gezeichneten Bildern und ihren Namen; Zahlen, die mit Minus und Plus gestuft oder **eingetippt** werden; die Bahn **gezogen und gezoomt von oben oder gedreht und gezoomt in 3D** mit dem Werkzeug; eine **Vorschau der G-Code-Datei** im Öffnen-Fenster; die **Aufzeichnung eines Absturzes** (`eh3d-crash.log`); und ein Abschnitt Sicherheit in den Einstellungen (`rapid`, `summary_tiny`, `summary_far` und `summary_margin` in der Einstellungsdatei).
 * **Eine Warteschlange von Programmen und der Verfahrweg der Steuerung:** mehrere im Öffnen-Fenster mit Strg+Klick gewählte, zusammen abgelegte oder in der Befehlszeile genannte Dateien (`phoenix-cnc a.nc b.nc`) laufen nacheinander, jede nach ihrer eigenen Zusammenfassung; das Fenster listet sie mit ihrem Zustand auf, erlaubt das Entfernen, Überspringen und Umordnen der wartenden, und die Warteschlange hält an, wenn ein Programm nicht fertig wird. Bei einer GRBL-Steuerung liest das Programm beim Verbinden `$130`, `$131` und `$132` (den größten Verfahrweg von X, Y und Z) und nimmt für Zusammenfassung und Ablehnung den kleineren Wert aus diesem und `travel_x`, `travel_y` und `travel_z`; antwortet die Steuerung nicht oder liefert sie die Werte nicht, gelten die Einstellungen und das Protokoll sagt es (`read_controller_travel = no` schaltet das Lesen ab).
 * **Prüfungen des Programms, weiche Grenzen des Jog und der Taster:** die Zusammenfassung sagt auch, was im Programm falsch aussieht (ein Eilgang, der unter der Oberfläche endet, ein Schnitt bei stehender Spindel, eine ohne Drehzahl gestartete Spindel, ein Werkzeugwechsel, ein Programm ohne Ende sowie ein Vorschub oder eine Spindeldrehzahl über `lint_max_feed` oder `lint_max_rpm`, die standardmäßig 5000 mm/min und 24000 U/min betragen und bei 0 aus sind; `lint = no` schaltet die Prüfungen aus und `lint_rapid_floor` legt das Z fest, unter dem ein Eilgang gemeldet wird). Ein Jog-Schritt, der den Verfahrweg überschreiten würde, wird bis zur Grenze gekürzt, und einer von der Grenze nach außen wird abgelehnt (`jog_soft_limits` ist standardmäßig `homing`: die Grenze gilt erst nach dem Referenzieren; `always` wendet sie von Anfang an an und `no` schaltet sie aus). **Maschine > Z antasten** führt den Zyklus auf einer Tastplatte aus (`probe_feed`, `probe_depth`, `probe_retract`, `probe_plate` und `probe_clearance` in der Einstellungsdatei) und **Maschine > Raster antasten** tastet ein Raster über den Schnitten des Programms ab (`probe_grid` mm Abstand), um eine Höhenkarte zu bauen; **Programm mit der Höhenkarte korrigieren** teilt jede Schnittbewegung in Stücke von höchstens `heightmap_segment` mm und hebt oder senkt jedes um die Höhe darunter (ein Programm in absoluten Millimetern ohne Bögen; eines, das den abgetasteten Bereich verlässt, wird abgelehnt), und **Höhenkorrektur rückgängig machen** stellt das Programm wieder her. Beide Antastungen fragen vorher, weil sich die Maschine bewegt, und eine Steuerung ohne Taster lehnt sie ab. Nur gegen Attrappen erprobt; nichts lief auf einer echten Maschine.
+* **Die Programmwerkzeuge, im Fenster und auf der Befehlszeile:** **Programm > Programm prüfen...** listet zeilenweise auf, was die Prüfungen finden (die Nummer neben jedem Fund zeigt diese Zeile im Programmfeld), **Programm > Sperrboxen...** bearbeitet die Stellen, an die das Werkzeug nicht fahren darf (ein Programm, das in eine hineinfährt, wird nicht gestartet, außer mit `keepout_reject = no`), und **Programm > Statistik und Simulation...** spielt die Bahn auf dem Papier ab, mit dem Cursor in der Zeile, während das Programmfeld die Restzeit nennt. Die Warteschlange wiederholt ein Programm (ein Feld mit der Zahl der Durchläufe), fragt den Bediener oder wartet `queue_pause` Sekunden zwischen zwei Durchläufen, zeigt ihre Gesamtzeit und wird zwischen den Läufen in einer Datei gehalten (sie kommt wartend zurück: nichts startet von selbst). Das Menü **Makros** führt nach Rückfrage die Makros aus `phoenix-cnc-macros.txt` (neben der Einstellungsdatei) aus; **Maschine > Höhenkarte speichern...** und **Maschine > Höhenkarte laden...** halten die Karte in einer Datei (nie ohne Rückfrage überschrieben), und **Datei > Sitzungsprotokoll exportieren...** speichert das Protokoll als Text, CSV oder JSON (nie über eine Datei). Ihre Werte (`progcheck`, `keepout`, `keepout_margin`, `keepout_reject`, `queue_repeat_max`, `queue_confirm_between`, `queue_pause`, `queue_remember`, `sim_speed`, `macros_confirm`, `macros_max_lines`, `log_max_entries` und `tool_change_time`) stehen in der Einstellungsdatei, und das Fenster behält sie, wenn es die übrigen Einstellungen speichert. `phoenix-cnc --report DATEI` gibt dieselben Funde mit Statistik und Zeit eines Programms aus, ohne das Fenster zu öffnen (Exitcode 0, wenn nichts zu lesen ist, 1, wenn etwas zu lesen ist, 2, wenn die Datei nicht gelesen werden kann; `--lang` wählt die Sprache), und `--version` und `--help` antworten sofort. Nur am Simulator erprobt; nichts lief auf einer echten Maschine.
 
 ## 🧩 Rolle in EH3D
 
@@ -116,7 +117,7 @@ Wie die Teile zusammenpassen: wer es nutzen wird, was dieses Repository enthält
 
 ## 🔒 Sicherheit und Schutz
 
-Dieses Programm öffnet eine serielle Schnittstelle nur, wenn es für GRBL gestartet wird (`--grbl`, ein Build mit `--features serial`), und eine Netzverbindung nur zum EH3D-Server, dessen Adresse in den Einstellungen steht, wenn der Bediener ihm ein Programm sendet; das Token liegt als Text in der Einstellungsdatei. Es öffnet keine Dateien anderer Personen außer der G-Code-Datei, die der Bediener wählt (als Text gelesen, nie von selbst ausgeführt), und ist kein Sicherheitssystem. Siehe [SECURITY.md](SECURITY.md).
+Dieses Programm öffnet eine serielle Schnittstelle nur, wenn es für GRBL gestartet wird (`--grbl`, ein Build mit `--features serial`), und eine Netzverbindung nur zum EH3D-Server, dessen Adresse in den Einstellungen steht, wenn der Bediener ihm ein Programm sendet; das Token liegt als Text in der Einstellungsdatei. Es öffnet keine Dateien anderer Personen außer der G-Code-Datei und der Höhenkarte, die der Bediener wählt (als Text gelesen, nie von selbst ausgeführt), und seinen eigenen Dateien neben den Einstellungen (die Makros, die zwischen den Läufen gehaltene Warteschlange, die Zeile, die ein Programm erreicht hatte); es schreibt eine Datei nur dort, wo der Bediener es sagt (das Programm, die Höhenkarte, das exportierte Protokoll), und schreibt das Protokoll nie über eine Datei. Die Makros, die es ausführt, sind G-Code-Zeilen, nach denen es vorher fragt, und die zurückkehrende Warteschlange startet nie von selbst. Es ist kein Sicherheitssystem. Siehe [SECURITY.md](SECURITY.md).
 
 ## 🚀 Schnellstart
 
@@ -135,7 +136,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 283 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 344 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -156,10 +157,11 @@ EH3D-PHOENIX-CNC/
 │   ├── lib.rs                                   die Module und die Ansicht von eh3d-view unter dem Namen dieses Programms
 │   ├── gui.rs                                   das Fenster: Position, Jog, Programm, Bahn, Befehle und Protokoll
 │   ├── session.rs                               was mit einer Steuerung getan wird: Jog, Nullpunkt, Referenz, ein Programm Zeile für Zeile, Pause, Stopp, Alarme
-│   ├── queue.rs                                 die Programm-Warteschlange: Reihenfolge, Zustand, überspringen, entfernen, Halt bei Fehler
+│   ├── queue.rs                                 die Warteschlange: Reihenfolge, Zustand, Durchläufe, Stopp bei Fehler, Zustandsdatei
 │   ├── progcheck.rs                             zweite Programmprüfung: Einheiten, Versätze, Antasten, Ebenen
 │   ├── boxes.rs                                 Sperrboxen und Verfahrgrenzen, Bewegung für Bewegung
 │   ├── sim.rs                                   der Pfad in der Zeit: Werkzeug zu jedem Zeitpunkt, Restzeit
+│   ├── estimate.rs                              die Zeit eines Programms, einmal gemessen und gemerkt: der geladene Pfad und die Dateien der Warteschlange
 │   ├── stats.rs                                 Programmstatistik: Strecken, Zeit, Werkzeugwechsel
 │   ├── jobs.rs                                  Wiederholungen und Pausen zwischen Warteschlangenprogrammen
 │   ├── macros.rs                                die Makrobibliothek: benannter G-Code, der vor dem Start fragt
@@ -185,7 +187,12 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/probe.rs                             der Taster im Fenster: Rückfragen und Höhenkarten-Einträge
 │   ├── gui/numfield.rs                          eine Zahl, die mit den Tasten Minus und Plus oder durch Eintippen gesetzt wird
 │   ├── gui/keys.rs                              die Tasten der Tastatur und die Tabelle, die Menüs und Tastenliste lesen
-│   ├── gui/queue.rs                             die Warteschlange im Fenster: Dateien nacheinander, jede nach ihrer Zusammenfassung
+│   ├── gui/queue.rs                             die Warteschlange im Fenster: Durchläufe, Wiederholungen, Rückfrage oder Wartezeit dazwischen
+│   ├── gui/check.rs                             das Prüffenster: was die Prüfungen finden, Zeile für Zeile
+│   ├── gui/keepout.rs                           der Editor der Sperrboxen und die Ablehnung eines Programms, das in eine hineinfährt
+│   ├── gui/sim.rs                               Statistik und Simulation: das Werkzeug auf dem Pfad, die Zeile, die Restzeit
+│   ├── gui/macros.rs                            das Makro-Menü und die Rückfrage vor dem Ausführen eines Makros
+│   ├── gui/files.rs                             die Höhenkarte und das Sitzungsprotokoll als Dateien, über die Dateifenster
 │   └── gui/icons.rs                             die Bilder der Schaltflächen, mit Linien gezeichnet, und die Schaltfläche der Werkzeugleiste
 ├── examples/                                    drei Beispiel-G-Code-Programme, vom Quadrat bis zur langen Spirale
 ├── tests/                                       weitere Tests zu G-Code und Einstellungen

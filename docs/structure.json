@@ -75,14 +75,14 @@
         {
           "name": "queue.rs",
           "desc": {
-            "en": "the queue of programs: order, state, skip, remove, reorder, stop on failure",
-            "es": "la cola de programas: orden, estado, saltar, quitar, reordenar, parada si falla",
-            "de": "die Programm-Warteschlange: Reihenfolge, Zustand, überspringen, entfernen, Halt bei Fehler",
-            "fr": "la file de programmes : ordre, état, ignorer, retirer, réordonner, arrêt si échec",
-            "it": "la coda dei programmi: ordine, stato, salta, rimuovi, riordina, stop se fallisce",
-            "ja": "プログラムのキュー：順序、状態、スキップ、削除、並べ替え、失敗時の停止",
-            "zh": "程序队列：顺序、状态、跳过、移除、重排，失败时停止",
-            "pt": "a fila de programas: ordem, estado, ignorar, retirar, reordenar, paragem se falha"
+            "en": "the queue: order, state, runs, skip, remove, reorder, stop on failure, state file",
+            "es": "la cola: orden, estado, pasadas, omitir, quitar, reordenar, parar al fallar, archivo de estado",
+            "de": "die Warteschlange: Reihenfolge, Zustand, Durchläufe, Stopp bei Fehler, Zustandsdatei",
+            "fr": "la file : ordre, état, passes, sauter, retirer, arrêt sur échec, fichier d'état",
+            "it": "la coda: ordine, stato, passate, saltare, rimuovere, stop in caso di errore, file di stato",
+            "ja": "キュー：順序、状態、実行回数、スキップ、削除、失敗時の停止、状態ファイル",
+            "zh": "队列：顺序、状态、运行次数、跳过、移除、失败时停止、状态文件",
+            "pt": "a fila: ordem, estado, passagens, saltar, remover, parar ao falhar, ficheiro de estado"
           }
         },
         {
@@ -122,6 +122,19 @@
             "ja": "時間軸上の経路：各時点の工具と残り時間",
             "zh": "时间轴上的路径：各时刻的刀具与剩余时间",
             "pt": "o trajeto no tempo: a ferramenta em cada instante"
+          }
+        },
+        {
+          "name": "estimate.rs",
+          "desc": {
+            "en": "the time of a program measured once and kept: the loaded path and the files of the queue",
+            "es": "el tiempo de un programa medido una vez y guardado: la trayectoria cargada y los archivos de la cola",
+            "de": "die Zeit eines Programms, einmal gemessen und gemerkt: der geladene Pfad und die Dateien der Warteschlange",
+            "fr": "le temps d'un programme mesuré une fois et gardé : la trajectoire chargée et les fichiers de la file",
+            "it": "il tempo di un programma misurato una volta e conservato: il percorso caricato e i file della coda",
+            "ja": "プログラムの時間を一度だけ測って保持：読み込んだ経路とキューのファイル",
+            "zh": "程序时间只测一次并保存：已载入的路径和队列中的文件",
+            "pt": "o tempo de um programa medido uma vez e guardado: a trajetória carregada e os ficheiros da fila"
           }
         },
         {
@@ -452,14 +465,79 @@
         {
           "name": "gui/queue.rs",
           "desc": {
-            "en": "the queue in the window: files run one after the other, each after its summary",
-            "es": "la cola en la ventana: archivos uno tras otro, cada uno tras su resumen",
-            "de": "die Warteschlange im Fenster: Dateien nacheinander, jede nach ihrer Zusammenfassung",
-            "fr": "la file dans la fenêtre : fichiers l'un après l'autre, chacun après son résumé",
-            "it": "la coda nella finestra: file uno dopo l'altro, ciascuno dopo il suo riepilogo",
-            "ja": "ウィンドウ内のキュー：ファイルを順に実行し、それぞれ概要の後に開始",
-            "zh": "窗口中的队列：文件依次运行，每个先显示摘要",
-            "pt": "a fila na janela: ficheiros um a seguir ao outro, cada um após o seu resumo"
+            "en": "the queue in the window: runs, repeats, a question or a wait between runs",
+            "es": "la cola en la ventana: pasadas, repeticiones, una pregunta o una espera entre pasadas",
+            "de": "die Warteschlange im Fenster: Durchläufe, Wiederholungen, Rückfrage oder Wartezeit dazwischen",
+            "fr": "la file dans la fenêtre : passes, répétitions, une question ou une attente entre passes",
+            "it": "la coda nella finestra: passate, ripetizioni, una domanda o un'attesa tra le passate",
+            "ja": "ウィンドウ内のキュー：実行、繰り返し、実行間の確認または待機",
+            "zh": "窗口中的队列：运行、重复，两次运行之间询问或等待",
+            "pt": "a fila na janela: passagens, repetições, uma pergunta ou uma espera entre passagens"
+          }
+        },
+        {
+          "name": "gui/check.rs",
+          "desc": {
+            "en": "the Check window: what the checkers find, line by line",
+            "es": "la ventana de comprobación: lo que encuentran las comprobaciones, línea por línea",
+            "de": "das Prüffenster: was die Prüfungen finden, Zeile für Zeile",
+            "fr": "la fenêtre de vérification : ce que trouvent les vérifications, ligne par ligne",
+            "it": "la finestra di controllo: ciò che trovano i controlli, riga per riga",
+            "ja": "検査ウィンドウ：検査で見つかったことを行ごとに表示",
+            "zh": "检查窗口：按行显示检查发现的问题",
+            "pt": "a janela de verificação: o que as verificações encontram, linha a linha"
+          }
+        },
+        {
+          "name": "gui/keepout.rs",
+          "desc": {
+            "en": "the editor of the keep-out boxes and the refusal of a program that enters one",
+            "es": "el editor de las cajas prohibidas y el rechazo de un programa que entra en una",
+            "de": "der Editor der Sperrboxen und die Ablehnung eines Programms, das in eine hineinfährt",
+            "fr": "l'éditeur des boîtes interdites et le refus d'un programme qui entre dans l'une",
+            "it": "l'editor dei riquadri vietati e il rifiuto di un programma che ne attraversa uno",
+            "ja": "進入禁止ボックスのエディタと、その中に入るプログラムの拒否",
+            "zh": "禁区盒编辑器，以及对进入禁区盒的程序的拒绝",
+            "pt": "o editor das caixas proibidas e a recusa de um programa que entre numa delas"
+          }
+        },
+        {
+          "name": "gui/sim.rs",
+          "desc": {
+            "en": "statistics and simulation: the tool on the path, the line, the time left",
+            "es": "estadísticas y simulación: la herramienta en la trayectoria, la línea, el tiempo restante",
+            "de": "Statistik und Simulation: das Werkzeug auf dem Pfad, die Zeile, die Restzeit",
+            "fr": "statistiques et simulation : l'outil sur la trajectoire, la ligne, le temps restant",
+            "it": "statistiche e simulazione: l'utensile sul percorso, la riga, il tempo che manca",
+            "ja": "統計とシミュレーション：経路上の工具、行、残り時間",
+            "zh": "统计与模拟：路径上的刀具、行、剩余时间",
+            "pt": "estatísticas e simulação: a ferramenta na trajetória, a linha, o tempo que falta"
+          }
+        },
+        {
+          "name": "gui/macros.rs",
+          "desc": {
+            "en": "the Macros menu and the question before a macro runs",
+            "es": "el menú de macros y la pregunta antes de ejecutar una macro",
+            "de": "das Makro-Menü und die Rückfrage vor dem Ausführen eines Makros",
+            "fr": "le menu des macros et la question avant de lancer une macro",
+            "it": "il menu delle macro e la domanda prima di eseguirne una",
+            "ja": "マクロメニューと、マクロ実行前の確認",
+            "zh": "宏菜单和运行宏之前的询问",
+            "pt": "o menu de macros e a pergunta antes de executar uma macro"
+          }
+        },
+        {
+          "name": "gui/files.rs",
+          "desc": {
+            "en": "the height map and the session log as files, through the file windows",
+            "es": "el mapa de alturas y el registro de la sesión como archivos, con las ventanas de archivos",
+            "de": "die Höhenkarte und das Sitzungsprotokoll als Dateien, über die Dateifenster",
+            "fr": "la carte des hauteurs et le journal de session en fichiers, par les fenêtres de fichiers",
+            "it": "la mappa delle altezze e il registro della sessione come file, con le finestre dei file",
+            "ja": "高さマップとセッションログをファイルとして扱う（ファイルウィンドウ経由）",
+            "zh": "高度图和会话日志作为文件，通过文件窗口读写",
+            "pt": "o mapa de alturas e o registo da sessão como ficheiros, pelas janelas de ficheiros"
           }
         },
         {
