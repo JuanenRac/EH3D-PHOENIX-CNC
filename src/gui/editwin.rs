@@ -110,7 +110,7 @@ impl App {
                 let select = st.select.take();
                 if let Some((s, _)) = select {
                     let line = editor::line_at(&st.text, s);
-                    area = area.vertical_scroll_offset((line.saturating_sub(4)) as f32 * row_h);
+                    area = area.vertical_scroll_offset(line.saturating_sub(4) as f32 * row_h);
                 }
                 area.show(ui, |ui| {
                     ui.horizontal_top(|ui| {
