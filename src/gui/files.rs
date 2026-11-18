@@ -305,21 +305,24 @@ mod tests {
     #[test]
     fn the_log_is_taken_once_and_the_lines_dropped_from_the_session_do_not_repeat_it() {
         let mut a = App::isolated();
+        // the session may have said something already (the travel read from the controller): that is taken first
+        a.log_collect();
+        let base = a.logbook.len();
         a.session.log.push("one".into());
         a.session.log.push("two".into());
         a.log_collect();
         a.log_collect();
-        assert_eq!(a.logbook.len(), 2);
+        assert_eq!(a.logbook.len(), base + 2);
         a.session.log.push("three".into());
         a.log_collect();
-        assert_eq!(a.logbook.len(), 3);
+        assert_eq!(a.logbook.len(), base + 3);
         // the session drops its oldest lines when the log gets long: what was taken is not taken again
         a.session.log = (0..150).map(|i| format!("line {i}")).collect();
         a.session.log_dropped = 100;
         a.log_seen = 100 + 3;
         a.log_collect();
         // lines 3.. of the new vector are new: 147 lines
-        assert_eq!(a.logbook.len(), 3 + 147);
+        assert_eq!(a.logbook.len(), base + 3 + 147);
         assert_eq!(a.log_seen, 250);
     }
 
