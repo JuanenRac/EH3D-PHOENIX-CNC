@@ -2,7 +2,7 @@
 //! fixture) are boxes written in the settings file, and every straight move of the program is tested against them and against the travel
 //! of each axis, so the line that goes wrong is named before anything moves. It knows nothing of the window or of the controller.
 
-use crate::gcode::Segment;
+use crate::gcode::{Point, Segment};
 
 /// A box of the machine where the tool must not enter, in mm of machine coordinates.
 #[derive(Debug, Clone, PartialEq)]
@@ -99,23 +99,43 @@ pub struct Hit {
 }
 
 /// The moves of the path that enter a box. `offset` is where the zero of the work is in the machine (machine position minus work
-/// position); `margin` makes every box bigger by that much. A line is reported once for each box.
+/// position); `margin` makes every box bigger by that much. A line is reported once for each box. An arc is tested by its chord only
+/// (see `hits_curved` for the arcs along their curve).
 pub fn hits(segs: &[Segment], offset: [f64; 3], boxes: &[KeepOut], margin: f64) -> Vec<Hit> {
+    hits_curved(segs, &[], offset, boxes, margin)
+}
+
+/// The same as `hits`, but an arc that has its curve in `curves` (`gcode::arc_curves`, the lines from 0) is tested piece by piece along
+/// the curve, so an arc that bulges into a box while its chord stays clear is found, and one whose chord cuts a box that the curve
+/// goes round is not reported. An arc with no curve in the list is tested by its chord and marked as such.
+pub fn hits_curved(
+    segs: &[Segment],
+    curves: &[(usize, Vec<Point>)],
+    offset: [f64; 3],
+    boxes: &[KeepOut],
+    margin: f64,
+) -> Vec<Hit> {
     let grown: Vec<KeepOut> = boxes.iter().map(|b| b.grown(margin)).collect();
+    let shifted = |p: Point| [p.0 + offset[0], p.1 + offset[1], p.2 + offset[2]];
     let mut out: Vec<Hit> = Vec::new();
     for s in segs {
-        let a = [
-            s.from.0 + offset[0],
-            s.from.1 + offset[1],
-            s.from.2 + offset[2],
-        ];
-        let b = [s.to.0 + offset[0], s.to.1 + offset[1], s.to.2 + offset[2]];
+        let curve = if s.arc {
+            curves.iter().find(|(l, _)| *l == s.line).map(|(_, p)| p)
+        } else {
+            None
+        };
         for g in &grown {
-            if g.crossed_by(a, b) && !out.iter().any(|h| h.line == s.line && h.name == g.name) {
+            let crossed = match curve {
+                Some(pts) => pts
+                    .windows(2)
+                    .any(|w| g.crossed_by(shifted(w[0]), shifted(w[1]))),
+                None => g.crossed_by(shifted(s.from), shifted(s.to)),
+            };
+            if crossed && !out.iter().any(|h| h.line == s.line && h.name == g.name) {
                 out.push(Hit {
                     line: s.line,
                     name: g.name.clone(),
-                    chord_only: s.arc,
+                    chord_only: s.arc && curve.is_none(),
                 });
             }
         }
@@ -123,7 +143,14 @@ pub fn hits(segs: &[Segment], offset: [f64; 3], boxes: &[KeepOut], margin: f64) 
     out
 }
 
-/// How many moves are arcs, which are only tested by their chord.
+/// How many arcs have no curve in `curves` and so are only tested by their chord.
+pub fn arcs_by_chord(segs: &[Segment], curves: &[(usize, Vec<Point>)]) -> usize {
+    segs.iter()
+        .filter(|s| s.arc && !curves.iter().any(|(l, _)| *l == s.line))
+        .count()
+}
+
+/// How many moves are arcs (all of them are tested by their chord when no curve is given).
 pub fn arc_chords(segs: &[Segment]) -> usize {
     segs.iter().filter(|s| s.arc).count()
 }
@@ -278,5 +305,65 @@ mod tests {
     fn the_ends_of_the_travel_are_inside_it() {
         let s = [seg((0.0, 0.0, 0.0), (300.0, 200.0, -50.0), 0, false)];
         assert!(travel_excess(&s, [0.0; 3], [(0.0, 300.0), (0.0, 200.0), (-50.0, 0.0)]).is_empty());
+    }
+
+    #[test]
+    fn an_arc_is_tested_along_its_curve_and_not_by_its_chord() {
+        // a half circle of radius 10 from (0, 0) to (20, 0) over the top (clockwise): its chord runs along Y 0, its top is at Y 10
+        let program: Vec<String> = ["G2 X20 Y0 I10 J0"].iter().map(|s| s.to_string()).collect();
+        let segs = crate::gcode::toolpath(&program);
+        let curves = crate::gcode::arc_curves(&program, 0.5);
+        assert!(segs[0].arc);
+        // a post on the top of the curve, well away from the chord
+        let post = KeepOut::parse("post 8 8 -5 12 12 5").unwrap();
+        assert!(hits(&segs, [0.0; 3], std::slice::from_ref(&post), 0.0).is_empty());
+        let h = hits_curved(&segs, &curves, [0.0; 3], std::slice::from_ref(&post), 0.0);
+        assert_eq!(h.len(), 1);
+        assert!(!h[0].chord_only);
+        assert_eq!(arcs_by_chord(&segs, &curves), 0);
+        // a box on the chord, under the curve: the chord crosses it, the curve goes round it
+        let under = KeepOut::parse("under 8 -1 -5 12 1 5").unwrap();
+        assert_eq!(
+            hits(&segs, [0.0; 3], std::slice::from_ref(&under), 0.0).len(),
+            1
+        );
+        assert!(hits_curved(&segs, &curves, [0.0; 3], &[under], 0.0).is_empty());
+        // the zero of the work and the margin apply to the curve as well
+        let high = KeepOut::parse("high 8 14 -5 12 16 5").unwrap();
+        assert!(hits_curved(&segs, &curves, [0.0; 3], std::slice::from_ref(&high), 0.0).is_empty());
+        assert_eq!(
+            hits_curved(
+                &segs,
+                &curves,
+                [0.0, 5.0, 0.0],
+                std::slice::from_ref(&high),
+                0.0
+            )
+            .len(),
+            1
+        );
+        assert_eq!(hits_curved(&segs, &curves, [0.0; 3], &[high], 5.0).len(), 1);
+    }
+
+    #[test]
+    fn an_arc_with_no_curve_is_still_tested_by_its_chord_and_said_so() {
+        // no centre and no radius: nothing to work out, the chord is what is known
+        let program: Vec<String> = ["G1 X0 Y15 F100", "G2 X30 Y15"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let segs = crate::gcode::toolpath(&program);
+        let curves = crate::gcode::arc_curves(&program, 0.5);
+        assert!(curves.is_empty());
+        assert_eq!(arcs_by_chord(&segs, &curves), 1);
+        let h = hits_curved(&segs, &curves, [0.0; 3], &[clamp()], 0.0);
+        assert_eq!(h.len(), 1);
+        assert!(h[0].chord_only);
+        // a straight move is never a chord, even beside the curves of other lines
+        let straight = [seg((0.0, 15.0, 0.0), (30.0, 15.0, 0.0), 9, false)];
+        let other = vec![(9usize, vec![(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])];
+        let h = hits_curved(&straight, &other, [0.0; 3], &[clamp()], 0.0);
+        assert_eq!(h.len(), 1);
+        assert!(!h[0].chord_only);
     }
 }

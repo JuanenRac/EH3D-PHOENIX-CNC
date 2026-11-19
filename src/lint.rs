@@ -56,6 +56,14 @@ pub enum Kind {
     /// An `S` below / above the range of spindle speed of the material in use.
     SpeedBelowMaterial,
     SpeedAboveMaterial,
+    /// An arc given by its centre that ends at another distance from the centre than it starts (the limit is the biggest gap, in mm).
+    ArcEndRadius,
+    /// An arc given by its radius (`R`) smaller than half the distance between its ends (the limit is the biggest shortfall, in mm).
+    ArcRadiusSmall,
+    /// `M3` while `M4` turns, or the other way round, with no `M5` between: the spindle is told to reverse at speed.
+    SpindleReversal,
+    /// An `F` of zero: a controller refuses a cut with no feed.
+    FeedZero,
     /// The program moves and has no `M2` or `M30`.
     NoEnd,
 }
@@ -173,6 +181,46 @@ fn template(kind: Kind, lang: &str) -> &'static str {
             "{n} 个主轴转速高于所选材料建议的 {limit} rpm（第一个在第 {line} 行）",
             "{n} velocidades do fuso ficam acima das {limit} rpm sugeridas para o material em uso (a primeira na linha {line})",
         ],
+        Kind::ArcEndRadius => [
+            "{n} arcs end at a different distance from their centre than they start, by up to {limit} mm (first at line {line}): a controller refuses them with a radius error",
+            "{n} arcos terminan a una distancia de su centro distinta de la de su comienzo, hasta {limit} mm (el primero en la línea {line}): un controlador los rechaza con un error de radio",
+            "{n} Kreisbögen enden in einem anderen Abstand vom Mittelpunkt, als sie beginnen, um bis zu {limit} mm (der erste in Zeile {line}): eine Steuerung lehnt sie mit einem Radiusfehler ab",
+            "{n} arcs finissent à une distance de leur centre différente de celle du départ, jusqu'à {limit} mm (le premier à la ligne {line}) : un contrôleur les refuse avec une erreur de rayon",
+            "{n} archi finiscono a una distanza dal centro diversa da quella di partenza, fino a {limit} mm (il primo alla riga {line}): un controllore li rifiuta con un errore di raggio",
+            "{n} 件の円弧の終点が、始点とは異なる中心からの距離にあり、最大 {limit} mm ずれています（最初は {line} 行目）：コントローラーは半径エラーで拒否します",
+            "{n} 个圆弧的终点到圆心的距离与起点不同，最大相差 {limit} mm（第一个在第 {line} 行）：控制器会以半径错误拒绝",
+            "{n} arcos terminam a uma distância do centro diferente da do início, até {limit} mm (o primeiro na linha {line}): um controlador recusa-os com um erro de raio",
+        ],
+        Kind::ArcRadiusSmall => [
+            "{n} arcs have a radius (R) smaller than half the distance between their ends, by up to {limit} mm (first at line {line}): a controller refuses them",
+            "{n} arcos tienen un radio (R) menor que la mitad de la distancia entre sus extremos, hasta {limit} mm (el primero en la línea {line}): un controlador los rechaza",
+            "{n} Kreisbögen haben einen Radius (R), der um bis zu {limit} mm kleiner ist als der halbe Abstand ihrer Enden (der erste in Zeile {line}): eine Steuerung lehnt sie ab",
+            "{n} arcs ont un rayon (R) inférieur à la moitié de la distance entre leurs extrémités, jusqu'à {limit} mm (le premier à la ligne {line}) : un contrôleur les refuse",
+            "{n} archi hanno un raggio (R) minore della metà della distanza tra i loro estremi, fino a {limit} mm (il primo alla riga {line}): un controllore li rifiuta",
+            "{n} 件の円弧で、半径（R）が両端の距離の半分より最大 {limit} mm 小さくなっています（最初は {line} 行目）：コントローラーは拒否します",
+            "{n} 个圆弧的半径（R）比两端距离的一半小，最多小 {limit} mm（第一个在第 {line} 行）：控制器会拒绝",
+            "{n} arcos têm um raio (R) menor do que metade da distância entre as extremidades, até {limit} mm (o primeiro na linha {line}): um controlador recusa-os",
+        ],
+        Kind::SpindleReversal => [
+            "{n} times the spindle is told to turn the other way without stopping first (first at line {line}): stop it with M5 and wait",
+            "{n} veces se manda al husillo girar al otro lado sin pararlo antes (la primera en la línea {line}): páralo con M5 y espera",
+            "{n}-mal soll die Spindel ohne vorheriges Anhalten die Drehrichtung wechseln (das erste Mal in Zeile {line}): mit M5 anhalten und warten",
+            "{n} fois la broche reçoit l'ordre de tourner dans l'autre sens sans s'arrêter avant (la première à la ligne {line}) : arrêtez-la avec M5 et attendez",
+            "{n} volte il mandrino riceve l'ordine di girare nell'altro verso senza fermarsi prima (la prima alla riga {line}): fermalo con M5 e attendi",
+            "{n} 回、停止せずにスピンドルの回転方向が逆転されます（最初は {line} 行目）：M5 で止めて待ってください",
+            "{n} 次未先停止就让主轴反向旋转（第一次在第 {line} 行）：请先用 M5 停转并等待",
+            "{n} vezes o fuso recebe ordem para rodar no sentido contrário sem parar antes (a primeira na linha {line}): pare-o com M5 e aguarde",
+        ],
+        Kind::FeedZero => [
+            "{n} feed rates are set to zero (first at line {line}): a controller refuses a cut with no feed",
+            "{n} avances se fijan en cero (el primero en la línea {line}): un controlador rechaza un corte sin avance",
+            "{n} Vorschübe sind auf null gesetzt (der erste in Zeile {line}): eine Steuerung lehnt einen Schnitt ohne Vorschub ab",
+            "{n} avances sont réglés à zéro (le premier à la ligne {line}) : un contrôleur refuse une coupe sans avance",
+            "{n} avanzamenti sono impostati a zero (il primo alla riga {line}): un controllore rifiuta un taglio senza avanzamento",
+            "{n} 件の送り速度が 0 に設定されています（最初は {line} 行目）：送り速度のない切削はコントローラーが拒否します",
+            "{n} 个进给速度被设为零（第一个在第 {line} 行）：控制器会拒绝没有进给的切削",
+            "{n} avanços estão definidos como zero (o primeiro na linha {line}): um controlador recusa um corte sem avanço",
+        ],
         Kind::NoEnd => [
             "The program has no end (M2 or M30): the spindle may stay on",
             "El programa no tiene final (M2 o M30): el husillo puede quedar encendido",
@@ -220,6 +268,10 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
     let mut change: Option<Finding> = None;
     let mut fast: Option<Finding> = None;
     let mut spinning: Option<Finding> = None;
+    let mut reversal: Option<Finding> = None;
+    let mut zero_feed: Option<Finding> = None;
+    // the way the spindle turns now (3 or 4), when it does
+    let mut turning: Option<i32> = None;
     let (mut feed_low, mut feed_high): (Option<Finding>, Option<Finding>) = (None, None);
     let (mut speed_low, mut speed_high): (Option<Finding>, Option<Finding>) = (None, None);
     // the feed in force, in mm/min
@@ -250,6 +302,9 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
             // the material in use: the feed in force is kept for the moves, and a spindle speed outside the range is said at once
             if l == 'F' {
                 feed_now = Some(v * scale);
+                if v <= 0.0 {
+                    bump(&mut zero_feed, Kind::FeedZero, n + 1);
+                }
             }
             if let ('S', Some((lo, hi))) = (l, cfg.material_rpm) {
                 if v > 0.0 && v < lo {
@@ -288,11 +343,20 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
                         if !speed_set {
                             bump(&mut nospeed, Kind::SpindleWithoutSpeed, n + 1);
                         }
+                        let way = v as i32;
+                        if turning.is_some_and(|t| t != way) {
+                            bump(&mut reversal, Kind::SpindleReversal, n + 1);
+                        }
+                        turning = Some(way);
                         spindle_on = true;
                     }
-                    5 => spindle_on = false,
+                    5 => {
+                        spindle_on = false;
+                        turning = None;
+                    }
                     2 | 30 => {
                         spindle_on = false;
+                        turning = None;
                         ended = true;
                     }
                     6 => bump(&mut change, Kind::ToolChange, n + 1),
@@ -338,8 +402,21 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
             f.limit = limit;
         }
     }
+    // the arcs a controller refuses
+    let (mut end_radius, mut too_small): (Option<Finding>, Option<Finding>) = (None, None);
+    for (line, fault, gap) in crate::gcode::arc_faults(lines) {
+        let (slot, kind) = match fault {
+            crate::gcode::ArcFault::EndRadius => (&mut end_radius, Kind::ArcEndRadius),
+            crate::gcode::ArcFault::RadiusTooSmall => (&mut too_small, Kind::ArcRadiusSmall),
+        };
+        bump(slot, kind, line + 1);
+        if let Some(f) = slot {
+            f.limit = f.limit.max(gap);
+        }
+    }
     let mut out: Vec<Finding> = [
         rapid, dry, nospeed, change, fast, spinning, feed_low, feed_high, speed_low, speed_high,
+        end_radius, too_small, reversal, zero_feed,
     ]
     .into_iter()
     .flatten()
@@ -389,7 +466,7 @@ mod tests {
             ..LintCfg::default()
         };
         let p = lines(
-            "M3 S5000\nG1 X5 F50\nG1 X9 F700\nG1 Z-1 F20\nG1 X1 F300\nG2 X2 Y2 I1 J0 F650\nS30000\nM30",
+            "M3 S5000\nG1 X5 F50\nG1 X9 F700\nG1 Z-1 F20\nG1 X1 F300\nG2 X3 Y0 I1 J0 F650\nS30000\nM30",
         );
         let got: Vec<(Kind, usize, usize, f64)> = lint(&p, &cfg)
             .iter()
@@ -562,6 +639,10 @@ mod tests {
             Kind::ToolChange,
             Kind::FeedTooHigh,
             Kind::SpeedTooHigh,
+            Kind::ArcEndRadius,
+            Kind::ArcRadiusSmall,
+            Kind::SpindleReversal,
+            Kind::FeedZero,
             Kind::NoEnd,
         ];
         for kind in all {
@@ -590,5 +671,56 @@ mod tests {
         }
         .message("en")
         .starts_with("3 rapid"));
+    }
+
+    #[test]
+    fn an_arc_that_ends_off_its_circle_or_is_too_small_is_said_with_the_biggest_gap() {
+        // line 3 starts at X1 and goes round the centre (2, 0): its end at X4 is 2 mm from the centre where it started 1 mm away
+        // (a gap of 1 mm), line 4 ends at X3.5 (a gap of 0.5 mm), line 5 asks for a radius of 3 over 20 mm and line 6 one of 4 over 10 mm
+        let p = lines("M3 S1000\nG1 X1 F100\nG2 X4 Y0 I1 J0\nG2 X3.5 Y0 I1 J0\nG3 X20 Y0 R3\nG3 X30 Y0 R4\nM30");
+        let got: Vec<(Kind, usize, usize, f64)> = lint(&p, &LintCfg::default())
+            .iter()
+            .map(|f| (f.kind, f.line, f.count, f.limit))
+            .collect();
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert_eq!((got[0].0, got[0].1, got[0].2), (Kind::ArcEndRadius, 3, 2));
+        assert!((got[0].3 - 1.0).abs() < 1e-9, "{got:?}");
+        assert_eq!((got[1].0, got[1].1), (Kind::ArcRadiusSmall, 5));
+        assert!((got[1].3 - 5.25).abs() < 1e-9, "{got:?}");
+        // a sound arc, by its centre and by its radius, says nothing
+        assert!(kinds("M3 S1000\nG1 X1 F100\nG2 X3 Y0 I1 J0\nG3 X1 Y0 R1\nM30").is_empty());
+        assert!(lint(&p, &LintCfg::default())[0]
+            .message("en")
+            .contains("by up to"));
+        // with the checks off nothing is said
+        let off = LintCfg {
+            enabled: false,
+            ..LintCfg::default()
+        };
+        assert!(lint(&p, &off).is_empty());
+    }
+
+    #[test]
+    fn a_spindle_told_to_reverse_without_stopping_and_a_feed_of_zero_are_found() {
+        let p = lines("M3 S1000\nG1 X1 F100\nM4\nG1 X2\nM5\nM4\nM3\nM30");
+        let got: Vec<(Kind, usize, usize)> = lint(&p, &LintCfg::default())
+            .iter()
+            .map(|f| (f.kind, f.line, f.count))
+            .collect();
+        // M4 on line 3 and M3 on line 7 reverse; M4 on line 6 starts after a stop
+        assert_eq!(got, vec![(Kind::SpindleReversal, 3, 2)]);
+        // the same direction again, a stop and a new start are not reversals
+        assert!(kinds("M3 S1000\nM3\nG1 X1 F5\nM5\nM4\nM30").is_empty());
+        // F0 is said once per line, in inches too, and a feed after it is fine
+        let z = lint(
+            &lines("M3 S1000\nG1 X1 F0\nG1 X2 F100\nG20\nG1 X3 F0.000\nM30"),
+            &LintCfg::default(),
+        );
+        assert_eq!(z.len(), 1);
+        assert_eq!((z[0].kind, z[0].line, z[0].count), (Kind::FeedZero, 2, 2));
+        assert!(z[0]
+            .message("en")
+            .starts_with("2 feed rates are set to zero"));
+        assert!(kinds("M3 S1000\nG1 X1 F0.1\nM30").is_empty());
     }
 }

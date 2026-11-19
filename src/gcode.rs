@@ -27,7 +27,180 @@ pub fn toolpath(lines: &[String]) -> Vec<Segment> {
 /// The length of the curve of an arc move, in mm: the lines that have one (their number from 0) and the length along the arc, with the
 /// rise of a helix. An arc that cannot be measured (no centre and no radius, or a centre on the start) has no entry, and its chord counts.
 pub fn arc_lengths(lines: &[String]) -> Vec<(usize, f64)> {
-    trace(lines).1
+    trace(lines)
+        .1
+        .iter()
+        .filter_map(|a| {
+            arc_length(
+                a.from,
+                a.to,
+                a.plane,
+                a.cw,
+                a.off,
+                a.radius,
+                a.centre_absolute,
+            )
+            .map(|l| (a.line, l))
+        })
+        .collect()
+}
+
+/// One arc move as the program wrote it, kept to work out its curve, its length and what is wrong with it.
+#[derive(Debug, Clone, Copy)]
+struct ArcRec {
+    line: usize,
+    from: Point,
+    to: Point,
+    plane: u8,
+    cw: bool,
+    off: [Option<f64>; 3],
+    radius: Option<f64>,
+    centre_absolute: bool,
+}
+
+/// The circle of an arc: its centre in the two axes of the plane, its radius, the angle it starts at and the signed sweep (positive
+/// counter-clockwise), with the index of the three axes (the two of the plane and the one it rises along).
+struct ArcGeo {
+    axes: (usize, usize, usize),
+    centre: (f64, f64),
+    radius: f64,
+    start: f64,
+    sweep: f64,
+    /// How far the end of the arc is from the circle that starts at the start of the arc, in mm (0 for an arc given by its radius).
+    end_gap: f64,
+    /// An arc given by its radius that is smaller than half the distance between its ends: by how much, in mm.
+    too_small: f64,
+}
+
+fn arc_geo(a: &ArcRec) -> Option<ArcGeo> {
+    let axes = match a.plane {
+        18 => (2, 0, 1),
+        19 => (1, 2, 0),
+        _ => (0, 1, 2),
+    };
+    let at = |p: Point, i: usize| [p.0, p.1, p.2][i];
+    let (sa, sb, ea, eb) = (
+        at(a.from, axes.0),
+        at(a.from, axes.1),
+        at(a.to, axes.0),
+        at(a.to, axes.1),
+    );
+    let tau = std::f64::consts::TAU;
+    let (centre, radius, end_gap, too_small) = if let Some(rr) = a.radius {
+        let (dx, dy) = (ea - sa, eb - sb);
+        let d = dx.hypot(dy);
+        let r = rr.abs();
+        if d <= 1e-9 || r <= 1e-9 {
+            return None;
+        }
+        let small = (d / 2.0 - r).max(0.0);
+        let h = (r * r - d * d / 4.0).max(0.0).sqrt();
+        let (ux, uy) = (dx / d, dy / d);
+        // the centre is to the left of the chord for a short counter-clockwise arc or a long clockwise one
+        let left = (!a.cw) != (rr < 0.0);
+        let side = if left { 1.0 } else { -1.0 };
+        let centre = (sa + dx / 2.0 - side * uy * h, sb + dy / 2.0 + side * ux * h);
+        (centre, r, 0.0, small)
+    } else {
+        if a.off[axes.0].is_none() && a.off[axes.1].is_none() {
+            return None;
+        }
+        let centre = if a.centre_absolute {
+            (a.off[axes.0].unwrap_or(sa), a.off[axes.1].unwrap_or(sb))
+        } else {
+            (
+                sa + a.off[axes.0].unwrap_or(0.0),
+                sb + a.off[axes.1].unwrap_or(0.0),
+            )
+        };
+        let r = (sa - centre.0).hypot(sb - centre.1);
+        if r <= 1e-9 {
+            return None;
+        }
+        let r_end = (ea - centre.0).hypot(eb - centre.1);
+        (centre, r, (r_end - r).abs(), 0.0)
+    };
+    let start = (sb - centre.1).atan2(sa - centre.0);
+    let mut d = (eb - centre.1).atan2(ea - centre.0) - start;
+    if a.cw {
+        while d > 1e-12 {
+            d -= tau;
+        }
+    } else {
+        while d < -1e-12 {
+            d += tau;
+        }
+    }
+    if d.abs() < 1e-9 {
+        d = if a.cw { -tau } else { tau };
+    }
+    Some(ArcGeo {
+        axes,
+        centre,
+        radius,
+        start,
+        sweep: d,
+        end_gap,
+        too_small,
+    })
+    .filter(|g| g.centre.0.is_finite() && g.centre.1.is_finite() && g.sweep.is_finite())
+}
+
+/// The curve of each arc of the program as a run of points (`from` and `to` included, the rise of a helix spread along it): the
+/// lines that have one (from 0) and the points, none further apart along the curve than `step_mm` (and never more than 720 pieces).
+/// An arc that cannot be worked out (no centre and no radius, or a centre on the start) has no entry and only its chord is known.
+pub fn arc_curves(lines: &[String], step_mm: f64) -> Vec<(usize, Vec<Point>)> {
+    let step = if step_mm.is_finite() && step_mm > 0.01 {
+        step_mm
+    } else {
+        0.5
+    };
+    let mut out = Vec::new();
+    for a in trace(lines).1 {
+        let Some(g) = arc_geo(&a) else { continue };
+        let at = |p: Point, i: usize| [p.0, p.1, p.2][i];
+        let rise = at(a.to, g.axes.2) - at(a.from, g.axes.2);
+        let n = ((g.sweep.abs() * g.radius / step).ceil() as usize).clamp(1, 720);
+        let mut pts: Vec<Point> = Vec::with_capacity(n + 1);
+        pts.push(a.from);
+        for k in 1..n {
+            let t = k as f64 / n as f64;
+            let ang = g.start + g.sweep * t;
+            let mut v = [0.0f64; 3];
+            v[g.axes.0] = g.centre.0 + g.radius * ang.cos();
+            v[g.axes.1] = g.centre.1 + g.radius * ang.sin();
+            v[g.axes.2] = at(a.from, g.axes.2) + rise * t;
+            pts.push((v[0], v[1], v[2]));
+        }
+        pts.push(a.to);
+        out.push((a.line, pts));
+    }
+    out
+}
+
+/// What is wrong with an arc: a controller refuses it with a radius error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArcFault {
+    /// The arc is given by its centre and its end is not at the same distance from the centre as its start.
+    EndRadius,
+    /// The arc is given by its radius (`R`) and the radius is less than half the distance between its ends.
+    RadiusTooSmall,
+}
+
+/// The arcs of the program that a controller would refuse: the line (from 0), what is wrong and by how many mm. The end of an arc given
+/// by its centre may be off by 0.005 mm up to a thousandth of its radius and never more than 0.5 mm (what common controllers accept); an arc given
+/// by its radius may be smaller than half its chord by 0.0005 mm (the rounding of a number written with three decimals).
+pub fn arc_faults(lines: &[String]) -> Vec<(usize, ArcFault, f64)> {
+    let mut out = Vec::new();
+    for a in trace(lines).1 {
+        let Some(g) = arc_geo(&a) else { continue };
+        if g.too_small > 0.0005 {
+            out.push((a.line, ArcFault::RadiusTooSmall, g.too_small));
+        } else if g.end_gap > 0.5 || (g.end_gap > 0.005 && g.end_gap > 0.001 * g.radius) {
+            out.push((a.line, ArcFault::EndRadius, g.end_gap));
+        }
+    }
+    out
 }
 
 /// The length along an arc: from `from` to `to` in the plane `plane` (17, 18 or 19), clockwise or not, with the offsets of the centre
@@ -88,9 +261,9 @@ fn arc_length(
 }
 
 /// The straight moves of the program and the length of the curve of its arcs.
-fn trace(lines: &[String]) -> (Vec<Segment>, Vec<(usize, f64)>) {
+fn trace(lines: &[String]) -> (Vec<Segment>, Vec<ArcRec>) {
     let mut out = Vec::new();
-    let mut arcs: Vec<(usize, f64)> = Vec::new();
+    let mut arcs: Vec<ArcRec> = Vec::new();
     let (mut pos, mut absolute, mut scale, mut rapid) = ((0.0, 0.0, 0.0), true, 1.0, true);
     let (mut feed, mut arc) = (0.0, false);
     let (mut plane, mut cw, mut centre_absolute) = (17u8, true, false);
@@ -166,9 +339,16 @@ fn trace(lines: &[String]) -> (Vec<Segment>, Vec<(usize, f64)>) {
             );
             if to != pos {
                 if arc {
-                    if let Some(l) = arc_length(pos, to, plane, cw, off, radius, centre_absolute) {
-                        arcs.push((n, l));
-                    }
+                    arcs.push(ArcRec {
+                        line: n,
+                        from: pos,
+                        to,
+                        plane,
+                        cw,
+                        off,
+                        radius,
+                        centre_absolute,
+                    });
                 }
                 out.push(Segment {
                     from: pos,
@@ -575,5 +755,103 @@ mod tests {
         assert!(arc_lengths(&lines("G0 X1\nG1 X5 F10")).is_empty());
         // the path itself did not change
         assert_eq!(toolpath(&lines("G2 X10 Y0 I5 J0")).len(), 1);
+    }
+
+    fn on_circle(pts: &[Point], c: (f64, f64), r: f64) -> bool {
+        pts.iter()
+            .all(|p| ((p.0 - c.0).hypot(p.1 - c.1) - r).abs() < 1e-6)
+    }
+
+    #[test]
+    fn an_arc_by_its_centre_is_followed_along_its_curve_from_end_to_end() {
+        // the upper half of a circle of radius 5 round (5, 0), clockwise from (0, 0) to (10, 0)
+        let c = arc_curves(&lines("G2 X10 Y0 I5 J0"), 0.5);
+        assert_eq!(c.len(), 1);
+        let (line, pts) = &c[0];
+        assert_eq!(*line, 0);
+        assert_eq!(pts[0], (0.0, 0.0, 0.0));
+        assert_eq!(*pts.last().unwrap(), (10.0, 0.0, 0.0));
+        assert!(on_circle(pts, (5.0, 0.0), 5.0));
+        assert!(
+            pts.iter().all(|p| p.1 >= -1e-9),
+            "clockwise goes over the top"
+        );
+        // no piece is longer than the step, and the half circle has about 31 mm of curve
+        assert!(pts.len() > 30);
+        let longest = pts
+            .windows(2)
+            .map(|w| (w[1].0 - w[0].0).hypot(w[1].1 - w[0].1))
+            .fold(0.0, f64::max);
+        assert!(longest <= 0.5 + 1e-9, "{longest}");
+        // counter-clockwise goes under
+        let ccw = arc_curves(&lines("G3 X10 Y0 I5 J0"), 0.5);
+        assert!(ccw[0].1.iter().all(|p| p.1 <= 1e-9));
+    }
+
+    #[test]
+    fn an_arc_by_its_radius_takes_the_short_or_the_long_way_and_a_helix_rises() {
+        // R positive: the short way, R negative: the long way (the same ends, the same direction)
+        let short = arc_curves(&lines("G3 X10 Y0 R5"), 0.5);
+        let long = arc_curves(&lines("G3 X10 Y0 R-6"), 0.5);
+        assert!(on_circle(&short[0].1, (5.0, 0.0), 5.0));
+        // a half circle: the centre is on the chord, under it for a counter-clockwise arc
+        assert!(short[0].1.iter().all(|p| p.1 <= 1e-9));
+        // the long way round a bigger circle: the centre is on the other side, below the chord, and the arc swings far under it
+        let (cx, cy) = (5.0, -(36.0f64 - 25.0).sqrt());
+        assert!(on_circle(&long[0].1, (cx, cy), 6.0), "{:?}", long[0].1[3]);
+        assert!(long[0].1.iter().any(|p| p.1 < -5.0));
+        // the rise of a helix is spread along it
+        let h = arc_curves(&lines("G3 X10 Y0 Z4 I5 J0"), 0.5);
+        let n = h[0].1.len();
+        assert!(near(h[0].1[n / 2].2, 4.0 * (n / 2) as f64 / (n - 1) as f64));
+        assert_eq!(h[0].1[n - 1].2, 4.0);
+        // the plane XZ turns the circle into the other axes
+        let xz = arc_curves(&lines("G18\nG3 X10 Z0 I5 K0"), 0.5);
+        assert!(xz[0].1.iter().all(|p| p.1 == 0.0));
+        assert!(xz[0].1.iter().any(|p| p.2.abs() > 4.0));
+    }
+
+    #[test]
+    fn an_arc_that_cannot_be_worked_out_has_no_curve_and_the_step_is_kept_in_bounds() {
+        assert!(arc_curves(&lines("G2 X10 Y0"), 0.5).is_empty());
+        assert!(arc_curves(&lines("G2 X10 Y0 I0 J0"), 0.5).is_empty());
+        assert!(arc_curves(&lines("G1 X5 F10"), 0.5).is_empty());
+        // a silly step falls back to the default; a huge circle is cut in at most 720 pieces
+        assert!(arc_curves(&lines("G2 X10 Y0 I5 J0"), f64::NAN)[0].1.len() > 30);
+        assert!(arc_curves(&lines("G2 X10 Y0 I5 J0"), -3.0)[0].1.len() > 30);
+        let big = arc_curves(&lines("G2 X2000 Y0 I1000 J0"), 0.5);
+        assert_eq!(big[0].1.len(), 721);
+    }
+
+    #[test]
+    fn an_arc_that_ends_off_its_circle_or_is_too_small_is_a_fault() {
+        // ends 1 mm farther from the centre than it started
+        let f = arc_faults(&lines("G2 X11 Y0 I5 J0"));
+        assert_eq!(f.len(), 1);
+        assert_eq!((f[0].0, f[0].1), (0, ArcFault::EndRadius));
+        assert!(near(f[0].2, 1.0), "{f:?}");
+        // a tenth of a mm on a circle of radius 5 is more than a thousandth and more than 0.005
+        assert_eq!(arc_faults(&lines("G2 X10.1 Y0 I5 J0")).len(), 1);
+        // the rounding of a number with three decimals is accepted
+        assert!(arc_faults(&lines("G2 X10.003 Y0 I5 J0")).is_empty());
+        // a bigger circle accepts a bigger gap, up to its thousandth: 0.04 of 100 mm, but not 0.2
+        assert!(arc_faults(&lines("G2 X200.04 Y0 I100 J0")).is_empty());
+        assert_eq!(arc_faults(&lines("G2 X200.2 Y0 I100 J0")).len(), 1);
+        // a radius smaller than half the chord
+        let r = arc_faults(&lines("G1 X1 F10\nG3 X11 Y0 R4"));
+        assert_eq!((r[0].0, r[0].1), (1, ArcFault::RadiusTooSmall));
+        assert!(near(r[0].2, 1.0), "{r:?}");
+        // a radius of exactly half the chord is a half circle and is fine
+        assert!(arc_faults(&lines("G3 X10 Y0 R5")).is_empty());
+        // a good arc, a program with none and an arc with no centre say nothing
+        assert!(arc_faults(&lines("G2 X10 Y0 I5 J0")).is_empty());
+        assert!(arc_faults(&lines("G1 X5 F10")).is_empty());
+        assert!(arc_faults(&lines("G2 X10 Y0")).is_empty());
+        // an absolute centre is measured from the point, in the plane given
+        assert!(arc_faults(&lines("G90.1\nG1 X10 F100\nG3 X0 Y0 I5 J0")).is_empty());
+        assert_eq!(
+            arc_faults(&lines("G90.1\nG1 X10 F100\nG3 X0 Y1 I5 J0")).len(),
+            1
+        );
     }
 }

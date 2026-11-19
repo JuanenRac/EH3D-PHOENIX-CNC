@@ -2,14 +2,17 @@
 //! wrong in it (the checks of the summary, the second checker, the keep-out boxes and the travel), with no window and no controller.
 //! It builds a text and counts the problems, so a script can stop on a program that is not right. It only reads.
 
-use crate::boxes::{arc_chords, hits, travel_excess};
-use crate::gcode::toolpath;
+use crate::boxes::{arcs_by_chord, hits_curved, travel_excess};
+use crate::gcode::{arc_curves, toolpath};
 use crate::lint::{lint, Kind as LintKind, LintCfg};
 use crate::progcheck::{check, Level};
 use crate::sim::{hms, Extras, Rates, Timeline};
 use crate::stats::measure;
 use crate::tuning::Tuning;
 use crate::words::{say, Msg};
+
+/// The longest piece of the curve of an arc that is tested against the keep-out boxes, in mm.
+pub const KEEPOUT_STEP_MM: f64 = 0.5;
 
 /// What the report needs to know about the machine; the command line takes it from the settings file.
 #[derive(Debug, Clone, PartialEq)]
@@ -40,11 +43,17 @@ pub struct Note {
     pub text: String,
 }
 
-/// Everything that looks wrong in the program, in the order: the summary check, the second checker, the keep-out boxes, the arcs that are
-/// tested by their chord only and the travel. A program with nothing to say gives an empty list.
+/// Everything that looks wrong in the program, in the order: the summary check, the second checker, the keep-out boxes (an arc along its
+/// curve), the arcs that could only be tested by their chord and the travel. A program with nothing to say gives an empty list.
 pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -> Vec<Note> {
     let lang = cfg.lang.as_str();
     let path = toolpath(lines);
+    // the curve of the arcs matters only to the keep-out boxes
+    let curves = if tuning.keepouts.is_empty() {
+        Vec::new()
+    } else {
+        arc_curves(lines, KEEPOUT_STEP_MM)
+    };
     let mut out: Vec<Note> = Vec::new();
     for f in lint(lines, lint_cfg) {
         out.push(Note {
@@ -66,7 +75,13 @@ pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
             text: f.text(lang),
         });
     }
-    for h in hits(&path, cfg.offset, &tuning.keepouts, tuning.keepout_margin) {
+    for h in hits_curved(
+        &path,
+        &curves,
+        cfg.offset,
+        &tuning.keepouts,
+        tuning.keepout_margin,
+    ) {
         out.push(Note {
             line: Some(h.line),
             level: Level::Danger,
@@ -111,7 +126,7 @@ pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
     let chords = if tuning.keepouts.is_empty() {
         0
     } else {
-        arc_chords(&path)
+        arcs_by_chord(&path, &curves)
     };
     if chords > 0 {
         out.push(Note {
@@ -241,8 +256,9 @@ mod tests {
     }
 
     #[test]
-    fn arcs_are_said_only_when_there_are_boxes() {
-        let p = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 I5 J0 F100\nM30");
+    fn arcs_that_cannot_be_followed_are_said_only_when_there_are_boxes() {
+        // an arc with no centre and no radius has no curve: its chord is all there is
+        let p = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 F100\nM30");
         let none = build(&p, &Tuning::default(), &LintCfg::default(), &cfg("en"));
         assert!(!none.text.contains("chord"));
         let t = Tuning {
@@ -253,6 +269,34 @@ mod tests {
         assert!(with
             .text
             .contains("1 arc moves are checked by their chord only"));
+        // an arc with its centre is followed along its curve: nothing is left to say
+        let q = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 I5 J0 F100\nM30");
+        let followed = build(&q, &t, &LintCfg::default(), &cfg("en"));
+        assert!(!followed.text.contains("chord"), "{}", followed.text);
+    }
+
+    #[test]
+    fn a_box_that_the_curve_of_an_arc_enters_is_a_problem_and_one_only_its_chord_crosses_is_not() {
+        // the half circle of radius 5 from (0, 0) to (10, 0), clockwise, goes over the top to Y 5
+        let p = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 I5 J0 F100\nM30");
+        let on_top = Tuning {
+            keepouts: vec![crate::boxes::KeepOut::parse("post 4 3 -5 6 7 5").unwrap()],
+            ..Tuning::default()
+        };
+        let r = build(&p, &on_top, &LintCfg::default(), &cfg("en"));
+        assert!(
+            r.text
+                .contains("Line 4: the move enters the keep-out box post"),
+            "{}",
+            r.text
+        );
+        assert!(r.problems >= 1);
+        let on_chord = Tuning {
+            keepouts: vec![crate::boxes::KeepOut::parse("slot 4 -1 -5 6 1 5").unwrap()],
+            ..Tuning::default()
+        };
+        let r = build(&p, &on_chord, &LintCfg::default(), &cfg("en"));
+        assert!(!r.text.contains("keep-out box slot"), "{}", r.text);
     }
 
     #[test]
@@ -299,7 +343,7 @@ mod tests {
             &cfg("en")
         )
         .is_empty());
-        let p = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 I5 J0 F100\nM30");
+        let p = prog("G21\nM3 S1000\nG0 X0 Y0\nG2 X10 Y0 F100\nM30");
         let t = Tuning {
             keepouts: vec![crate::boxes::KeepOut::parse("far 100 100 -5 110 110 5").unwrap()],
             ..Tuning::default()

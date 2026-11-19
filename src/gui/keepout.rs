@@ -4,7 +4,7 @@
 //! the settings file with the other values of the tools.
 
 use super::*;
-use crate::boxes::{hits, KeepOut};
+use crate::boxes::{hits_curved, KeepOut};
 use crate::heightmap::num;
 use crate::words::Msg;
 
@@ -63,7 +63,15 @@ impl App {
             return None;
         }
         let offset = self.work_offset();
-        let path = hits(&self.path_toolpath, offset, &t.keepouts, t.keepout_margin);
+        let curves =
+            crate::gcode::arc_curves(&self.session.program, crate::report::KEEPOUT_STEP_MM);
+        let path = hits_curved(
+            &self.path_toolpath,
+            &curves,
+            offset,
+            &t.keepouts,
+            t.keepout_margin,
+        );
         if let Some(first) = path.into_iter().next() {
             return Some(self.ws(
                 Msg::KeepRefused,
