@@ -676,6 +676,7 @@ dependencies = [
  "eframe",
  "eh3d-controller",
  "eh3d-filedialog",
+ "eh3d-serverclient",
  "eh3d-summary",
  "eh3d-view",
  "png 0.17.16",
@@ -683,6 +684,10 @@ dependencies = [
  "sha2",
  "winresource",
 ]
+
+[[package]]
+name = "eh3d-serverclient"
+version = "0.0.1"
 
 [[package]]
 name = "eh3d-summary"

@@ -6,11 +6,7 @@ use crate::server::{job_request, Client, Follow, Start};
 
 impl App {
     pub(super) fn server_client(&self) -> Option<Client> {
-        Client::new(
-            &self.settings.server_address,
-            &self.settings.server_token,
-            &self.settings.server_machine,
-        )
+        Client::from_settings(&self.settings)
     }
 
     /// A job on the server is being followed (it runs or waits).
@@ -204,6 +200,13 @@ impl App {
                 if r.save(&path).is_ok() {
                     self.recovery_saved = Some(i.line);
                 }
+            }
+        }
+        if snap.link != self.server_snap.link {
+            if let Some(link) = snap.link {
+                self.session
+                    .log
+                    .push(format!("server: link {}", crate::server::link_word(link)));
             }
         }
         let over = snap.over;

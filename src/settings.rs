@@ -41,6 +41,12 @@ pub struct Settings {
     pub server_address: String,
     pub server_token: String,
     pub server_machine: String,
+    /// The limits of the link to the server, the same keys and ranges every program of the suite reads: seconds one try may take (1 to 120), tries more
+    /// after a failure on the network (0 to 5), whether to look for the server on the local network (off), and the most MiB read from one answer (1 to 256).
+    pub server_timeout_s: u64,
+    pub server_retries: u32,
+    pub server_mdns: bool,
+    pub server_max_answer_mib: u64,
     /// When a program goes on after a stop, also start the spindle and the coolant again as they were (off: the operator starts them).
     pub server_restore_outputs: bool,
     /// When a program goes on after a failure: the Z (work coordinates) the head goes up to before it moves sideways, and the seconds the spindle gets to reach its speed.
@@ -116,6 +122,10 @@ impl Default for Settings {
             server_address: String::new(),
             server_token: String::new(),
             server_machine: String::new(),
+            server_timeout_s: 15,
+            server_retries: 2,
+            server_mdns: false,
+            server_max_answer_mib: 8,
             server_restore_outputs: false,
             resume_safe_z_mm: 5.0,
             resume_spindle_wait_s: 3.0,
@@ -214,6 +224,35 @@ impl Settings {
                 "server_address" => s.server_address = v.to_string(),
                 "server_token" => s.server_token = v.to_string(),
                 "server_machine" => s.server_machine = v.to_string(),
+                "server_timeout_s" => {
+                    s.server_timeout_s = v
+                        .trim()
+                        .parse::<u64>()
+                        .ok()
+                        .filter(|x| (1..=120).contains(x))
+                        .unwrap_or(s.server_timeout_s)
+                }
+                "server_retries" => {
+                    s.server_retries = v
+                        .trim()
+                        .parse::<u32>()
+                        .ok()
+                        .filter(|x| *x <= 5)
+                        .unwrap_or(s.server_retries)
+                }
+                "server_mdns" => {
+                    s.server_mdns = ["on", "yes", "true", "1"]
+                        .iter()
+                        .any(|t| v.trim().eq_ignore_ascii_case(t))
+                }
+                "server_max_answer_mib" => {
+                    s.server_max_answer_mib = v
+                        .trim()
+                        .parse::<u64>()
+                        .ok()
+                        .filter(|x| (1..=256).contains(x))
+                        .unwrap_or(s.server_max_answer_mib)
+                }
                 "server_restore_outputs" => s.server_restore_outputs = on(v),
                 "resume_safe_z" => {
                     s.resume_safe_z_mm = num(v)
@@ -361,7 +400,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         let mut out = format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_timeout_s = {}\nserver_retries = {}\nserver_mdns = {}\nserver_max_answer_mib = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -387,6 +426,10 @@ impl Settings {
             one_line(&self.server_address),
             one_line(&self.server_token),
             one_line(&self.server_machine),
+            self.server_timeout_s,
+            self.server_retries,
+            yes(self.server_mdns),
+            self.server_max_answer_mib,
             yes(self.server_restore_outputs),
             self.resume_safe_z_mm,
             self.resume_spindle_wait_s,
@@ -573,6 +616,10 @@ mod tests {
             server_address: "192.168.0.180:18200".into(),
             server_token: "a-token".into(),
             server_machine: "router".into(),
+            server_timeout_s: 30,
+            server_retries: 4,
+            server_mdns: true,
+            server_max_answer_mib: 64,
             server_restore_outputs: true,
             resume_safe_z_mm: 7.5,
             resume_spindle_wait_s: 4.0,
@@ -670,6 +717,66 @@ mod tests {
         assert_eq!(s.step_mm, 3.0);
         assert_eq!(s.tuning.pause_s, 4.0);
         assert_eq!(Settings::default().tuning, Tuning::default());
+    }
+
+    #[test]
+    fn the_four_limits_of_the_link_are_read_inside_their_ranges_and_written_back() {
+        let limits = |s: &Settings| {
+            (
+                s.server_timeout_s,
+                s.server_retries,
+                s.server_mdns,
+                s.server_max_answer_mib,
+            )
+        };
+        assert_eq!(limits(&Settings::default()), (15, 2, false, 8));
+        let top = "server_timeout_s = 120\nserver_retries = 5\nserver_mdns = on\nserver_max_answer_mib = 256\n";
+        assert_eq!(limits(&Settings::parse(top)), (120, 5, true, 256));
+        let bottom = "server_timeout_s = 1\nserver_retries = 0\nserver_max_answer_mib = 1\n";
+        assert_eq!(limits(&Settings::parse(bottom)), (1, 0, false, 1));
+        // a value out of its range, or not a number, changes nothing
+        for bad in [
+            "server_timeout_s = 0",
+            "server_timeout_s = 121",
+            "server_timeout_s = -5",
+            "server_timeout_s = fast",
+            "server_retries = 6",
+            "server_retries = -1",
+            "server_max_answer_mib = 0",
+            "server_max_answer_mib = 257",
+        ] {
+            assert_eq!(limits(&Settings::parse(bad)), (15, 2, false, 8), "{bad}");
+        }
+        // the earlier good value stays when a later line is bad
+        let kept = Settings::parse("server_timeout_s = 40\nserver_timeout_s = 500\n");
+        assert_eq!(kept.server_timeout_s, 40);
+        // the discovery on the network is off unless it is clearly turned on
+        for (value, on) in [
+            ("on", true),
+            ("YES", true),
+            ("true", true),
+            ("1", true),
+            ("off", false),
+            ("no", false),
+            ("maybe", false),
+            ("", false),
+        ] {
+            let s = Settings::parse(&format!("server_mdns = {value}\n"));
+            assert_eq!(s.server_mdns, on, "{value:?}");
+        }
+        // written back in the file, next to the other keys of the server
+        let s = Settings {
+            server_timeout_s: 7,
+            server_retries: 3,
+            server_mdns: true,
+            server_max_answer_mib: 12,
+            ..Settings::default()
+        };
+        let text = s.to_text();
+        assert!(text.contains(
+            "server_timeout_s = 7\nserver_retries = 3\nserver_mdns = yes\nserver_max_answer_mib = 12\n"
+        ));
+        assert_eq!(limits(&Settings::parse(&text)), (7, 3, true, 12));
     }
 
     #[test]
