@@ -580,6 +580,84 @@
           }
         },
         {
+          "name": "cli_tools.rs",
+          "desc": {
+            "en": "command-line tools that print a text: convert, compare, times, offsets, format",
+            "es": "las herramientas de la línea de órdenes que imprimen un texto: convertir, comparar, tiempos, correcciones y formato",
+            "de": "die Werkzeuge der Befehlszeile, die einen Text ausgeben: umrechnen, vergleichen, Zeiten, Korrekturen und Format",
+            "fr": "les outils de la ligne de commande qui impriment un texte : conversion, comparaison, temps, décalages et format",
+            "it": "gli strumenti della riga di comando che stampano un testo: conversione, confronto, tempi, correttori e formato",
+            "ja": "テキストを出力するコマンドラインの機能：変換、比較、時間、補正、書式",
+            "zh": "输出文本的命令行工具：换算、比较、时间、补偿和格式",
+            "pt": "as ferramentas da linha de comandos que imprimem um texto: converter, comparar, tempos, correções e formato"
+          }
+        },
+        {
+          "name": "compare.rs",
+          "desc": {
+            "en": "the comparison of two programs: lengths, time, tools, reach, depth and findings",
+            "es": "la comparación de dos programas: longitudes, tiempo, herramientas, alcance, profundidad y avisos",
+            "de": "der Vergleich zweier Programme: Längen, Zeit, Werkzeuge, Reichweite, Tiefe und Hinweise",
+            "fr": "la comparaison de deux programmes : longueurs, temps, outils, portée, profondeur et remarques",
+            "it": "il confronto di due programmi: lunghezze, tempo, utensili, estensione, profondità e segnalazioni",
+            "ja": "2 つのプログラムの比較：長さ、時間、工具、範囲、深さ、指摘",
+            "zh": "两个程序的比较：长度、时间、刀具、范围、深度和发现",
+            "pt": "a comparação de dois programas: comprimentos, tempo, ferramentas, alcance, profundidade e avisos"
+          }
+        },
+        {
+          "name": "offsets.rs",
+          "desc": {
+            "en": "the H and D words and the length offsets of the tools against the table of tools",
+            "es": "las palabras H y D y las longitudes de las herramientas frente a la tabla de herramientas",
+            "de": "die Wörter H und D und die Werkzeuglängen gegen die Werkzeugtabelle",
+            "fr": "les mots H et D et les longueurs d'outil face à la table d'outils",
+            "it": "le parole H e D e le lunghezze utensile rispetto alla tabella utensili",
+            "ja": "H・D ワードと工具長オフセットを工具表と照合",
+            "zh": "对照刀具表检查 H、D 字和刀具长度偏置",
+            "pt": "as palavras H e D e os comprimentos das ferramentas face à tabela de ferramentas"
+          }
+        },
+        {
+          "name": "postcheck.rs",
+          "desc": {
+            "en": "the format a controller takes: line length, decimals, codes it lists, groups and the end",
+            "es": "el formato que admite un controlador: longitud de línea, decimales, códigos que lista, grupos y el final",
+            "de": "das Format, das eine Steuerung annimmt: Zeilenlänge, Dezimalstellen, gelistete Codes, Gruppen und das Ende",
+            "fr": "le format qu'accepte un contrôleur : longueur de ligne, décimales, codes listés, groupes et fin",
+            "it": "il formato che accetta un controller: lunghezza riga, decimali, codici elencati, gruppi e fine",
+            "ja": "コントローラが受け付ける書式：行の長さ、小数桁、一覧のコード、グループ、終了",
+            "zh": "控制器接受的格式：行长度、小数位、列出的代码、分组和结尾",
+            "pt": "o formato que um controlador aceita: comprimento da linha, decimais, códigos listados, grupos e o fim"
+          }
+        },
+        {
+          "name": "timesplit.rs",
+          "desc": {
+            "en": "the time of a program split by kind of move: rapid, cutting, plunges, arcs, dwells, changes",
+            "es": "el tiempo de un programa por tipo de movimiento: rápido, corte, penetraciones, arcos, pausas, cambios",
+            "de": "die Zeit eines Programms nach Bewegungsart: Eilgang, Schnitt, Eintauchen, Bögen, Pausen, Wechsel",
+            "fr": "le temps d'un programme par type de mouvement : rapide, coupe, plongées, arcs, temporisations, changements",
+            "it": "il tempo di un programma per tipo di movimento: rapido, taglio, penetrazioni, archi, pause, cambi",
+            "ja": "プログラムの時間を動作の種類別に分割：早送り、切削、突っ込み、円弧、待機、交換",
+            "zh": "按动作类型划分程序时间：快速、切削、下刀、圆弧、暂停、换刀",
+            "pt": "o tempo de um programa por tipo de movimento: rápido, corte, penetrações, arcos, pausas, trocas"
+          }
+        },
+        {
+          "name": "units.rs",
+          "desc": {
+            "en": "converts a program between millimetres and inches and says what it left",
+            "es": "la conversión de un programa entre milímetros y pulgadas, con lo que no pudo convertir",
+            "de": "die Umrechnung eines Programms zwischen Millimetern und Zoll, mit dem, was nicht umgerechnet werden konnte",
+            "fr": "la conversion d'un programme entre millimètres et pouces, avec ce qui n'a pu être converti",
+            "it": "la conversione di un programma tra millimetri e pollici, con ciò che non si è potuto convertire",
+            "ja": "プログラムのミリメートルとインチの変換と、変換できなかったもの",
+            "zh": "程序在毫米与英寸之间的换算，以及无法换算的内容",
+            "pt": "a conversão de um programa entre milímetros e polegadas, com o que não se pôde converter"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
