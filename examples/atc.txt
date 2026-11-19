@@ -1,0 +1,14 @@
+# The slot of each tool in the rack of the tool changer (worked out in simulation). To use it, copy this file next to the settings file with
+# the name phoenix-cnc-atc.txt and edit it; the changer itself is turned on with the atc line of the settings file.
+#
+# tool = NUMBER | pos=X,Y      (X and Y of the slot in mm of the machine; the Z of the rack and the safe height come from the atc line)
+#
+# A tool that is not here is placed by the rack and the pitch of the atc line. A line that is not valid is left out and named, with its
+# number, in --report and in the Statistics window: a tool number from 1 to 255, one slot for each tool, slots at least 1 mm apart, up to
+# 64 tools, a file of up to 16 KiB.
+tool = 1 | pos=20,10
+tool = 2 | pos=45,10
+tool = 3 | pos=70,10
+tool = 4 | pos=20,35
+tool = 5 | pos=45,35
+tool = 6 | pos=70,35

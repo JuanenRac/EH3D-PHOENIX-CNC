@@ -190,6 +190,9 @@ impl App {
         // the library may have been edited: the material in use is looked for again
         self.materials = crate::materials::load(&self.settings_path);
         self.settings.resolve_material(&self.materials);
+        // the same for the table of slots of the tool changer
+        self.settings
+            .resolve_atc_table(crate::atc::load_table(&self.settings_path));
         if self.theme.id != self.settings.theme {
             self.theme = Theme::for_id(self.settings.theme);
         }

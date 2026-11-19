@@ -9,13 +9,171 @@
 //! (`on` or `off`; `safe` is the Z of the travel between slots; `rack` is X, Y and Z of the slot of tool 1 and `pitch` the X and Y step to
 //! the slot of the next tool; `lock` is the output pin that clamps the tool, on = clamped, and the seconds the clamp needs; `blow` is the output pin
 //! of the air and the seconds it blows). Pins are switched with `M64 P` (on) and `M65 P` (off).
+//!
+//! The slot of each tool can come from a table instead of the pitch: `phoenix-cnc-atc.txt` next to the settings file, one
+//! `tool = NUMBER | pos=X,Y` line for each tool of the rack (`examples/atc.txt` is a model). A line that cannot be used is left out and named with
+//! its number; a tool that is not in the table keeps the rack and the pitch.
 
 use crate::gcode::words;
 use crate::heightmap::num;
 use crate::words::{say, Msg};
 
-/// The changer, as the settings describe it.
+/// The most slots a table holds, the highest tool number it names and the biggest file that is read.
+pub const MAX_SLOTS: usize = 64;
+pub const MAX_TOOL: u32 = 255;
+pub const MAX_FILE_BYTES: u64 = 16 * 1024;
+/// The biggest X or Y of a slot, in mm.
+const LIMIT_MM: f64 = 100_000.0;
+/// Two slots closer than this (mm) are the same place.
+pub const MIN_APART_MM: f64 = 1.0;
+
+/// The slot of one tool in the rack: where the tool is put down and picked up.
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Slot {
+    pub tool: u32,
+    pub x: f64,
+    pub y: f64,
+}
+
+/// What is wrong with a line of the table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableError {
+    /// The line is not `tool = N | pos=X,Y`.
+    Syntax,
+    /// The tool is not a whole number from 1 to `MAX_TOOL`.
+    Tool,
+    /// The position is missing, is not two numbers or is out of reach.
+    Position,
+    /// The tool has a slot already (the first line stays).
+    Repeated,
+    /// The slot is closer than `MIN_APART_MM` to the slot of another tool.
+    Close,
+    /// The table holds `MAX_SLOTS` already.
+    Full,
+    /// The file is bigger than `MAX_FILE_BYTES` and was not read (line 0).
+    TooBig,
+    /// The file could not be read (line 0).
+    Unreadable,
+}
+
+/// A line of the table that was left out, with the reason. `line` counts from 1; 0 is the whole file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Issue {
+    pub line: usize,
+    pub error: TableError,
+}
+
+/// The slots of the tools in the rack, as the file of the operator gives them, and the lines of it that were left out.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RackTable {
+    pub slots: Vec<Slot>,
+    pub issues: Vec<Issue>,
+}
+
+fn parse_slot(line: &str) -> Result<Slot, TableError> {
+    let (k, v) = line.split_once('=').ok_or(TableError::Syntax)?;
+    if !k.trim().eq_ignore_ascii_case("tool") {
+        return Err(TableError::Syntax);
+    }
+    let mut parts = v.split('|');
+    let tool = parts
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .parse::<u32>()
+        .ok()
+        .filter(|t| (1..=MAX_TOOL).contains(t))
+        .ok_or(TableError::Tool)?;
+    let mut pos = None;
+    for p in parts {
+        let (k, v) = p.split_once('=').ok_or(TableError::Syntax)?;
+        if k.trim().eq_ignore_ascii_case("pos") {
+            pos = Some(
+                pair(v)
+                    .filter(|(x, y)| x.abs() <= LIMIT_MM && y.abs() <= LIMIT_MM)
+                    .ok_or(TableError::Position)?,
+            );
+        }
+    }
+    let (x, y) = pos.ok_or(TableError::Position)?;
+    Ok(Slot { tool, x, y })
+}
+
+impl RackTable {
+    /// Reads the text of the file: one `tool = N | pos=X,Y` line for each tool in the rack; empty lines and lines that start with `#` or
+    /// `;` are skipped. Every other line that cannot be used is left out and named in `issues` with its number.
+    pub fn parse(text: &str) -> RackTable {
+        let mut t = RackTable::default();
+        for (i, raw) in text.trim_start_matches('\u{feff}').lines().enumerate() {
+            let line = raw.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+            let found = parse_slot(line).and_then(|s| {
+                if t.slots.iter().any(|o| o.tool == s.tool) {
+                    Err(TableError::Repeated)
+                } else if t
+                    .slots
+                    .iter()
+                    .any(|o| (o.x - s.x).hypot(o.y - s.y) < MIN_APART_MM)
+                {
+                    Err(TableError::Close)
+                } else if t.slots.len() >= MAX_SLOTS {
+                    Err(TableError::Full)
+                } else {
+                    Ok(s)
+                }
+            });
+            match found {
+                Ok(s) => t.slots.push(s),
+                Err(error) => t.issues.push(Issue { line: i + 1, error }),
+            }
+        }
+        t
+    }
+
+    /// The slot of a tool, when the table has one.
+    pub fn find(&self, tool: u32) -> Option<(f64, f64)> {
+        self.slots
+            .iter()
+            .find(|s| s.tool == tool)
+            .map(|s| (s.x, s.y))
+    }
+
+    /// Nothing in the table: no slots and nothing left out.
+    pub fn is_empty(&self) -> bool {
+        self.slots.is_empty() && self.issues.is_empty()
+    }
+}
+
+/// Where the table of the operator is: next to the settings, with the name of the settings file in front (`phoenix-cnc-atc.txt`).
+pub fn table_path(settings: &std::path::Path) -> std::path::PathBuf {
+    let stem = settings.file_stem().map_or_else(
+        || "phoenix-cnc".to_string(),
+        |s| s.to_string_lossy().to_string(),
+    );
+    settings.with_file_name(format!("{stem}-atc.txt"))
+}
+
+/// The table of the operator: empty when there is no file, with one issue on line 0 when the file is too big or cannot be read.
+pub fn load_table(settings: &std::path::Path) -> RackTable {
+    let path = table_path(settings);
+    let whole = |error| RackTable {
+        slots: Vec::new(),
+        issues: vec![Issue { line: 0, error }],
+    };
+    match std::fs::metadata(&path) {
+        Err(_) => RackTable::default(),
+        Ok(m) if m.len() > MAX_FILE_BYTES => whole(TableError::TooBig),
+        Ok(_) => match std::fs::read(&path) {
+            Ok(b) => RackTable::parse(&String::from_utf8_lossy(&b)),
+            Err(_) => whole(TableError::Unreadable),
+        },
+    }
+}
+
+/// The changer, as the settings describe it.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AtcCfg {
     pub enabled: bool,
     /// The Z the tool travels at between the slots.
@@ -29,6 +187,9 @@ pub struct AtcCfg {
     /// The output of the air and the seconds it blows.
     pub blow_pin: u32,
     pub blow_s: f64,
+    /// The slot of each tool, from the file of the operator; a tool that is not in it has the slot the rack and the pitch give. It is not
+    /// part of the settings line: the window and the command line load it from its file.
+    pub table: RackTable,
 }
 
 impl Default for AtcCfg {
@@ -42,6 +203,7 @@ impl Default for AtcCfg {
             lock_wait_s: 0.5,
             blow_pin: 4,
             blow_s: 1.0,
+            table: RackTable::default(),
         }
     }
 }
@@ -129,8 +291,12 @@ impl AtcCfg {
         )
     }
 
-    /// X and Y of the slot of a tool (tool 1 is the first slot; tool 0 is the same slot).
+    /// X and Y of the slot of a tool: the one of the table when it has the tool, else the rack and the pitch (tool 1 is the first slot;
+    /// tool 0 is the same slot).
     pub fn slot(&self, tool: u32) -> (f64, f64) {
+        if let Some(p) = self.table.find(tool) {
+            return p;
+        }
         let n = f64::from(tool.saturating_sub(1));
         (
             self.rack[0] + n * self.pitch[0],
@@ -275,28 +441,63 @@ pub fn changes_of(lines: &[String]) -> Vec<(usize, Option<u32>, u32)> {
 /// The most changes the report lists one by one.
 const LISTED: usize = 20;
 
+impl TableError {
+    /// The words that name the reason.
+    pub fn msg(self) -> Msg {
+        match self {
+            TableError::Syntax => Msg::AtcErrSyntax,
+            TableError::Tool => Msg::AtcErrTool,
+            TableError::Position => Msg::AtcErrPosition,
+            TableError::Repeated => Msg::AtcErrRepeated,
+            TableError::Close => Msg::AtcErrClose,
+            TableError::Full => Msg::AtcErrFull,
+            TableError::TooBig => Msg::AtcErrTooBig,
+            TableError::Unreadable => Msg::AtcErrUnreadable,
+        }
+    }
+}
+
+/// The lines about the table of slots: how many tools it holds and, for every line that was left out, its number and the reason.
+pub fn table_lines(table: &RackTable, lang: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if !table.slots.is_empty() {
+        out.push(say(lang, Msg::AtcTable, &[table.slots.len().to_string()]));
+    }
+    for i in table.issues.iter().take(LISTED) {
+        let why = say(lang, i.error.msg(), &[] as &[&str]);
+        let said = if i.line == 0 {
+            say(lang, Msg::AtcIssueFile, &[why])
+        } else {
+            say(lang, Msg::AtcIssue, &[i.line.to_string(), why])
+        };
+        out.push(format!("  {said}"));
+    }
+    out
+}
+
 /// The lines for the report and the statistics: the changes of the program as the changer would make them, with their time. Nothing when the
 /// changer is off or the program changes no tool.
 pub fn report_lines(lines: &[String], cfg: &AtcCfg, rapid_mm_min: f64, lang: &str) -> Vec<String> {
     if !cfg.enabled {
         return Vec::new();
     }
+    let mut out = table_lines(&cfg.table, lang);
     let changes = changes_of(lines);
     if changes.is_empty() {
-        return Vec::new();
+        return out;
     }
     let times: Vec<f64> = changes
         .iter()
         .map(|&(_, from, to)| seconds(cfg, &plan(cfg, from, to), rapid_mm_min))
         .collect();
-    let mut out = vec![say(
+    out.push(say(
         lang,
         Msg::AtcHeader,
         &[
             changes.len().to_string(),
             crate::sim::hms(times.iter().sum::<f64>()),
         ],
-    )];
+    ));
     for (&(line, from, to), t) in changes.iter().zip(&times).take(LISTED) {
         let args = [
             (line + 1).to_string(),
@@ -313,6 +514,21 @@ pub fn report_lines(lines: &[String], cfg: &AtcCfg, rapid_mm_min: f64, lang: &st
             Msg::AtcFirst
         };
         out.push(format!("  {}", say(lang, msg, &args)));
+    }
+    // with a table, a tool the program takes that the table does not have is placed by the rack and the pitch: say so, once for each
+    if !cfg.table.slots.is_empty() {
+        let mut said: Vec<u32> = Vec::new();
+        for &(_, from, to) in &changes {
+            for tool in from.into_iter().chain(std::iter::once(to)) {
+                if cfg.table.find(tool).is_none() && !said.contains(&tool) && said.len() < LISTED {
+                    said.push(tool);
+                    out.push(format!(
+                        "  {}",
+                        say(lang, Msg::AtcNoSlot, &[tool.to_string()])
+                    ));
+                }
+            }
+        }
     }
     out
 }
@@ -331,6 +547,7 @@ mod tests {
             lock_wait_s: 0.5,
             blow_pin: 4,
             blow_s: 1.5,
+            table: RackTable::default(),
         }
     }
 
@@ -504,6 +721,175 @@ mod tests {
         assert_eq!(
             report_lines(&lines(&many), &on(), 6000.0, "en").len(),
             1 + LISTED
+        );
+    }
+
+    #[test]
+    fn the_table_gives_each_tool_its_slot_and_names_the_lines_it_leaves_out() {
+        let text = "\u{feff}# slots\n; more\ntool = 1 | pos=10,20\n\nTOOL = 2 | POS=30, 20\ntool = 3\ntool = 0 | pos=1,1\ntool = 256 | pos=1,1\ntool = x | pos=1,1\ntool = 4 | pos=1\ntool = 5 | pos=1e9,0\ntool = 6 | pos=10,20.5\ntool = 1 | pos=90,90\nnonsense\nmaterial = A | pos=1,1\ntool = 7 | pos=50,50 | colour=red\ntool = 8 | colour=red\ntool = 9 | pos=NaN,1\n";
+        let t = RackTable::parse(text);
+        assert_eq!(
+            t.slots,
+            vec![
+                Slot {
+                    tool: 1,
+                    x: 10.0,
+                    y: 20.0
+                },
+                Slot {
+                    tool: 2,
+                    x: 30.0,
+                    y: 20.0
+                },
+                Slot {
+                    tool: 7,
+                    x: 50.0,
+                    y: 50.0
+                }
+            ]
+        );
+        let at = |line: usize| t.issues.iter().find(|i| i.line == line).map(|i| i.error);
+        assert_eq!(at(6), Some(TableError::Position));
+        assert_eq!(at(7), Some(TableError::Tool));
+        assert_eq!(at(8), Some(TableError::Tool));
+        assert_eq!(at(9), Some(TableError::Tool));
+        assert_eq!(at(10), Some(TableError::Position));
+        assert_eq!(at(11), Some(TableError::Position));
+        assert_eq!(at(12), Some(TableError::Close));
+        assert_eq!(at(13), Some(TableError::Repeated));
+        assert_eq!(at(14), Some(TableError::Syntax));
+        assert_eq!(at(15), Some(TableError::Syntax));
+        assert_eq!(at(17), Some(TableError::Position));
+        assert_eq!(at(18), Some(TableError::Position));
+        assert_eq!(t.issues.len(), 12);
+        assert!(!t.is_empty() && RackTable::default().is_empty());
+        assert_eq!(t.find(2), Some((30.0, 20.0)));
+        assert_eq!(t.find(3), None);
+    }
+
+    #[test]
+    fn a_table_holds_64_tools_and_the_next_one_is_named_as_too_many() {
+        let text: String = (1..=66)
+            .map(|n| format!("tool = {n} | pos={},0\n", n * 10))
+            .collect();
+        let t = RackTable::parse(&text);
+        assert_eq!(t.slots.len(), MAX_SLOTS);
+        assert_eq!(
+            t.issues,
+            vec![
+                Issue {
+                    line: 65,
+                    error: TableError::Full
+                },
+                Issue {
+                    line: 66,
+                    error: TableError::Full
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn the_slot_of_a_tool_is_the_one_of_the_table_and_the_pitch_gives_the_others() {
+        let mut c = on();
+        c.table = RackTable::parse("tool = 2 | pos=7,8\n");
+        assert_eq!(c.slot(2), (7.0, 8.0));
+        // tools 1 and 3 are not in the table: the rack and the pitch place them as before
+        assert_eq!(c.slot(1), (100.0, 50.0));
+        assert_eq!(c.slot(3), (160.0, 50.0));
+        // the steps of a change go to the slots of the table
+        let steps = plan(&c, Some(2), 1);
+        assert!(steps.contains(&Step::ToXy(7.0, 8.0)));
+        assert!(steps.contains(&Step::ToXy(100.0, 50.0)));
+        assert!(g_code(&steps).contains(&"G0 X7 Y8".to_string()));
+        // and the time follows them
+        assert_ne!(
+            seconds(&c, &steps, 6000.0),
+            seconds(&on(), &plan(&on(), Some(2), 1), 6000.0)
+        );
+        // the line of the settings does not carry the table
+        assert_eq!(
+            AtcCfg::parse(&c.to_line()).unwrap().table,
+            RackTable::default()
+        );
+    }
+
+    #[test]
+    fn the_table_is_read_from_its_file_next_to_the_settings() {
+        let dir = std::env::temp_dir().join(format!("eh3d-atc-table-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("phoenix-cnc.cfg");
+        let file = table_path(&settings);
+        assert_eq!(file.file_name().unwrap(), "phoenix-cnc-atc.txt");
+        // no file: an empty table
+        assert!(load_table(&settings).is_empty());
+        std::fs::write(&file, "tool = 1 | pos=5,6\ntool = 2\n").unwrap();
+        let t = load_table(&settings);
+        assert_eq!(t.slots.len(), 1);
+        assert_eq!(
+            t.issues,
+            vec![Issue {
+                line: 2,
+                error: TableError::Position
+            }]
+        );
+        // a file that is too big is not read
+        std::fs::write(&file, "#".repeat(MAX_FILE_BYTES as usize + 1)).unwrap();
+        assert_eq!(
+            load_table(&settings).issues,
+            vec![Issue {
+                line: 0,
+                error: TableError::TooBig
+            }]
+        );
+        // a file in a code page of its own is read as far as it can be
+        std::fs::write(&file, b"# caf\xe9\ntool = 3 | pos=1,2\n").unwrap();
+        assert_eq!(load_table(&settings).slots.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_example_table_is_valid_and_the_report_names_the_table_and_what_is_wrong_with_it() {
+        let example = RackTable::parse(include_str!("../examples/atc.txt"));
+        assert!(example.issues.is_empty(), "{:?}", example.issues);
+        assert_eq!(example.slots.len(), 6);
+        let mut c = on();
+        c.table = RackTable::parse("tool = 1 | pos=5,5\ntool = 2 | pos=5\ntool = 1 | pos=9,9\n");
+        let p = lines("T1 M6\nG1 X1 F10\nT2 M6\nT3 M6\nM30");
+        let r = report_lines(&p, &c, 6000.0, "en");
+        // the table, its two lines left out, the header, the three changes and the tools without a slot
+        assert!(r[0].contains('1') && r[0].contains("table"), "{r:?}");
+        assert!(
+            r[1].contains("line 2") && r[1].contains("position"),
+            "{r:?}"
+        );
+        assert!(r[2].contains("line 3") && r[2].contains("already"), "{r:?}");
+        assert_eq!(r.len(), 1 + 2 + 1 + 3 + 2, "{r:?}");
+        assert!(r[7].contains("T2") && r[8].contains("T3"), "{r:?}");
+        // in the other languages too
+        for lang in ["es", "de", "fr", "it", "ja", "zh", "pt"] {
+            let o = report_lines(&p, &c, 6000.0, lang);
+            assert_eq!(o.len(), r.len());
+            assert_ne!(o[1], r[1], "{lang}");
+        }
+        // the issues are told even when the program changes no tool, and nothing when the changer is off
+        let no_change = lines("G1 X1 F10");
+        assert_eq!(report_lines(&no_change, &c, 6000.0, "en").len(), 3);
+        c.enabled = false;
+        assert!(report_lines(&p, &c, 6000.0, "en").is_empty());
+        // a file that was not read is told as a whole
+        let big = RackTable {
+            slots: Vec::new(),
+            issues: vec![Issue {
+                line: 0,
+                error: TableError::TooBig,
+            }],
+        };
+        let said = table_lines(&big, "en");
+        assert_eq!(said.len(), 1);
+        assert!(
+            said[0].contains("16 KiB") && !said[0].contains("line"),
+            "{said:?}"
         );
     }
 }

@@ -253,10 +253,22 @@ pub enum Msg {
     AtcHeader,
     AtcChange,
     AtcFirst,
+    AtcTable,
+    AtcIssue,
+    AtcIssueFile,
+    AtcNoSlot,
+    AtcErrSyntax,
+    AtcErrTool,
+    AtcErrPosition,
+    AtcErrRepeated,
+    AtcErrClose,
+    AtcErrFull,
+    AtcErrTooBig,
+    AtcErrUnreadable,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 245] = [
+pub const ALL: [Msg; 257] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -502,6 +514,18 @@ pub const ALL: [Msg; 245] = [
     Msg::AtcHeader,
     Msg::AtcChange,
     Msg::AtcFirst,
+    Msg::AtcTable,
+    Msg::AtcIssue,
+    Msg::AtcIssueFile,
+    Msg::AtcNoSlot,
+    Msg::AtcErrSyntax,
+    Msg::AtcErrTool,
+    Msg::AtcErrPosition,
+    Msg::AtcErrRepeated,
+    Msg::AtcErrClose,
+    Msg::AtcErrFull,
+    Msg::AtcErrTooBig,
+    Msg::AtcErrUnreadable,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2957,6 +2981,126 @@ fn table(m: Msg) -> [&'static str; 8] {
             "第 {0} 行：取出 T{2}，{3} 秒（锁紧用输出 {4}，吹气用输出 {5}，持续 {6} 秒）",
             "linha {0}: T{2} é tomada, {3} s (bloqueio na saída {4}, sopro na saída {5} durante {6} s)",
         ],
+        Msg::AtcTable => [
+            "Rack table: {0} tools with a slot of their own",
+            "Tabla del almacén: {0} herramientas con hueco propio",
+            "Magazintabelle: {0} Werkzeuge mit eigenem Platz",
+            "Table du magasin : {0} outils avec un emplacement propre",
+            "Tabella del magazzino: {0} utensili con posto proprio",
+            "マガジン表：専用の位置を持つ工具 {0} 本",
+            "刀库表：{0} 把刀具有各自的刀位",
+            "Tabela do armazém: {0} ferramentas com posição própria",
+        ],
+        Msg::AtcIssue => [
+            "table line {0}: {1}",
+            "línea {0} de la tabla: {1}",
+            "Tabellenzeile {0}: {1}",
+            "ligne {0} de la table : {1}",
+            "riga {0} della tabella: {1}",
+            "表の {0} 行目：{1}",
+            "表第 {0} 行：{1}",
+            "linha {0} da tabela: {1}",
+        ],
+        Msg::AtcIssueFile => [
+            "table file: {0}",
+            "fichero de la tabla: {0}",
+            "Tabellendatei: {0}",
+            "fichier de la table : {0}",
+            "file della tabella: {0}",
+            "表のファイル：{0}",
+            "表文件：{0}",
+            "ficheiro da tabela: {0}",
+        ],
+        Msg::AtcNoSlot => [
+            "T{0} has no slot in the table: the rack and the pitch of the settings place it",
+            "T{0} no tiene hueco en la tabla: lo sitúan el almacén y el paso de los ajustes",
+            "T{0} hat keinen Platz in der Tabelle: Magazin und Abstand der Einstellungen legen ihn fest",
+            "T{0} n'a pas d'emplacement dans la table : le magasin et le pas des réglages le placent",
+            "T{0} non ha un posto nella tabella: lo posizionano il magazzino e il passo delle impostazioni",
+            "T{0} は表に位置がありません：設定のマガジンとピッチで位置が決まります",
+            "T{0} 在表中没有刀位：由设置中的刀库和间距确定其位置",
+            "T{0} não tem posição na tabela: o armazém e o passo das definições colocam-na",
+        ],
+        Msg::AtcErrSyntax => [
+            "it is not written as tool = NUMBER | pos=X,Y",
+            "no está escrita como tool = NÚMERO | pos=X,Y",
+            "sie ist nicht als tool = NUMMER | pos=X,Y geschrieben",
+            "elle n'est pas écrite sous la forme tool = NUMÉRO | pos=X,Y",
+            "non è scritta come tool = NUMERO | pos=X,Y",
+            "tool = 番号 | pos=X,Y の形式ではありません",
+            "格式不是 tool = 编号 | pos=X,Y",
+            "não está escrita como tool = NÚMERO | pos=X,Y",
+        ],
+        Msg::AtcErrTool => [
+            "the tool is not a whole number from 1 to 255",
+            "la herramienta no es un número entero de 1 a 255",
+            "das Werkzeug ist keine ganze Zahl von 1 bis 255",
+            "l'outil n'est pas un nombre entier de 1 à 255",
+            "l'utensile non è un numero intero da 1 a 255",
+            "工具は 1 から 255 までの整数ではありません",
+            "刀具不是 1 到 255 的整数",
+            "a ferramenta não é um número inteiro de 1 a 255",
+        ],
+        Msg::AtcErrPosition => [
+            "the position is missing or is not two numbers (X,Y) within 100000 mm",
+            "falta la posición o no son dos números (X,Y) dentro de 100000 mm",
+            "die Position fehlt oder sind nicht zwei Zahlen (X,Y) innerhalb von 100000 mm",
+            "la position manque ou n'est pas formée de deux nombres (X,Y) dans 100000 mm",
+            "la posizione manca o non sono due numeri (X,Y) entro 100000 mm",
+            "位置がないか、100000 mm 以内の 2 つの数値 (X,Y) ではありません",
+            "缺少位置，或不是 100000 mm 以内的两个数 (X,Y)",
+            "falta a posição ou não são dois números (X,Y) dentro de 100000 mm",
+        ],
+        Msg::AtcErrRepeated => [
+            "the tool has a slot already (the first line stays)",
+            "la herramienta ya tiene hueco (se queda la primera línea)",
+            "das Werkzeug hat schon einen Platz (die erste Zeile bleibt)",
+            "l'outil a déjà un emplacement (la première ligne reste)",
+            "l'utensile ha già un posto (resta la prima riga)",
+            "この工具にはすでに位置があります（最初の行が有効）",
+            "该刀具已有刀位（保留第一行）",
+            "a ferramenta já tem posição (fica a primeira linha)",
+        ],
+        Msg::AtcErrClose => [
+            "the slot is less than 1 mm from the slot of another tool",
+            "el hueco está a menos de 1 mm del hueco de otra herramienta",
+            "der Platz liegt weniger als 1 mm vom Platz eines anderen Werkzeugs entfernt",
+            "l'emplacement est à moins de 1 mm de celui d'un autre outil",
+            "il posto è a meno di 1 mm dal posto di un altro utensile",
+            "位置が別の工具の位置から 1 mm 未満です",
+            "该刀位与另一把刀具的刀位相距不足 1 mm",
+            "a posição está a menos de 1 mm da posição de outra ferramenta",
+        ],
+        Msg::AtcErrFull => [
+            "the table holds 64 tools at most",
+            "la tabla admite 64 herramientas como máximo",
+            "die Tabelle fasst höchstens 64 Werkzeuge",
+            "la table contient 64 outils au plus",
+            "la tabella contiene al massimo 64 utensili",
+            "表に入れられる工具は最大 64 本です",
+            "表最多容纳 64 把刀具",
+            "a tabela admite no máximo 64 ferramentas",
+        ],
+        Msg::AtcErrTooBig => [
+            "the file is bigger than 16 KiB and was not read",
+            "el fichero pesa más de 16 KiB y no se ha leído",
+            "die Datei ist größer als 16 KiB und wurde nicht gelesen",
+            "le fichier dépasse 16 Kio et n'a pas été lu",
+            "il file supera i 16 KiB e non è stato letto",
+            "ファイルが 16 KiB を超えているため読み込まれませんでした",
+            "文件超过 16 KiB，未读取",
+            "o ficheiro tem mais de 16 KiB e não foi lido",
+        ],
+        Msg::AtcErrUnreadable => [
+            "the file could not be read",
+            "no se ha podido leer el fichero",
+            "die Datei konnte nicht gelesen werden",
+            "le fichier n'a pas pu être lu",
+            "il file non ha potuto essere letto",
+            "ファイルを読み込めませんでした",
+            "无法读取该文件",
+            "não foi possível ler o ficheiro",
+        ],
     }
 }
 
@@ -3020,7 +3164,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 245);
+        assert_eq!(seen.len(), 257);
     }
 
     #[test]

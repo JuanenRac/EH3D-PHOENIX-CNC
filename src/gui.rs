@@ -279,6 +279,7 @@ impl App {
         }
         let materials = crate::materials::load(&path);
         settings.resolve_material(&materials);
+        settings.resolve_atc_table(crate::atc::load_table(&path));
         let settings_log_max = settings.tuning.log_max;
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;

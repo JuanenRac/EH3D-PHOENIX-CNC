@@ -426,6 +426,11 @@ impl Settings {
         }
     }
 
+    /// Gives the tool changer the table of slots read from its file (see `atc::load_table`).
+    pub fn resolve_atc_table(&mut self, table: crate::atc::RackTable) {
+        self.tuning.atc.table = table;
+    }
+
     /// The checks of the program go back to their defaults (the keep-out boxes stay).
     pub fn reset_checks(&mut self) {
         let d = Settings::default();
@@ -459,7 +464,10 @@ impl Settings {
         t.macro_max_lines = d.macro_max_lines;
         t.tool_change_s = d.tool_change_s;
         t.startline_confirm = d.startline_confirm;
+        // the table of slots lives in its own file: the values of the line go back, the table stays
+        let table = std::mem::take(&mut t.atc.table);
         t.atc = d.atc;
+        t.atc.table = table;
     }
 
     /// Puts a file at the head of the recent ones (it is not listed twice).

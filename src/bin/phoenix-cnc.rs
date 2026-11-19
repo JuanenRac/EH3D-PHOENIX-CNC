@@ -60,6 +60,7 @@ fn print_report(o: &Options) -> i32 {
     // the material chosen in the settings holds the program to its ranges of feed and speed
     let library = eh3d_phoenix_cnc::materials::load(&settings::settings_path());
     s.resolve_material(&library);
+    s.resolve_atc_table(eh3d_phoenix_cnc::atc::load_table(&settings::settings_path()));
     let cfg = report::Cfg {
         travel: s.travel,
         offset: [0.0; 3],

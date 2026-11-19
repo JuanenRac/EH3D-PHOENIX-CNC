@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **The slot of each tool in the tool changer comes from a table in a file:** `phoenix-cnc-atc.txt` next to the settings file (`examples/atc.txt` is a model) has one `tool = NUMBER | pos=X,Y` line for each tool of the rack, and the steps, the G-code and the time of a change go to those slots; a tool that is not in the table keeps the rack and the pitch of the `atc` line, and with no file nothing changes. A line that cannot be used is left out and named with its number and the reason in the eight languages: not in the form of the line, a tool that is not a whole number from 1 to 255, a position that is missing, not two numbers or beyond 100000 mm, a tool that has a slot already (the first line stays), a slot less than 1 mm from the slot of another tool, more than 64 tools, a file bigger than 16 KiB (not read) or one that cannot be read. `phoenix-cnc --report` and the Statistics window list the size of the table, those lines and every tool a program takes that the table does not have (once each); the window looks the file up again whenever the settings are applied, and **Defaults of this section** keeps the table. Nothing is written. The rules are `RackTable` in `src/atc.rs`, tested for the lines, the limits, the file, the example and the report.
 
 ## [0.1.6] - Editor saving in place, a start from a bookmarked line, fixed views, materials and a tool changer in simulation, and --profile on the command line
 
