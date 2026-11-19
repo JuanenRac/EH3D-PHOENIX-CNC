@@ -3,7 +3,7 @@
 //! It builds a text and counts the problems, so a script can stop on a program that is not right. It only reads.
 
 use crate::boxes::{arcs_by_chord, hits_curved, travel_excess};
-use crate::gcode::{arc_curves, toolpath};
+use crate::gcode::arc_curves;
 use crate::lint::{lint, Kind as LintKind, LintCfg};
 use crate::progcheck::{check, Level};
 use crate::sim::{hms, Extras, Rates, Timeline};
@@ -43,11 +43,36 @@ pub struct Note {
     pub text: String,
 }
 
+/// What the canned cycles, the cutter compensation and the work coordinate systems of the program have to say, as notes. The program
+/// with none of them has none.
+fn program_notes(lines: &[String], tuning: &Tuning, lang: &str) -> Vec<Note> {
+    let mut found = Vec::new();
+    if crate::cycles::has_cycles(lines) {
+        found.extend(crate::cycles::expand(lines).findings);
+    }
+    found.extend(crate::cutcomp::findings(lines, &tuning.tools));
+    found.extend(
+        crate::wcs::findings(lines)
+            .into_iter()
+            .filter(|f| f.msg != Msg::WcsUsed),
+    );
+    found
+        .into_iter()
+        .map(|f| Note {
+            line: f.line,
+            level: f.level,
+            problem: f.level == Level::Danger,
+            text: f.text(lang),
+        })
+        .collect()
+}
+
 /// Everything that looks wrong in the program, in the order: the summary check, the second checker, the keep-out boxes (an arc along its
 /// curve), the arcs that could only be tested by their chord and the travel. A program with nothing to say gives an empty list.
 pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -> Vec<Note> {
     let lang = cfg.lang.as_str();
-    let path = toolpath(lines);
+    // the moves of the canned cycles are in the path, each one carrying the line of its cycle
+    let path = crate::cycles::toolpath_expanded(lines);
     // the curve of the arcs matters only to the keep-out boxes
     let curves = if tuning.keepouts.is_empty() {
         Vec::new()
@@ -74,6 +99,9 @@ pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
             problem: f.level == Level::Danger,
             text: f.text(lang),
         });
+    }
+    if tuning.progcheck {
+        out.extend(program_notes(lines, tuning, lang));
     }
     for h in hits_curved(
         &path,
@@ -161,8 +189,11 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
     let change_s = tuning.change_seconds(cfg.rapid_mm_min);
     let accel = tuning.accel_mm_s2;
     let stats = measure_accel(lines, rates, change_s, accel);
-    let path = toolpath(lines);
-    let timeline = Timeline::build_accel(&path, rates, &Extras::of(lines), change_s, accel);
+    // the cycles are expanded into their moves, so the time is the one of the holes
+    let cycles = crate::cycles::has_cycles(lines).then(|| crate::cycles::expand(lines));
+    let walked: &[String] = cycles.as_ref().map_or(lines, |e| e.lines.as_slice());
+    let path = crate::gcode::toolpath(walked);
+    let timeline = Timeline::build_accel(&path, rates, &Extras::of(walked), change_s, accel);
     let mut out: Vec<String> = stats.lines(lang);
     out.extend(stats.layer_lines(lang));
     out.extend(crate::atc::report_lines(
@@ -173,6 +204,21 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
     ));
     out.extend(crate::tools::report_lines(lines, &tuning.tools, lang));
     out.extend(crate::tools::wear_lines(&stats, &tuning.tools, lang));
+    out.extend(crate::consumption::use_lines(
+        &stats,
+        &tuning.tools,
+        &tuning.material,
+        lang,
+    ));
+    if let Some(e) = cycles.as_ref().filter(|e| e.holes > 0) {
+        out.push(say(
+            lang,
+            Msg::CycleHoles,
+            &[e.holes.to_string(), path.len().to_string()],
+        ));
+    }
+    out.extend(crate::cutcomp::report_lines(lines, &tuning.tools, lang));
+    out.extend(crate::wcs::report_lines(lines, lang));
     out.push(say(
         lang,
         Msg::ReportMoves,
@@ -473,5 +519,55 @@ mod tests {
                 .iter()
                 .all(|x| !x.text.contains("tool table"))
         );
+    }
+
+    #[test]
+    fn the_report_works_out_the_cycles_the_compensation_the_coordinate_systems_and_the_use_of_the_tools(
+    ) {
+        let t = Tuning {
+            tools: crate::tools::ToolTable::parse("tool = 1 | diameter=2 | life=100"),
+            material: "steel".to_string(),
+            ..Tuning::default()
+        };
+        let p = prog(
+            "G21 G90\nT1 M6\nM3 S1000\nG0 Z5\nG81 X1 Y1 Z-3 R1 F600\nX5\nG80\nG0 X0 Y0\nG1 F600\nG41\nG1 X60\nG40\nG10 L2 P2 X0\nG55\nG0 X1\nM30",
+        );
+        let r = build(&p, &t, &LintCfg::default(), &cfg("en"));
+        for part in [
+            "Canned cycles: 2 holes",
+            "Cutter compensation:",
+            "Work coordinate systems in use",
+            "use up",
+            "G10 L2 writes the offsets of G55",
+        ] {
+            assert!(r.text.contains(part), "{part}: {}", r.text);
+        }
+        // the time is the one of the holes: two plunges of 4 mm at 600 mm/min and a cut of 60 mm
+        let n = notes(&p, &t, &LintCfg::default(), &cfg("en"));
+        assert!(n.iter().all(|x| x.line.is_none_or(|l| l < p.len())));
+        // the switch of the checks turns the three new readings off together with the others, and the statistics stay
+        let off = Tuning {
+            progcheck: false,
+            ..t.clone()
+        };
+        let quiet = build(&p, &off, &LintCfg::default(), &cfg("en"));
+        assert!(!quiet.text.contains("G10 L2 writes"), "{}", quiet.text);
+        assert!(quiet.text.contains("Canned cycles: 2 holes"));
+    }
+
+    #[test]
+    fn the_findings_of_a_cycle_reach_the_notes_with_their_line_and_a_danger_is_a_problem() {
+        let p = prog("G21 G90\nG0 Z5\nG81 X1 Y1 R1 F10\nG80\nT1 M6\nG1 F5\nG42\nG1 X10\nG1 Y0.5\nG1 X0\nG40\nM30");
+        let t = Tuning {
+            tools: crate::tools::ToolTable::parse("tool = 1 | diameter=2"),
+            ..Tuning::default()
+        };
+        let n = notes(&p, &t, &LintCfg::default(), &cfg("en"));
+        let cycle = n.iter().find(|x| x.text.contains("has no depth")).unwrap();
+        assert_eq!(cycle.line, Some(2));
+        assert!(!cycle.problem);
+        let gouge = n.iter().find(|x| x.text.contains("turned round")).unwrap();
+        assert_eq!(gouge.line, Some(8));
+        assert!(gouge.problem && gouge.level == Level::Danger);
     }
 }

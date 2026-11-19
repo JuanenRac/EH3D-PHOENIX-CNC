@@ -307,7 +307,8 @@ fn trace(lines: &[String]) -> (Vec<Segment>, Vec<ArcRec>) {
             words.push(word);
         }
         for w in &words {
-            let (letter, num) = w.split_at(1);
+            // the first character may be one that is not a letter of A to Z (and is more than one byte long)
+            let (letter, num) = w.split_at(w.chars().next().map_or(0, char::len_utf8));
             let Ok(v) = num.parse::<f64>() else { continue };
             match letter {
                 // in tenths, so that G90.1 and G91.1 (the arc centres) are not read as G90 and G91
@@ -590,6 +591,15 @@ mod tests {
 
     fn lines(s: &str) -> Vec<String> {
         s.lines().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn text_that_is_not_a_letter_of_a_to_z_does_not_stop_the_path() {
+        // a character of another alphabet outside a comment (a file in a code page is read byte by byte) is not a word and is left out
+        let p = toolpath(&lines("G1 \u{416}5 X10 F100\n\u{6728} Y5\nG1 \u{e9}3 X20"));
+        assert_eq!(p.len(), 3, "{p:?}");
+        assert_eq!(p[2].to, (20.0, 5.0, 0.0));
+        assert!(arc_lengths(&lines("G2 X5 Y5 I2.5 J0\n\u{416} X1")).len() <= 1);
     }
 
     #[test]

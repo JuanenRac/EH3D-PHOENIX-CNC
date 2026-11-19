@@ -45,6 +45,9 @@ pub struct Tuning {
     pub atc: AtcCfg,
     /// The table of tools (name, diameter, length, flutes), from its file next to the settings; empty when there is no file.
     pub tools: crate::tools::ToolTable,
+    /// The name of the material in use (`material` of the settings), for the estimate of what a program uses up of each tool; empty
+    /// when none is chosen. It is not written with the tuning: the settings keep it as `material`.
+    pub material: String,
 }
 
 impl Default for Tuning {
@@ -69,6 +72,7 @@ impl Default for Tuning {
             bookmarks_confirm_replace: true,
             atc: AtcCfg::default(),
             tools: crate::tools::ToolTable::default(),
+            material: String::new(),
         }
     }
 }

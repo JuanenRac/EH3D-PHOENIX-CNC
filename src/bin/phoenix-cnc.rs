@@ -20,12 +20,61 @@ fn main() -> eframe::Result {
             std::process::exit(0);
         }
         Ok(o) if o.report => std::process::exit(print_report(&o)),
+        Ok(o) if o.gcode.is_some() => std::process::exit(print_gcode_help(&o)),
+        Ok(o) if o.macros.is_some() => std::process::exit(print_macros_check(&o)),
         Ok(o) => eh3d_phoenix_cnc::gui::run(&o),
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");
             std::process::exit(2);
         }
     }
+}
+
+/// `--gcode WORD`: prints the help of a G-code word, or of the words of a line, and returns the exit code (0 when there is help, 2 when
+/// no word of the argument has any).
+fn print_gcode_help(o: &Options) -> i32 {
+    let arg = o.gcode.as_deref().unwrap_or("");
+    let lang = o.lang.map_or("en", |l| l.code());
+    match eh3d_phoenix_cnc::gcodehelp::answer(arg, lang) {
+        Some(text) => {
+            print!("{text}");
+            0
+        }
+        None => {
+            eprintln!("phoenix-cnc: no help for '{arg}'");
+            2
+        }
+    }
+}
+
+/// `--macros FILE`: checks a file of macros and returns the exit code (0 when nothing needs reading, 1 when something does, 2 when the
+/// file cannot be read). The settings come from the settings file, as in the window.
+fn print_macros_check(o: &Options) -> i32 {
+    use eh3d_phoenix_cnc::{macrocheck, settings};
+    let Some(path) = o.macros.as_ref() else {
+        return 2;
+    };
+    let bytes = match std::fs::read(path) {
+        Ok(b) if b.len() <= 1024 * 1024 => b,
+        Ok(_) => {
+            eprintln!(
+                "phoenix-cnc: {} is too big for a file of macros",
+                path.display()
+            );
+            return 2;
+        }
+        Err(e) => {
+            eprintln!("phoenix-cnc: {}: {e}", path.display());
+            return 2;
+        }
+    };
+    let file = std::fs::read_to_string(settings::settings_path()).unwrap_or_default();
+    let s = settings::Settings::parse(&file);
+    let lang = o.lang.unwrap_or(s.lang).code();
+    let (text, problems) =
+        macrocheck::validate_text(&String::from_utf8_lossy(&bytes), &s.tuning, lang);
+    print!("{text}");
+    i32::from(problems > 0)
 }
 
 /// `--report FILE`: prints the report of the program and returns the exit code (0 when nothing needs reading, 1 when something does, 2 when

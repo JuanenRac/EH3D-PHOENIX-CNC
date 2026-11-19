@@ -44,6 +44,11 @@ pub struct Options {
     pub report: bool,
     /// With `--report`: also writes the work report as one page of HTML (`--html FILE`); a file that is there is not written over.
     pub html: Option<PathBuf>,
+    /// Prints the help of a G-code word, or of every word of a line, and leaves (`--gcode WORD`); no window, nothing moves.
+    pub gcode: Option<String>,
+    /// Checks a file of macros and leaves (`--macros FILE`): what a macro leaves on, an empty one, one that ends the program (exit code 0
+    /// clean, 1 something to read, 2 error); no window, nothing moves.
+    pub macros: Option<PathBuf>,
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
     pub version: bool,
     pub help: bool,
@@ -86,6 +91,8 @@ pub fn help_text() -> String {
          Options:\n\
          \x20 --report FILE      print the statistics, the time and what looks wrong in a program, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
          \x20 --html FILE        with --report, also write the work report as one page of HTML (a file that is there is not written over)\n\
+         \x20 --gcode WORD       print the help of a G-code word (G83, M6, F) or of the words of a line, in the language of --lang, and leave\n\
+         \x20 --macros FILE      check a file of macros (what a macro leaves on, an empty one, one that ends the program), and leave (exit code 0 clean, 1 something to read, 2 error)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view VIEW        how the path is seen at the start (plan, 3d, top, front, side or iso)\n\
@@ -178,6 +185,14 @@ impl Options {
                 "--ports" => o.ports = true,
                 "--report" => o.report = true,
                 "--html" => o.html = Some(PathBuf::from(value("--html")?)),
+                "--gcode" => {
+                    let v = value("--gcode")?;
+                    if v.trim().is_empty() {
+                        return Err("--gcode needs a G-code word such as G83".to_string());
+                    }
+                    o.gcode = Some(v);
+                }
+                "--macros" => o.macros = Some(PathBuf::from(value("--macros")?)),
                 "--version" | "-V" => o.version = true,
                 "--help" | "-h" => o.help = true,
                 other if !other.starts_with("--") => {
@@ -308,6 +323,8 @@ mod tests {
         for option in [
             "--report",
             "--html",
+            "--gcode",
+            "--macros",
             "--lang",
             "--theme",
             "--view",
@@ -388,6 +405,23 @@ mod tests {
         assert!(parse("--profile").is_err());
         assert!(parse("--profile |").is_err());
         assert!(help_text().contains("--profile"));
+    }
+
+    #[test]
+    fn the_help_of_a_word_and_the_check_of_the_macros_are_asked_for_with_their_own_options() {
+        let g = parse("--gcode G83 --lang es").unwrap();
+        assert_eq!(g.gcode.as_deref(), Some("G83"));
+        assert_eq!(g.lang, Some(Lang::Es));
+        assert_eq!(parse("job.nc").unwrap().gcode, None);
+        assert!(parse("--gcode").is_err());
+        let m = parse("--macros my.txt").unwrap();
+        assert_eq!(m.macros, Some(PathBuf::from("my.txt")));
+        assert_eq!(parse("job.nc").unwrap().macros, None);
+        assert!(parse("--macros").is_err());
+        // the help answers first
+        assert!(parse("--gcode G1 --help").unwrap().help);
+        let h = help_text();
+        assert!(h.contains("--gcode WORD") && h.contains("--macros FILE"));
     }
 
     #[test]

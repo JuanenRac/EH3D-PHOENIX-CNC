@@ -91,13 +91,24 @@ pub fn measure(lines: &[String], rates: Rates, change_s: f64) -> Stats {
 
 /// As `measure`, with the time of every move worked out with the acceleration `accel_mm_s2` (mm/s2) of the machine: a move speeds up and
 /// slows down and so takes longer than its length over its feed. 0 (or a number that is not one) gives the plain time of `measure`.
+///
+/// A program with canned cycles is measured with its cycles expanded into the moves they stand for (see `cycles`), so the length and
+/// the time are those of the holes and not of the straight line from hole to hole.
 pub fn measure_accel(lines: &[String], rates: Rates, change_s: f64, accel_mm_s2: f64) -> Stats {
+    let program_lines = lines.iter().filter(|l| !words(l).is_empty()).count();
+    let expanded;
+    let lines: &[String] = if crate::cycles::has_cycles(lines) {
+        expanded = crate::cycles::expand(lines).lines;
+        &expanded
+    } else {
+        lines
+    };
     let (by_line, change_at) = tools_by_line(lines);
     let changes = change_at.len();
     let arc_mm = arc_lengths(lines);
     let mut st = Stats {
         changes,
-        program_lines: lines.iter().filter(|l| !words(l).is_empty()).count(),
+        program_lines,
         ..Stats::default()
     };
     // the levels of depth by hundredths of a mm
@@ -495,5 +506,31 @@ mod tests {
         // the time of the tools adds up to the time of the moves
         let total: f64 = slow.tools.iter().map(|t| t.seconds).sum();
         assert!((total - slow.seconds).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_drilling_program_is_measured_by_its_holes_and_not_by_the_line_from_hole_to_hole() {
+        let p = prog("G21 G90\nG0 Z5\nG81 X10 Y0 Z-3 R2 F100\nX20\nG80\nM30");
+        let s = measure(&p, R, 0.0);
+        // two holes of 5 mm from the R plane down to the depth
+        assert!((s.cut_mm - 10.0).abs() < 1e-9, "{}", s.cut_mm);
+        assert_eq!(s.deepest_mm, Some(-3.0));
+        assert_eq!(s.depth_levels, 1);
+        // the lines are those of the program, not of the expanded one
+        assert_eq!(s.program_lines, 6);
+        // the same program with the cycle written out by hand is measured the same
+        let by_hand = prog(
+            "G21 G90\nG0 Z5\nG0 X10 Y0\nG0 Z2\nG1 Z-3 F100\nG0 Z5\nG0 X20 Y0\nG0 Z2\nG1 Z-3 F100\nG0 Z5\nM30",
+        );
+        let h = measure(&by_hand, R, 0.0);
+        assert!(
+            (h.seconds - s.seconds).abs() < 1e-9,
+            "{} {}",
+            h.seconds,
+            s.seconds
+        );
+        assert!((h.rapid_mm - s.rapid_mm).abs() < 1e-9);
+        // a program with no cycle is measured as it was
+        assert_eq!(measure(&prog("G1 X10 F100"), R, 0.0).cut_mm, 10.0);
     }
 }

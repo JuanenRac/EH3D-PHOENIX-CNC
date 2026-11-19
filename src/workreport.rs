@@ -6,7 +6,7 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use crate::gcode::{toolpath, Segment};
+use crate::gcode::Segment;
 use crate::heightmap::HeightMap;
 use crate::lint::LintCfg;
 use crate::progcheck::Level;
@@ -209,7 +209,7 @@ pub fn html(i: &Input) -> String {
         i.tuning.accel_mm_s2,
     );
     let found = notes(i.lines, i.tuning, i.lint, i.cfg);
-    let path = toolpath(i.lines);
+    let path = crate::cycles::toolpath_expanded(i.lines);
     let mut out = String::new();
     let _ = write!(
         out,
@@ -384,6 +384,7 @@ pub fn write_new(path: &Path, page: &str) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gcode::toolpath;
 
     fn cfg(lang: &str) -> Cfg {
         Cfg {

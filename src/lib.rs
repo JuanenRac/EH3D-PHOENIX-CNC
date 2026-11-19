@@ -9,9 +9,13 @@ pub mod bookmarks;
 pub mod boxes;
 pub mod cli;
 pub mod complete;
+pub mod consumption;
+pub mod cutcomp;
+pub mod cycles;
 pub mod editor;
 pub mod estimate;
 pub mod gcode;
+pub mod gcodehelp;
 #[cfg(feature = "gui")]
 pub mod gui;
 pub mod heightmap;
@@ -20,6 +24,7 @@ pub mod jog;
 pub mod link;
 pub mod lint;
 pub mod logbook;
+pub mod macrocheck;
 pub mod macros;
 pub mod materials;
 pub mod plan;
@@ -41,5 +46,9 @@ pub mod transform;
 pub mod tuning;
 pub mod view;
 pub mod viewer;
+pub mod wcs;
 pub mod words;
 pub mod workreport;
+
+#[cfg(test)]
+mod fuzz;

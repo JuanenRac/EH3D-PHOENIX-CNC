@@ -183,7 +183,10 @@ impl Settings {
             let num = |v: &str| v.parse::<f64>().ok().filter(|x| x.is_finite());
             match k.as_str() {
                 "lang" => s.lang = Lang::from_code(v).unwrap_or(s.lang),
-                "material" => s.material = crate::profiles::clean_name(v).unwrap_or_default(),
+                "material" => {
+                    s.material = crate::profiles::clean_name(v).unwrap_or_default();
+                    s.tuning.material = s.material.clone();
+                }
                 "theme" => s.theme = ThemeId::from_key(v).unwrap_or(s.theme),
                 "units" => {
                     s.inches = v.eq_ignore_ascii_case("in") || v.eq_ignore_ascii_case("inch")
@@ -433,6 +436,7 @@ impl Settings {
     pub fn resolve_material(&mut self, library: &[crate::materials::Material]) {
         self.lint.material_feed = None;
         self.lint.material_rpm = None;
+        self.tuning.material = self.material.clone();
         if let Some(m) = crate::materials::find(library, &self.material) {
             m.apply(&mut self.lint);
         }
@@ -453,6 +457,7 @@ impl Settings {
         let d = Settings::default();
         self.lint = d.lint;
         self.material.clear();
+        self.tuning.material.clear();
         self.tuning.progcheck = d.tuning.progcheck;
         self.tuning.keepout_margin = d.tuning.keepout_margin;
         self.tuning.keepout_reject = d.tuning.keepout_reject;
@@ -496,6 +501,7 @@ impl Settings {
     /// No material is chosen (the library, which is a file of its own, stays).
     pub fn reset_materials(&mut self) {
         self.material.clear();
+        self.tuning.material.clear();
         self.lint.material_feed = None;
         self.lint.material_rpm = None;
     }
@@ -921,5 +927,26 @@ mod tests {
         assert_eq!(s.recent, ["a.nc"]);
         // what was reset is what the file says too
         assert_eq!(Settings::parse(&s.to_text()), s);
+    }
+
+    #[test]
+    fn the_material_in_use_reaches_the_tuning_for_the_estimate_of_the_tools_and_the_resets_clear_it(
+    ) {
+        let mut s = Settings::parse("material = Aluminium\n");
+        assert_eq!(s.tuning.material, "Aluminium");
+        // a name that is not in the library still names the material of the estimate
+        s.material = "Brass".to_string();
+        s.resolve_material(&[]);
+        assert_eq!(s.tuning.material, "Brass");
+        s.reset_materials();
+        assert_eq!((s.material.as_str(), s.tuning.material.as_str()), ("", ""));
+        s.material = "Steel".to_string();
+        s.resolve_material(&[]);
+        s.reset_checks();
+        assert_eq!(s.tuning.material, "");
+        // it is not written as a key of its own: the file has `material` only
+        let text = Settings::parse("material = Oak\n").to_text();
+        assert_eq!(text.matches("material = Oak").count(), 1);
+        assert_eq!(Settings::parse(&text), Settings::parse("material = Oak\n"));
     }
 }
