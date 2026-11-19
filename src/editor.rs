@@ -164,6 +164,8 @@ pub struct EditState {
     pub from: usize,
     /// The bytes (start, end) the window selects and shows in the next frame.
     pub select: Option<(usize, usize)>,
+    /// The text for which the operator was asked whether the file may be written over (None: no question is open).
+    save_asked: Option<u64>,
 }
 
 impl EditState {
@@ -207,6 +209,25 @@ impl EditState {
     pub fn set_notes(&mut self, notes: Vec<Note>) {
         self.notes = notes;
         self.notes_of = Some(self.text_hash());
+    }
+
+    /// Opens the question of writing the text over the file of the program, in line in the window.
+    pub fn ask_save(&mut self) {
+        self.save_asked = Some(self.text_hash());
+    }
+
+    /// Takes the question away without writing.
+    pub fn cancel_save(&mut self) {
+        self.save_asked = None;
+    }
+
+    /// Whether the question is open for the text as it is now. A text that changed after the question was asked is another text: the
+    /// question goes away and has to be asked again.
+    pub fn save_question_open(&mut self) -> bool {
+        if self.save_asked.is_some() && self.save_asked != Some(self.text_hash()) {
+            self.save_asked = None;
+        }
+        self.save_asked.is_some()
     }
 
     /// Finds the next match from the place the last search ended (going round at the end) and selects it.
@@ -409,6 +430,26 @@ mod tests {
         e.mark_applied();
         assert!(!e.dirty());
         assert!(!editor("").dirty());
+    }
+
+    #[test]
+    fn the_question_of_saving_is_open_only_for_the_text_it_was_asked_about() {
+        let mut e = editor("G21\nM30");
+        assert!(!e.save_question_open());
+        e.ask_save();
+        assert!(e.save_question_open());
+        // cancelling closes it
+        e.cancel_save();
+        assert!(!e.save_question_open());
+        // a change of the text after the question closes it for good, even if the text comes back
+        e.ask_save();
+        e.text.push_str("\n; more");
+        assert!(!e.save_question_open());
+        e.text = "G21\nM30".to_string();
+        assert!(!e.save_question_open());
+        // asking again opens it for the new text
+        e.ask_save();
+        assert!(e.save_question_open());
     }
 
     #[test]

@@ -33,6 +33,19 @@ impl App {
         st.mark_applied();
     }
 
+    /// Applies the text and writes it over the file the program came from (what Replace does after the question of the editor). Nothing is
+    /// written while a program runs or when the program has no file.
+    pub(super) fn save_edit_here(&mut self, st: &mut EditState) {
+        st.cancel_save();
+        if self.session.running || self.path.is_empty() {
+            return;
+        }
+        self.apply_edit(st);
+        self.file_purpose = Purpose::Program;
+        let path = PathBuf::from(&self.path);
+        self.file_chosen(Mode::Save, &path);
+    }
+
     /// The sentence for what the last search or jump said.
     fn said_text(&self, said: &Said) -> String {
         match said {
@@ -59,6 +72,9 @@ impl App {
         let mut apply = false;
         let mut save_here = false;
         let mut save_as = false;
+        let mut save_yes = false;
+        let mut save_no = false;
+        let asked = st.save_question_open();
         let mut jump_to_line: Option<usize> = None;
         let t = self.theme.clone();
         self.window(self.t(Text::McEditProgram))
@@ -197,6 +213,24 @@ impl App {
                 if running {
                     ui.colored_label(col(t.warn), self.w(Msg::EdRunning));
                 }
+                // the question before the file is written over, in line: nothing is written until the operator says Replace
+                if asked && !running {
+                    ui.horizontal_wrapped(|ui| {
+                        let name = std::path::Path::new(&self.path)
+                            .file_name()
+                            .map_or_else(String::new, |n| n.to_string_lossy().to_string());
+                        ui.colored_label(
+                            col(t.warn),
+                            format!("{name} {}", self.t(Text::McReplaceAsk)),
+                        );
+                        if ui.button(self.t(Text::McReplace)).clicked() {
+                            save_yes = true;
+                        }
+                        if ui.button(self.t(Text::McCancel)).clicked() {
+                            save_no = true;
+                        }
+                    });
+                }
                 ui.horizontal_wrapped(|ui| {
                     if ui
                         .add_enabled(!running, egui::Button::new(self.t(Text::Apply)))
@@ -231,13 +265,18 @@ impl App {
         if let Some(n) = jump_to_line {
             st.go_to(n);
         }
-        if apply || save_here || save_as {
+        if apply || save_as {
             self.apply_edit(&mut st);
         }
-        // a file that is there is never written over without the question of the Save window
+        // a file that is there is never written over without the question, which is asked in line
         if save_here {
-            let b = self.browser(Mode::Save);
-            return Some(Win::Replace(b, PathBuf::from(&self.path)));
+            st.ask_save();
+        }
+        if save_no {
+            st.cancel_save();
+        }
+        if save_yes {
+            self.save_edit_here(&mut st);
         }
         if save_as {
             return Some(Win::Save(self.browser(Mode::Save)));
@@ -269,6 +308,43 @@ mod tests {
         a.apply_edit(&mut st);
         assert_eq!(a.session.program, ["G21 G90", "G1 X25 F100"]);
         assert!(!st.dirty());
+    }
+
+    #[test]
+    fn saving_in_the_editor_writes_the_file_only_after_the_question_is_answered() {
+        let d = std::env::temp_dir().join(format!("eh3d_editwin_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let file = d.join("job.nc");
+        let old = "G21 G90\nG1 X1 F100\n";
+        std::fs::write(&file, old).unwrap();
+        let mut a = App::isolated();
+        a.open(&file);
+        let mut st = a.edit_state();
+        st.text = "G21 G90\nG1 X7 F100".to_string();
+        // asking writes nothing
+        st.ask_save();
+        assert!(st.save_question_open());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), old);
+        // a program that runs is never written
+        a.session.running = true;
+        a.save_edit_here(&mut st);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), old);
+        a.session.running = false;
+        st.ask_save();
+        a.save_edit_here(&mut st);
+        let written = std::fs::read_to_string(&file).unwrap();
+        assert_eq!(written.replace("\r\n", "\n"), "G21 G90\nG1 X7 F100\n");
+        assert_eq!(a.session.program[1], "G1 X7 F100");
+        assert!(!st.save_question_open() && !st.dirty());
+        // a program with no file has nowhere to be written
+        let mut b = App::isolated();
+        b.session.load("G21");
+        let mut st = b.edit_state();
+        st.text = "G20".to_string();
+        b.save_edit_here(&mut st);
+        assert_eq!(b.session.program, ["G21"]);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

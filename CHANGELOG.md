@@ -3,6 +3,7 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
+- **The editor saves straight over the file, asking in line:** **Apply and save** in the editor window no longer opens the Save window: it shows the question "the file already exists, replace it?" inside the editor, with **Replace** and **Cancel**, and only Replace applies the text and writes it over the file the program came from. The question is tied to the text it was asked about: if the text changes after it, the question goes away and must be asked again; nothing is written while a program runs or when the program has no file. **Apply and save as...** still goes through the Save window. The question and its rules are in `src/editor.rs` and the write is tested through the window with a real file.
 
 ## [0.1.5] - A program editor, transformations of a program, machine profiles, arcs and tool changes in the summary and options for the pictures of the viewer
 
