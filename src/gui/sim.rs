@@ -68,6 +68,11 @@ impl App {
                     self.settings.rapid_mm_min,
                     self.lang.code(),
                 ));
+                lines.extend(crate::tools::report_lines(
+                    &self.session.program,
+                    &self.settings.tuning.tools,
+                    self.lang.code(),
+                ));
                 lines
             },
             t: 0.0,

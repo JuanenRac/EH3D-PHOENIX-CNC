@@ -40,6 +40,8 @@ pub struct Tuning {
     pub bookmarks_confirm_replace: bool,
     /// The automatic tool changer worked out in simulation (`atc`): off unless the line says `on`.
     pub atc: AtcCfg,
+    /// The table of tools (name, diameter, length, flutes), from its file next to the settings; empty when there is no file.
+    pub tools: crate::tools::ToolTable,
 }
 
 impl Default for Tuning {
@@ -62,6 +64,7 @@ impl Default for Tuning {
             bookmarks_load: true,
             bookmarks_confirm_replace: true,
             atc: AtcCfg::default(),
+            tools: crate::tools::ToolTable::default(),
         }
     }
 }

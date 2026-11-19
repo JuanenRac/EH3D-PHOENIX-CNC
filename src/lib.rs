@@ -36,6 +36,7 @@ pub mod settings;
 pub mod sim;
 pub mod startline;
 pub mod stats;
+pub mod tools;
 pub mod transform;
 pub mod tuning;
 pub mod view;

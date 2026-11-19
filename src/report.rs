@@ -96,6 +96,18 @@ pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
             ),
         });
     }
+    for (line, tool) in crate::tools::missing(lines, &tuning.tools) {
+        out.push(Note {
+            line: Some(line),
+            level: Level::Warning,
+            problem: false,
+            text: say(
+                lang,
+                Msg::ToolsMissingAt,
+                &[(line + 1).to_string(), tool.to_string()],
+            ),
+        });
+    }
     let chords = if tuning.keepouts.is_empty() {
         0
     } else {
@@ -142,6 +154,7 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
         cfg.rapid_mm_min,
         lang,
     ));
+    out.extend(crate::tools::report_lines(lines, &tuning.tools, lang));
     out.push(say(
         lang,
         Msg::ReportMoves,
@@ -333,5 +346,42 @@ mod tests {
         assert!(notes(&p, &t, &LintCfg::default(), &cfg("en"))
             .iter()
             .all(|x| !x.text.contains("change to")));
+    }
+
+    #[test]
+    fn the_tool_table_is_listed_in_the_report_and_a_tool_it_lacks_is_a_warning_that_is_not_a_problem(
+    ) {
+        let p = prog("G21\nM3 S1000\nT1 M6\nG0 X0 Y0 Z5\nG1 X10 F100\nT7 M6\nG1 X20\nM30");
+        let none = build(&p, &Tuning::default(), &LintCfg::default(), &cfg("en"));
+        assert!(!none.text.contains("Tool table"));
+        let t = Tuning {
+            tools: crate::tools::ToolTable::parse("tool = 1 | name=Mill | diameter=2 | flutes=2\n"),
+            ..Tuning::default()
+        };
+        let r = build(&p, &t, &LintCfg::default(), &cfg("en"));
+        assert!(r.text.contains("Tool table: 1 tools"), "{}", r.text);
+        assert!(
+            r.text.contains("T1: Mill, diameter 2 mm, 2 flutes"),
+            "{}",
+            r.text
+        );
+        assert!(r.text.contains("T7 is not in the tool table"), "{}", r.text);
+        // as a note it carries its line and is a warning, so it does not make the exit code of --report 1
+        let n = notes(&p, &t, &LintCfg::default(), &cfg("en"));
+        let missing = n
+            .iter()
+            .find(|x| x.text.contains("T7 is not in the tool table"))
+            .unwrap_or_else(|| panic!("{n:?}"));
+        assert_eq!(
+            (missing.line, missing.level, missing.problem),
+            (Some(5), Level::Warning, false)
+        );
+        assert_eq!(r.problems, none.problems);
+        // a machine with no table is not told anything
+        assert!(
+            notes(&p, &Tuning::default(), &LintCfg::default(), &cfg("en"))
+                .iter()
+                .all(|x| !x.text.contains("tool table"))
+        );
     }
 }

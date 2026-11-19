@@ -426,6 +426,11 @@ impl Settings {
         }
     }
 
+    /// Gives the settings the table of tools read from its file (see `tools::load`).
+    pub fn resolve_tool_table(&mut self, table: crate::tools::ToolTable) {
+        self.tuning.tools = table;
+    }
+
     /// Gives the tool changer the table of slots read from its file (see `atc::load_table`).
     pub fn resolve_atc_table(&mut self, table: crate::atc::RackTable) {
         self.tuning.atc.table = table;

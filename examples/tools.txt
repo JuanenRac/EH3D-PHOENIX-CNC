@@ -1,0 +1,15 @@
+# The table of tools of the machine: for each tool number the name, the diameter and, if you wish, the length offset and the number of
+# flutes of the tool that is meant to be in the spindle for it. The program reads it and, in --report and in the Statistics window, lists
+# each tool a program takes with what the table says of it, and warns of a tool the table does not have. Nothing is sent to the machine.
+#
+# To use it, copy this file next to the settings file with the name phoenix-cnc-tools.txt and edit it. A line that is not valid is left
+# out and named, with its number, in the report: a tool number from 1 to 255, a diameter above 0 up to 1000 mm, one line for each tool,
+# up to 64 tools, a file of up to 16 KiB.
+#
+# tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N      (the diameter is needed; the rest may be left out)
+tool = 1 | name=Engraving V bit | diameter=0.2 | flutes=1
+tool = 2 | name=End mill 1 mm | diameter=1 | flutes=2
+tool = 3 | name=End mill 2 mm | diameter=2 | flutes=2
+tool = 4 | name=Drill 0.8 mm | diameter=0.8
+tool = 5 | name=Drill 1 mm | diameter=1
+tool = 6 | name=Router bit 3.175 mm | diameter=3.175 | flutes=2

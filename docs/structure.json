@@ -151,6 +151,19 @@
           }
         },
         {
+          "name": "tools.rs",
+          "desc": {
+            "en": "the table of tools (name, diameter, flutes) read from a file and listed in the report",
+            "es": "la tabla de herramientas: nombre, diámetro, filos, de un fichero y del informe",
+            "de": "die Werkzeugtabelle: Name, Durchmesser, Schneiden, aus einer Datei, im Bericht",
+            "fr": "la table d'outils : nom, diamètre, dents, lue dans un fichier, dans le rapport",
+            "it": "la tabella utensili: nome, diametro, taglienti, da un file, nel rapporto",
+            "ja": "工具表：名前、直径、刃数をファイルから読み込み、レポートに表示",
+            "zh": "刀具表：名称、直径、刃数，从文件读取并列入报告",
+            "pt": "a tabela de ferramentas: nome, diâmetro, dentes, de um ficheiro, no relatório"
+          }
+        },
+        {
           "name": "jobs.rs",
           "desc": {
             "en": "repeats and pauses between the programs of the queue",

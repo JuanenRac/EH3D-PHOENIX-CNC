@@ -197,6 +197,8 @@ impl App {
         // the same for the table of slots of the tool changer
         self.settings
             .resolve_atc_table(crate::atc::load_table(&self.settings_path));
+        self.settings
+            .resolve_tool_table(crate::tools::load(&self.settings_path));
         if self.theme.id != self.settings.theme {
             self.theme = Theme::for_id(self.settings.theme);
         }
