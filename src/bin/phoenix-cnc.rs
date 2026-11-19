@@ -22,6 +22,9 @@ fn main() -> eframe::Result {
         Ok(o) if o.report => std::process::exit(print_report(&o)),
         Ok(o) if o.gcode.is_some() => std::process::exit(print_gcode_help(&o)),
         Ok(o) if o.macros.is_some() => std::process::exit(print_macros_check(&o)),
+        Ok(o) if eh3d_phoenix_cnc::cli_tools::wanted(&o) => {
+            std::process::exit(eh3d_phoenix_cnc::cli_tools::run(&o))
+        }
         Ok(o) => eh3d_phoenix_cnc::gui::run(&o),
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");

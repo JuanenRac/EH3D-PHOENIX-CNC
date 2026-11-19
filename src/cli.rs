@@ -49,6 +49,16 @@ pub struct Options {
     /// Checks a file of macros and leaves (`--macros FILE`): what a macro leaves on, an empty one, one that ends the program (exit code 0
     /// clean, 1 something to read, 2 error); no window, nothing moves.
     pub macros: Option<PathBuf>,
+    /// Prints the program in the other unit and leaves (`--convert in|mm`, with the file): `in` or `mm`, as `units::convert` takes it.
+    pub convert: Option<String>,
+    /// Compares the program with another one and leaves (`--compare FILE2`, with the first file); exit code 0 equal, 1 different, 2 error.
+    pub compare: Option<PathBuf>,
+    /// Prints the time of the program by kind of move and leaves (`--times`, with the file).
+    pub times: bool,
+    /// Checks the `H` and `D` words and the length offsets against the table of tools and leaves (`--offsets`, with the file).
+    pub offsets: bool,
+    /// Checks the format of the program for a kind of controller and leaves (`--format grbl|full|generic`, with the file).
+    pub format: Option<String>,
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
     pub version: bool,
     pub help: bool,
@@ -93,6 +103,11 @@ pub fn help_text() -> String {
          \x20 --html FILE        with --report, also write the work report as one page of HTML (a file that is there is not written over)\n\
          \x20 --gcode WORD       print the help of a G-code word (G83, M6, F) or of the words of a line, in the language of --lang, and leave\n\
          \x20 --macros FILE      check a file of macros (what a macro leaves on, an empty one, one that ends the program), and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --convert UNIT     print the program in the other unit (in or mm) and say what was converted, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --compare FILE2    compare the program with another one (lengths, time, tools, reach, depth, findings), and leave (exit code 0 equal, 1 different, 2 error)\n\
+         \x20 --times            print the time of the program by kind of move (rapid, cutting, plunges, arcs, dwells, tool changes), and leave\n\
+         \x20 --offsets          check the H and D words and the length offsets against the table of tools, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --format PROFILE   check the format of the program for a kind of controller (grbl, full, generic), and leave (exit code 0 clean, 1 something to read, 2 error)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view VIEW        how the path is seen at the start (plan, 3d, top, front, side or iso)\n\
@@ -193,6 +208,30 @@ impl Options {
                     o.gcode = Some(v);
                 }
                 "--macros" => o.macros = Some(PathBuf::from(value("--macros")?)),
+                "--convert" => {
+                    let v = value("--convert")?;
+                    o.convert = Some(
+                        match v.trim().to_ascii_lowercase().as_str() {
+                            "in" | "inch" | "inches" | "g20" => "in",
+                            "mm" | "metric" | "millimetres" | "millimeters" | "g21" => "mm",
+                            _ => return Err(format!("--convert needs in or mm, not '{v}'")),
+                        }
+                        .to_string(),
+                    );
+                }
+                "--compare" => o.compare = Some(PathBuf::from(value("--compare")?)),
+                "--times" => o.times = true,
+                "--offsets" => o.offsets = true,
+                "--format" => {
+                    let v = value("--format")?;
+                    if crate::postcheck::Profile::named(&v).is_none() {
+                        return Err(format!(
+                            "unknown format profile '{v}' ({})",
+                            crate::postcheck::NAMES.join(", ")
+                        ));
+                    }
+                    o.format = Some(v.trim().to_ascii_lowercase());
+                }
                 "--version" | "-V" => o.version = true,
                 "--help" | "-h" => o.help = true,
                 other if !other.starts_with("--") => {
@@ -211,6 +250,17 @@ impl Options {
         }
         if o.report && o.file.is_none() {
             return Err("--report needs a G-code file".to_string());
+        }
+        for (asked, name) in [
+            (o.convert.is_some(), "--convert"),
+            (o.compare.is_some(), "--compare"),
+            (o.times, "--times"),
+            (o.offsets, "--offsets"),
+            (o.format.is_some(), "--format"),
+        ] {
+            if asked && o.file.is_none() {
+                return Err(format!("{name} needs a G-code file"));
+            }
         }
         if o.html.is_some() && !o.report {
             return Err("--html only goes with --report".to_string());
@@ -325,6 +375,11 @@ mod tests {
             "--html",
             "--gcode",
             "--macros",
+            "--convert",
+            "--compare",
+            "--times",
+            "--offsets",
+            "--format",
             "--lang",
             "--theme",
             "--view",
@@ -405,6 +460,57 @@ mod tests {
         assert!(parse("--profile").is_err());
         assert!(parse("--profile |").is_err());
         assert!(help_text().contains("--profile"));
+    }
+
+    #[test]
+    fn the_conversion_the_comparison_the_times_the_offsets_and_the_format_are_asked_for_with_their_own_options(
+    ) {
+        let c = parse("--convert IN job.nc").unwrap();
+        assert_eq!(c.convert.as_deref(), Some("in"));
+        assert_eq!(
+            parse("--convert g21 job.nc").unwrap().convert.as_deref(),
+            Some("mm")
+        );
+        assert_eq!(
+            parse("--convert inches job.nc").unwrap().convert.as_deref(),
+            Some("in")
+        );
+        assert!(parse("--convert cm job.nc").is_err());
+        assert!(parse("--convert").is_err());
+        let k = parse("--compare other.nc job.nc").unwrap();
+        assert_eq!(k.compare, Some(PathBuf::from("other.nc")));
+        assert_eq!(k.file, Some(PathBuf::from("job.nc")));
+        assert!(parse("--times job.nc").unwrap().times);
+        assert!(parse("--offsets job.nc").unwrap().offsets);
+        let f = parse("--format GRBL job.nc").unwrap();
+        assert_eq!(f.format.as_deref(), Some("grbl"));
+        let bad = parse("--format nosuchprofile job.nc").unwrap_err();
+        assert!(bad.contains("grbl, full, generic"), "{bad}");
+        // each one needs the program to read
+        for args in [
+            "--convert in",
+            "--compare other.nc",
+            "--times",
+            "--offsets",
+            "--format grbl",
+        ] {
+            let why = parse(args).unwrap_err();
+            assert!(why.ends_with("needs a G-code file"), "{args}: {why}");
+        }
+        // none of them is asked for by a plain file
+        let plain = parse("job.nc").unwrap();
+        assert!(plain.convert.is_none() && plain.compare.is_none() && plain.format.is_none());
+        assert!(!plain.times && !plain.offsets);
+        let h = help_text();
+        for word in [
+            "--convert UNIT",
+            "--compare FILE2",
+            "--times",
+            "--offsets",
+            "--format PROFILE",
+        ] {
+            assert!(h.contains(word), "{word}");
+        }
     }
 
     #[test]

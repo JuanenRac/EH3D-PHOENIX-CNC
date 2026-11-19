@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use crate::lint::LintCfg;
 use crate::progcheck::Finding;
 use crate::report::{build, notes, Cfg};
+use crate::sim::Rates;
 use crate::tools::ToolTable;
 use crate::tuning::Tuning;
 use crate::words::{Msg, LANGS};
@@ -228,7 +229,59 @@ fn run(lines: &[String], lang: &str) -> String {
     }
     let (said, _) = crate::macrocheck::validate_text(&lib, &t, lang);
     assert!(!said.contains('{'), "{lang}: {said}");
+    newest_tools(lines, &t, lang);
     r.text
+}
+
+/// The conversion of units, the offsets of the tools, the format for a controller, the time by kind of move and the comparison on any program.
+fn newest_tools(lines: &[String], t: &Tuning, lang: &str) {
+    let no_hole = |f: &[Finding]| {
+        for x in f {
+            assert!(!x.text(lang).contains('{'), "{lang}: {:?}", x.msg);
+        }
+    };
+    // the units, both ways: a line is added at most (the unit word at the top) and the findings point at lines that are there
+    for to_inches in [true, false] {
+        let c = crate::units::convert(lines, to_inches);
+        assert!(c.lines.len() == lines.len() || c.lines.len() == lines.len() + 1);
+        assert!(all_lines_are_inside(&c.findings, lines.len()));
+        no_hole(&c.findings);
+        assert!(c.changed_lines <= c.lines.len());
+        // a program that is converted twice to the same unit is not changed by the second time
+        let again = crate::units::convert(&c.lines, to_inches);
+        assert_eq!(again.lines, c.lines, "{lines:?}");
+    }
+    // the offsets against the table of tools
+    let o = crate::offsets::check(lines, &t.tools);
+    assert!(all_lines_are_inside(&o, lines.len()));
+    no_hole(&o);
+    // the format for each family of controllers
+    for name in crate::postcheck::NAMES {
+        let p = crate::postcheck::Profile::named(name).unwrap();
+        let f = crate::postcheck::check(lines, &p);
+        assert!(all_lines_are_inside(&f, lines.len()));
+        no_hole(&f);
+    }
+    // the time by kind of move: no negative part, and the text has no hole
+    let rates = Rates {
+        rapid: 6000.0,
+        default_feed: 300.0,
+    };
+    let s = crate::timesplit::split(lines, rates, 5.0, 100.0);
+    for part in [
+        s.rapid_s, s.cut_s, s.plunge_s, s.arc_s, s.dwell_s, s.change_s,
+    ] {
+        assert!(part >= 0.0 || part.is_nan(), "{lines:?}");
+    }
+    assert!(s.lines(lang).iter().all(|l| !l.contains('{')));
+    // a program does not differ from itself, and from its inch version the text has no hole
+    let f = crate::compare::facts(lines, rates, 5.0, 100.0, t);
+    let (same, n) = crate::compare::compare(&f, &f, ("a.nc", "b.nc"), lang);
+    assert_eq!((n, same.len()), (0, 2), "{lines:?}");
+    let inches = crate::units::convert(lines, true).lines;
+    let g = crate::compare::facts(&inches, rates, 5.0, 100.0, t);
+    let (text, _) = crate::compare::compare(&f, &g, ("a.nc", "b.nc"), lang);
+    assert!(text.iter().all(|l| !l.contains('{')), "{lang}: {text:?}");
 }
 
 #[test]
