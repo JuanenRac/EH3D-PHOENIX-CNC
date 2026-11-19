@@ -680,7 +680,7 @@ fn the_command_line_names_what_it_cannot_read() {
         ("--theme blue-ish", "unknown theme"),
         ("--wait many", "needs a number"),
         ("--wait -3", "needs a number"),
-        ("--view side", "unknown view 'side'"),
+        ("--view sideways", "unknown view 'sideways'"),
         ("--grbl", "needs a value"),
         ("--frobnicate", "unknown option '--frobnicate'"),
         ("--shot", "--shot needs a value"),
