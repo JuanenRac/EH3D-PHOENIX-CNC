@@ -668,7 +668,7 @@ impl App {
         });
     }
 
-    /// The left panel, made like the one of PlanetCNC: a column of buttons for the zeros and the stored positions, the position with its
+    /// The left panel, made as a column of buttons: a column of buttons for the zeros and the stored positions, the position with its
     /// tabs (work, machine, operator, GCode), the speed and the spindle, the codes in force or the inputs and outputs, and the jog.
     fn left(&mut self, ui: &mut egui::Ui) {
         if self.settings.show_buttons {

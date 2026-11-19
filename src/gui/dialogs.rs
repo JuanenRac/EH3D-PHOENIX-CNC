@@ -1106,7 +1106,7 @@ impl App {
         ));
     }
 
-    /// The settings: the sections on the left like the tree of PlanetCNC, the section on the right, Ok and Cancel.
+    /// The settings: the sections on the left as a tree, the section on the right, Ok and Cancel.
     fn settings_window(&mut self, ctx: &egui::Context, mut d: Box<Draft>) -> Option<Win> {
         let mut ok = false;
         let mut cancel = false;
