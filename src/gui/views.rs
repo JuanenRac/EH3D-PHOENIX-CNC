@@ -129,7 +129,7 @@ impl App {
         });
     }
 
-    /// How the plan fits the table (or the program) into the area: the corner, the scale and the inner rectangle.
+    /// How the plan fits the table (or the program) into the area: its size and the true view from above that draws it.
     pub(super) fn plan_frame(&self, rect: Rect) -> PlanFrame {
         let off = self.work_offset();
         let ((tx0, tx1), (ty0, ty1)) = (
@@ -150,16 +150,19 @@ impl App {
             }
         }
         let (w, h) = ((maxx - minx).max(1.0), (maxy - miny).max(1.0));
-        let inner = rect.shrink(18.0);
-        let k = ((inner.width() as f64) / w).min((inner.height() as f64) / h);
-        PlanFrame {
-            minx,
-            miny,
-            w,
-            h,
-            k,
-            inner,
-        }
+        // the true view from above of the suite, fitted to the area: X to the right, Y up, the same scale on both axes
+        let ortho = crate::view::plan_view(
+            (minx, miny),
+            (maxx, maxy),
+            (
+                f64::from(rect.left()),
+                f64::from(rect.top()),
+                f64::from(rect.width()),
+                f64::from(rect.height()),
+            ),
+            18.0,
+        );
+        PlanFrame { w, h, ortho }
     }
 
     pub(super) fn paint_plan(
@@ -365,23 +368,17 @@ impl App {
     }
 }
 
-/// How the plan fits into its area: the corner of what is shown (mm), its size, the pixels per mm and the rectangle it is drawn in.
+/// How the plan fits into its area: the size of what is shown (mm) and the view from above that draws it.
 pub(super) struct PlanFrame {
-    minx: f64,
-    miny: f64,
     w: f64,
     h: f64,
-    k: f64,
-    inner: Rect,
+    ortho: eh3d_view::views::Ortho,
 }
 
 impl PlanFrame {
     /// A point of the machine (mm) to the fitted view, in pixels, before the zoom and the shift of the operator.
     pub(super) fn fitted(&self, x: f64, y: f64) -> (f64, f64) {
-        (
-            self.inner.left() as f64 + (x - self.minx) * self.k,
-            self.inner.bottom() as f64 - (y - self.miny) * self.k,
-        )
+        self.ortho.project(x, y, 0.0)
     }
 }
 

@@ -1,8 +1,10 @@
 //! How the path of a program is looked at: the plan from above that zooms about the pointer and is dragged, and the 3D view that is turned
 //! and zoomed. Only numbers and no window, so the movements of the pointer are tested on their own; the window draws with what is worked
-//! out here. The 3D projection itself is the isometric one of `eh3d-view`, shared with the other programs of the suite.
+//! out here. The 3D projection itself is the isometric one of `eh3d-view`, shared with the other programs of the suite, and the plan from above is
+//! its true orthographic view from above (`Ortho` with `StandardView::Top`): X to the right, Y up, the same scale on both axes.
 
 use eh3d_view::scene::{Iso, Table};
+use eh3d_view::views::{Ortho, StandardView};
 
 /// The least and the most the plan can be magnified.
 pub const ZOOM_MIN: f64 = 0.2;
@@ -70,6 +72,30 @@ impl Plan2d {
 
     pub fn is_default(&self) -> bool {
         *self == Plan2d::default()
+    }
+}
+
+/// The view from above that fits the part of the table to show (`min` and `max` as X and Y in mm) into the area `(left, top, width, height)` in pixels
+/// with `margin` pixels free on every side, centred. A part less than 1 mm across is taken as 1 mm, so a program of one point still has a scale. The
+/// height of a point does not move it: the plan is a true view from above, and `Ortho::to_table` gives back the point of the table under a pixel.
+pub fn plan_view(
+    min: (f64, f64),
+    max: (f64, f64),
+    area: (f64, f64, f64, f64),
+    margin: f64,
+) -> Ortho {
+    let (w, h) = ((max.0 - min.0).max(1.0), (max.1 - min.1).max(1.0));
+    let fitted = Ortho::fit_box(
+        StandardView::Top,
+        (min.0, min.1, 0.0),
+        (min.0 + w, min.1 + h, 0.0),
+        area.2,
+        area.3,
+        margin,
+    );
+    Ortho {
+        origin: (fitted.origin.0 + area.0, fitted.origin.1 + area.1),
+        ..fitted
     }
 }
 
@@ -475,5 +501,88 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn near(a: (f64, f64), b: (f64, f64)) -> bool {
+        (a.0 - b.0).abs() < 1e-9 && (a.1 - b.1).abs() < 1e-9
+    }
+
+    #[test]
+    fn the_plan_is_the_true_view_from_above_with_x_to_the_right_and_y_up() {
+        // a table of 500 x 300 mm in an area of 1000 x 800 px that starts at (20, 30)
+        let v = plan_view((0.0, 0.0), (500.0, 300.0), (20.0, 30.0, 1000.0, 800.0), 0.0);
+        assert_eq!(v.view, StandardView::Top);
+        // the width limits the scale: 1000 px for 500 mm
+        assert!((v.k - 2.0).abs() < 1e-9, "{}", v.k);
+        // the same scale on both axes: the table is 1000 x 600 px, centred in the height
+        let front_left = v.project(0.0, 0.0, 0.0);
+        let back_right = v.project(500.0, 300.0, 0.0);
+        assert!(near(front_left, (20.0, 30.0 + 700.0)), "{front_left:?}");
+        assert!(near(back_right, (1020.0, 30.0 + 100.0)), "{back_right:?}");
+        // Y up on the machine is up on the screen, and the height moves nothing
+        assert!(back_right.1 < front_left.1);
+        assert_eq!(v.project(10.0, 20.0, 0.0), v.project(10.0, 20.0, 77.0));
+    }
+
+    #[test]
+    fn a_click_on_the_plan_gives_back_the_point_of_the_table_under_it() {
+        let v = plan_view(
+            (-40.0, -10.0),
+            (260.0, 190.0),
+            (0.0, 0.0, 600.0, 400.0),
+            18.0,
+        );
+        for (x, y) in [(-40.0, -10.0), (260.0, 190.0), (100.0, 25.5), (0.0, 0.0)] {
+            let (px, py) = v.project(x, y, 0.0);
+            let back = v.to_table(px, py).unwrap();
+            assert!(near(back, (x, y)), "{back:?}");
+        }
+        // the whole part is inside the area with the margin on every side
+        for (x, y) in [
+            (-40.0, -10.0),
+            (260.0, 190.0),
+            (-40.0, 190.0),
+            (260.0, -10.0),
+        ] {
+            let (px, py) = v.project(x, y, 0.0);
+            assert!((18.0 - 1e-9..=582.0 + 1e-9).contains(&px), "{px}");
+            assert!((18.0 - 1e-9..=382.0 + 1e-9).contains(&py), "{py}");
+        }
+    }
+
+    #[test]
+    fn a_part_with_no_size_keeps_a_scale_and_a_tiny_area_does_not_break_the_plan() {
+        // one point: taken as 1 mm across, so the scale is the area over 1 mm and nothing is NaN
+        let v = plan_view((5.0, 5.0), (5.0, 5.0), (0.0, 0.0, 400.0, 300.0), 18.0);
+        assert!(v.k.is_finite() && v.k > 0.0);
+        let p = v.project(5.0, 5.0, 0.0);
+        assert!(p.0.is_finite() && p.1.is_finite());
+        // an area smaller than its margins keeps one pixel per millimetre
+        let tiny = plan_view((0.0, 0.0), (100.0, 100.0), (0.0, 0.0, 20.0, 20.0), 18.0);
+        assert_eq!(tiny.k, 1.0);
+        assert!(tiny.project(50.0, 50.0, 0.0).0.is_finite());
+    }
+
+    #[test]
+    fn the_plan_and_the_standard_top_view_agree_with_the_fit_of_the_suite() {
+        let ours = plan_view((0.0, 0.0), (500.0, 300.0), (0.0, 0.0, 800.0, 600.0), 18.0);
+        let theirs = Ortho::fit_box(
+            StandardView::Top,
+            (0.0, 0.0, 0.0),
+            (500.0, 300.0, 0.0),
+            800.0,
+            600.0,
+            18.0,
+        );
+        assert_eq!((ours.k, ours.origin), (theirs.k, theirs.origin));
+        // and the zoom of the plan goes on over the fitted view, as before
+        let z = Plan2d {
+            zoom: 2.0,
+            pan: (10.0, 0.0),
+        };
+        let fitted = ours.project(250.0, 150.0, 0.0);
+        let centre = (400.0, 300.0);
+        let on_screen = z.apply(fitted, centre);
+        assert!(near(on_screen, (410.0, 300.0)), "{on_screen:?}");
     }
 }
