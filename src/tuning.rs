@@ -2,6 +2,7 @@
 //! the statistics) that the operator may tune in the settings file. The lines are the same `key = value` lines of the settings file, so
 //! they can live in that file: what is not known is left alone and what is not valid keeps its default. The example text is the defaults.
 
+use crate::atc::AtcCfg;
 use crate::boxes::KeepOut;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +34,8 @@ pub struct Tuning {
     /// Starting a program from one of its lines asks for a tick that says the tool, the spindle and the zero were checked
     /// (`startline_confirm`).
     pub startline_confirm: bool,
+    /// The automatic tool changer worked out in simulation (`atc`): off unless the line says `on`.
+    pub atc: AtcCfg,
 }
 
 impl Default for Tuning {
@@ -52,6 +55,7 @@ impl Default for Tuning {
             macro_max_lines: 200,
             tool_change_s: 30.0,
             startline_confirm: true,
+            atc: AtcCfg::default(),
         }
     }
 }
@@ -143,6 +147,11 @@ impl Tuning {
                         .unwrap_or(t.macro_max_lines)
                 }
                 "startline_confirm" => t.startline_confirm = on(v),
+                "atc" => {
+                    if let Some(c) = AtcCfg::parse(v) {
+                        t.atc = c;
+                    }
+                }
                 "tool_change_time" => {
                     t.tool_change_s = num(v)
                         .filter(|x| (0.0..=3600.0).contains(x))
@@ -152,6 +161,16 @@ impl Tuning {
             }
         }
         t
+    }
+
+    /// The seconds a tool change adds to the estimate: the time of a change of the tool changer when it is on (see `atc`), or
+    /// `tool_change_time` when it is not.
+    pub fn change_seconds(&self, rapid_mm_min: f64) -> f64 {
+        if self.atc.enabled {
+            crate::atc::typical_seconds(&self.atc, rapid_mm_min)
+        } else {
+            self.tool_change_s
+        }
     }
 
     /// The lines of the settings file for these values. The text of `Tuning::default()` is the example shipped with the program.
@@ -177,6 +196,9 @@ impl Tuning {
             "startline_confirm",
             yes_no(self.startline_confirm).to_string(),
         );
+        if self.atc != AtcCfg::default() {
+            put("atc", self.atc.to_line());
+        }
         for b in &self.keepouts {
             s.push_str(&b.to_setting());
             s.push('\n');
@@ -188,6 +210,7 @@ impl Tuning {
     pub fn example() -> String {
         let mut s = Tuning::default().to_text();
         s.push_str("# keepout = clamp 0 0 -5 20 20 40\n");
+        s.push_str("# atc = on | safe=5 | rack=0,0,-5 | pitch=20,0 | lock=3,0.5 | blow=4,1\n");
         s
     }
 }
@@ -200,6 +223,31 @@ mod tests {
     fn the_example_is_the_defaults() {
         assert_eq!(Tuning::parse(&Tuning::example()), Tuning::default());
         assert_eq!(Tuning::parse(""), Tuning::default());
+    }
+
+    #[test]
+    fn the_tool_changer_is_off_until_its_line_says_on_and_then_sets_the_time_of_a_change() {
+        let d = Tuning::default();
+        assert!(!d.atc.enabled);
+        assert_eq!(d.change_seconds(6000.0), d.tool_change_s);
+        let t = Tuning::parse("tool_change_time = 7\natc = on | rack=0,0,-5 | blow=4,2\n");
+        assert!(t.atc.enabled && t.atc.blow_s == 2.0);
+        assert_eq!(
+            t.change_seconds(6000.0),
+            crate::atc::typical_seconds(&t.atc, 6000.0)
+        );
+        // the sequence takes its own time (two moves of 10 mm, the blow of 2 s, two waits of the lock...), not the 7 s of the setting
+        assert!(t.change_seconds(6000.0) > 3.0 && t.change_seconds(6000.0) != 7.0);
+        // written back and read again
+        assert_eq!(Tuning::parse(&t.to_text()), t);
+        // an off line is kept, a line that is not valid changes nothing, and the default is not written
+        let off = Tuning::parse("atc = off | rack=1,2,3\n");
+        assert!(!off.atc.enabled && off.atc.rack == [1.0, 2.0, 3.0]);
+        assert_eq!(Tuning::parse("atc = on | safe=x\n").atc, AtcCfg::default());
+        assert!(!Tuning::default().to_text().contains("atc"));
+        assert_eq!(off.change_seconds(6000.0), off.tool_change_s);
+        // the example shows the line as a comment
+        assert!(Tuning::example().contains("# atc = on"));
     }
 
     #[test]

@@ -250,10 +250,13 @@ pub enum Msg {
     ViewIso,
     SetMaterial,
     MatNone,
+    AtcHeader,
+    AtcChange,
+    AtcFirst,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 242] = [
+pub const ALL: [Msg; 245] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -496,6 +499,9 @@ pub const ALL: [Msg; 242] = [
     Msg::ViewIso,
     Msg::SetMaterial,
     Msg::MatNone,
+    Msg::AtcHeader,
+    Msg::AtcChange,
+    Msg::AtcFirst,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2921,6 +2927,36 @@ fn table(m: Msg) -> [&'static str; 8] {
             "无",
             "Nenhum",
         ],
+        Msg::AtcHeader => [
+            "Tool changer (simulation): {0} changes, {1} in all",
+            "Cambiador de herramientas (simulación): {0} cambios, {1} en total",
+            "Werkzeugwechsler (Simulation): {0} Wechsel, insgesamt {1}",
+            "Changeur d'outils (simulation) : {0} changements, {1} au total",
+            "Cambio utensile automatico (simulazione): {0} cambi, {1} in tutto",
+            "ツールチェンジャー（シミュレーション）：{0} 回の交換、合計 {1}",
+            "换刀器（模拟）：{0} 次换刀，共 {1}",
+            "Trocador de ferramentas (simulação): {0} trocas, {1} no total",
+        ],
+        Msg::AtcChange => [
+            "line {0}: T{1} is put back and T{2} taken, {3} s (lock on output {4}, blow on output {5} for {6} s)",
+            "línea {0}: se devuelve T{1} y se toma T{2}, {3} s (bloqueo en la salida {4}, soplado en la salida {5} durante {6} s)",
+            "Zeile {0}: T{1} wird zurückgelegt und T{2} genommen, {3} s (Verriegelung an Ausgang {4}, Ausblasen an Ausgang {5} für {6} s)",
+            "ligne {0} : T{1} est reposé et T{2} pris, {3} s (verrou sur la sortie {4}, soufflage sur la sortie {5} pendant {6} s)",
+            "riga {0}: T{1} viene rimesso e T{2} preso, {3} s (blocco sull'uscita {4}, soffio sull'uscita {5} per {6} s)",
+            "{0} 行目：T{1} を戻して T{2} を取る、{3} 秒（ロックは出力 {4}、エアブローは出力 {5} で {6} 秒）",
+            "第 {0} 行：放回 T{1} 并取出 T{2}，{3} 秒（锁紧用输出 {4}，吹气用输出 {5}，持续 {6} 秒）",
+            "linha {0}: T{1} é devolvida e T{2} tomada, {3} s (bloqueio na saída {4}, sopro na saída {5} durante {6} s)",
+        ],
+        Msg::AtcFirst => [
+            "line {0}: T{2} is taken, {3} s (lock on output {4}, blow on output {5} for {6} s)",
+            "línea {0}: se toma T{2}, {3} s (bloqueo en la salida {4}, soplado en la salida {5} durante {6} s)",
+            "Zeile {0}: T{2} wird genommen, {3} s (Verriegelung an Ausgang {4}, Ausblasen an Ausgang {5} für {6} s)",
+            "ligne {0} : T{2} est pris, {3} s (verrou sur la sortie {4}, soufflage sur la sortie {5} pendant {6} s)",
+            "riga {0}: T{2} viene preso, {3} s (blocco sull'uscita {4}, soffio sull'uscita {5} per {6} s)",
+            "{0} 行目：T{2} を取る、{3} 秒（ロックは出力 {4}、エアブローは出力 {5} で {6} 秒）",
+            "第 {0} 行：取出 T{2}，{3} 秒（锁紧用输出 {4}，吹气用输出 {5}，持续 {6} 秒）",
+            "linha {0}: T{2} é tomada, {3} s (bloqueio na saída {4}, sopro na saída {5} durante {6} s)",
+        ],
     }
 }
 
@@ -2984,7 +3020,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 242);
+        assert_eq!(seen.len(), 245);
     }
 
     #[test]

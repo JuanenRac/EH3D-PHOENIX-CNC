@@ -26,7 +26,10 @@ impl App {
             offset: self.work_offset(),
             default_feed: self.settings.feed_mm_min,
             rapid_mm_min: self.settings.rapid_mm_min,
-            change_s: self.settings.tuning.tool_change_s,
+            change_s: self
+                .settings
+                .tuning
+                .change_seconds(self.settings.rapid_mm_min),
             limits: Limits {
                 tiny_mm: self.settings.summary_tiny_mm,
                 far_mm: self.settings.summary_far_mm,

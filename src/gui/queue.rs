@@ -210,7 +210,13 @@ impl App {
             let path = self.queue.items[i].path.clone();
             let one = self
                 .estimate
-                .file_seconds_with(&path, rates, self.settings.tuning.tool_change_s)
+                .file_seconds_with(
+                    &path,
+                    rates,
+                    self.settings
+                        .tuning
+                        .change_seconds(self.settings.rapid_mm_min),
+                )
                 .unwrap_or(0.0);
             runs += n;
             seconds += one * f64::from(n) + wait * f64::from(n.saturating_sub(1));

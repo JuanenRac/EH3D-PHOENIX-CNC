@@ -459,6 +459,7 @@ impl Settings {
         t.macro_max_lines = d.macro_max_lines;
         t.tool_change_s = d.tool_change_s;
         t.startline_confirm = d.startline_confirm;
+        t.atc = d.atc;
     }
 
     /// Puts a file at the head of the recent ones (it is not listed twice).

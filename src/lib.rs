@@ -4,6 +4,7 @@
 
 pub use eh3d_view::{crash, scene, texts, theme};
 
+pub mod atc;
 pub mod bookmarks;
 pub mod boxes;
 pub mod cli;

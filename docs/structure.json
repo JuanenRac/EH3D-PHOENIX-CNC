@@ -424,6 +424,19 @@
           }
         },
         {
+          "name": "atc.rs",
+          "desc": {
+            "en": "the tool changer worked out in simulation: lock, blow, the steps, the G-code and the time",
+            "es": "el cambiador de herramientas en simulación: bloqueo, soplado, los pasos, el G-code y el tiempo",
+            "de": "der Werkzeugwechsler in der Simulation: Verriegelung, Ausblasen, Schritte, G-Code und Zeit",
+            "fr": "le changeur d'outils en simulation : verrou, soufflage, les étapes, le G-code et le temps",
+            "it": "il cambio utensile in simulazione: blocco, soffio, i passi, il G-code e il tempo",
+            "ja": "シミュレーションのツールチェンジャー：ロック、エアブロー、手順、G コード、時間",
+            "zh": "模拟中的换刀器：锁紧、吹气、步骤、G 代码和时间",
+            "pt": "o trocador de ferramentas em simulação: bloqueio, sopro, os passos, o G-code e o tempo"
+          }
+        },
+        {
           "name": "bookmarks.rs",
           "desc": {
             "en": "bookmarks on the lines of a program: toggle, next, previous",

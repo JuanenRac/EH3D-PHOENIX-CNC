@@ -202,7 +202,7 @@ pub fn html(i: &Input) -> String {
         rapid: i.cfg.rapid_mm_min,
         default_feed: i.cfg.default_feed,
     };
-    let stats = measure(i.lines, rates, i.tuning.tool_change_s);
+    let stats = measure(i.lines, rates, i.tuning.change_seconds(i.cfg.rapid_mm_min));
     let found = notes(i.lines, i.tuning, i.lint, i.cfg);
     let path = toolpath(i.lines);
     let mut out = String::new();

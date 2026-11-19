@@ -44,16 +44,32 @@ impl App {
         }
     }
 
+    /// The seconds a tool change adds to the time: the changer's when it is on, `tool_change_time` when not.
+    pub(super) fn change_seconds(&self) -> f64 {
+        self.settings
+            .tuning
+            .change_seconds(self.settings.rapid_mm_min)
+    }
+
     /// The statistics of the program that is loaded, at the start of the simulation.
     pub(super) fn sim_state(&self) -> SimState {
         SimState {
             program_len: self.session.program.len(),
-            lines: measure(
-                &self.session.program,
-                self.sim_rates(),
-                self.settings.tuning.tool_change_s,
-            )
-            .lines(self.lang.code()),
+            lines: {
+                let mut lines = measure(
+                    &self.session.program,
+                    self.sim_rates(),
+                    self.change_seconds(),
+                )
+                .lines(self.lang.code());
+                lines.extend(crate::atc::report_lines(
+                    &self.session.program,
+                    &self.settings.tuning.atc,
+                    self.settings.rapid_mm_min,
+                    self.lang.code(),
+                ));
+                lines
+            },
             t: 0.0,
             playing: false,
         }
@@ -67,7 +83,7 @@ impl App {
                 &self.path_toolpath,
                 rates,
                 &self.path_extras,
-                self.settings.tuning.tool_change_s,
+                self.change_seconds(),
             );
             (tl.line_at(t), tl.position_at(t))
         };
@@ -105,7 +121,7 @@ impl App {
                 &self.path_toolpath,
                 rates,
                 &self.path_extras,
-                self.settings.tuning.tool_change_s,
+                self.change_seconds(),
             );
             let done = tl.begin_of_line(line);
             (tl.remaining(done), tl.total_s)
@@ -124,7 +140,7 @@ impl App {
                 &self.path_toolpath,
                 rates,
                 &self.path_extras,
-                self.settings.tuning.tool_change_s,
+                self.change_seconds(),
             )
             .total_s;
         let speed = self.settings.tuning.sim_speed;
@@ -217,7 +233,7 @@ impl App {
                     &self.path_toolpath,
                     rates,
                     &self.path_extras,
-                    self.settings.tuning.tool_change_s,
+                    self.change_seconds(),
                 )
                 .time_of_line(l);
             if let Some(t) = at {

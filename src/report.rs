@@ -113,10 +113,17 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
         rapid: cfg.rapid_mm_min,
         default_feed: cfg.default_feed,
     };
-    let stats = measure(lines, rates, tuning.tool_change_s);
+    let change_s = tuning.change_seconds(cfg.rapid_mm_min);
+    let stats = measure(lines, rates, change_s);
     let path = toolpath(lines);
-    let timeline = Timeline::build_with(&path, rates, &Extras::of(lines), tuning.tool_change_s);
+    let timeline = Timeline::build_with(&path, rates, &Extras::of(lines), change_s);
     let mut out: Vec<String> = stats.lines(lang);
+    out.extend(crate::atc::report_lines(
+        lines,
+        &tuning.atc,
+        cfg.rapid_mm_min,
+        lang,
+    ));
     out.push(say(
         lang,
         Msg::ReportMoves,
