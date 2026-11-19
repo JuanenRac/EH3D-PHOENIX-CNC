@@ -444,6 +444,7 @@ impl App {
                 self.refresh_path();
                 self.path = path.display().to_string();
                 self.remember(path);
+                self.load_marks_for(path);
                 true
             }
             Err(e) => {

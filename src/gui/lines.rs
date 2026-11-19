@@ -2,17 +2,29 @@
 //! in force is `startline`, both tested without a window; here there are the lists, the words (those of `words`, in the eight languages of the
 //! interface) and the preparation of the start, which is the same one a program left in the middle uses: the controller is put back in the
 //! state of the program and the program waits paused at the line, so the machine moves only when the operator presses Resume. Nothing moves
-//! before that, and a program that runs, here or on the server, is never touched.
+//! before that, and a program that runs, here or on the server, is never touched. The bookmarks can be kept in a file next to the program
+//! and read again when it is opened (`bookmarks`): the file is written only by its button, and replaced only after a question (unless the
+//! settings turn the question off).
 
 use super::*;
+use crate::bookmarks::{Loaded, SaveError, Saved};
 use crate::startline::{self, Note, Refusal, StartCheck};
 use crate::words::Msg;
 
-/// The window as it is: the start being looked at, if any, and whether the operator ticked the box that says the machine was checked.
+/// The window as it is: the start being looked at, if any, whether the operator ticked the box that says the machine was checked, what the
+/// last button of the file said, and whether the question about replacing the file is showing.
 #[derive(Default)]
 pub(super) struct LinesState {
     pub check: Option<StartCheck>,
     pub confirmed: bool,
+    pub said: Option<(Msg, Vec<String>)>,
+    pub ask_replace: bool,
+}
+
+/// What saving the bookmarks came to: a thing to say, or the question about replacing a file that is there.
+pub(super) enum MarksOutcome {
+    Said(Msg, Vec<String>),
+    Ask,
 }
 
 /// What a click in the window asks for.
@@ -25,6 +37,10 @@ enum Act {
     Back,
     Prepare,
     Close,
+    Save,
+    SaveReplace,
+    CancelAsk,
+    LoadFile,
 }
 
 impl App {
@@ -48,6 +64,65 @@ impl App {
         };
         if let Some(l) = to.filter(|&l| l < self.session.program.len()) {
             self.show_line(l);
+        }
+    }
+
+    /// Reads the bookmarks file next to a program that was just opened, when the settings ask for it, and says in the log what was found:
+    /// the bookmarks that belong to this very program are taken, a file written for another version is left out.
+    pub(super) fn load_marks_for(&mut self, path: &Path) {
+        if !self.settings.tuning.bookmarks_load {
+            return;
+        }
+        let file = crate::bookmarks::marks_path(path);
+        let shown = file.display().to_string();
+        let said = match crate::bookmarks::Bookmarks::load(&file, &self.session.program) {
+            Loaded::Missing => return,
+            Loaded::Marks(b) => {
+                let n = b.len().to_string();
+                self.bookmarks = b;
+                self.ws(Msg::BmLoadedFile, &[n, shown])
+            }
+            Loaded::Stale => self.w(Msg::BmStale).to_string(),
+            Loaded::Unusable => self.w(Msg::BmUnreadable).to_string(),
+        };
+        self.session.log.push(said);
+    }
+
+    /// Writes the bookmarks next to the program. A file that is there is replaced when `replace` is true or when the settings turn the
+    /// question off; otherwise the answer is `Ask`. A file that has these bookmarks already is left alone.
+    pub(super) fn save_marks(&mut self, replace: bool) -> MarksOutcome {
+        if self.path.is_empty() {
+            return MarksOutcome::Said(Msg::BmNoFile, Vec::new());
+        }
+        let file = crate::bookmarks::marks_path(Path::new(&self.path));
+        let replace = replace || !self.settings.tuning.bookmarks_confirm_replace;
+        match self.bookmarks.save(&file, &self.session.program, replace) {
+            Ok(Saved::Written) => {
+                MarksOutcome::Said(Msg::BmSaved, vec![file.display().to_string()])
+            }
+            Ok(Saved::Same) => MarksOutcome::Said(Msg::BmSame, Vec::new()),
+            Err(SaveError::Exists) => MarksOutcome::Ask,
+            Err(SaveError::Io(e)) => MarksOutcome::Said(Msg::FileError, vec![e]),
+        }
+    }
+
+    /// Adds the bookmarks of the file next to the program to the ones in the window (the ones there are kept). Says what it found.
+    pub(super) fn load_marks_button(&mut self) -> (Msg, Vec<String>) {
+        if self.path.is_empty() {
+            return (Msg::BmNoFile, Vec::new());
+        }
+        let file = crate::bookmarks::marks_path(Path::new(&self.path));
+        let shown = file.display().to_string();
+        match crate::bookmarks::Bookmarks::load(&file, &self.session.program) {
+            Loaded::Missing => (Msg::BmNoMarksFile, vec![shown]),
+            Loaded::Stale => (Msg::BmStale, Vec::new()),
+            Loaded::Unusable => (Msg::BmUnreadable, Vec::new()),
+            Loaded::Marks(b) => {
+                for &l in b.lines() {
+                    self.bookmarks.add(l);
+                }
+                (Msg::BmLoadedFile, vec![b.len().to_string(), shown])
+            }
         }
     }
 
@@ -111,6 +186,9 @@ impl App {
         let tick = self.settings.tuning.startline_confirm;
         let t = self.theme.clone();
         let check = st.check.clone();
+        let said = st.said.clone();
+        let ask = st.ask_replace;
+        let has_file = !self.path.is_empty();
         self.window(self.w(Msg::BmTitle))
             .default_width(520.0)
             .show(ctx, |ui| {
@@ -198,7 +276,36 @@ impl App {
                     {
                         act = Some(Act::Clear);
                     }
+                    if ui
+                        .add_enabled(
+                            has_file && !self.bookmarks.is_empty(),
+                            egui::Button::new(self.w(Msg::BmSave)),
+                        )
+                        .clicked()
+                    {
+                        act = Some(Act::Save);
+                    }
+                    if ui
+                        .add_enabled(has_file, egui::Button::new(self.w(Msg::BmLoadFile)))
+                        .clicked()
+                    {
+                        act = Some(Act::LoadFile);
+                    }
                 });
+                if let Some((m, args)) = &said {
+                    ui.colored_label(col(t.dim), self.ws(*m, args));
+                }
+                if ask {
+                    ui.colored_label(col(t.warn), self.w(Msg::BmReplaceAsk));
+                    ui.horizontal(|ui| {
+                        if ui.button(self.w(Msg::MatReplace)).clicked() {
+                            act = Some(Act::SaveReplace);
+                        }
+                        if ui.button(self.t(Text::McCancel)).clicked() {
+                            act = Some(Act::CancelAsk);
+                        }
+                    });
+                }
                 ui.separator();
                 if self.bookmarks.is_empty() {
                     ui.colored_label(col(t.dim), self.w(Msg::BmNone));
@@ -260,6 +367,27 @@ impl App {
                 }
             }
             Some(Act::Close) => return None,
+            Some(Act::Save) => match self.save_marks(false) {
+                MarksOutcome::Said(m, args) => {
+                    st.said = Some((m, args));
+                    st.ask_replace = false;
+                }
+                MarksOutcome::Ask => {
+                    st.said = None;
+                    st.ask_replace = true;
+                }
+            },
+            Some(Act::SaveReplace) => {
+                if let MarksOutcome::Said(m, args) = self.save_marks(true) {
+                    st.said = Some((m, args));
+                }
+                st.ask_replace = false;
+            }
+            Some(Act::CancelAsk) => st.ask_replace = false,
+            Some(Act::LoadFile) => {
+                st.said = Some(self.load_marks_button());
+                st.ask_replace = false;
+            }
             None => {}
         }
         Some(Win::Lines(st))
@@ -419,5 +547,105 @@ mod tests {
             .clear();
             assert!(matches!(a.win, Some(Win::Lines(_))));
         }
+    }
+
+    fn marks_folder(tag: &str) -> PathBuf {
+        let d =
+            std::env::temp_dir().join(format!("phoenix-cnc-marks-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn said(o: MarksOutcome) -> Option<Msg> {
+        match o {
+            MarksOutcome::Said(m, _) => Some(m),
+            MarksOutcome::Ask => None,
+        }
+    }
+
+    #[test]
+    fn the_bookmarks_are_kept_next_to_the_program_and_come_back_when_it_is_opened_again() {
+        let d = marks_folder("keep");
+        let file = d.join("part.nc");
+        std::fs::write(&file, "G21 G90\nG0 X1\nG0 X2\nG0 X3\nG0 X4\nM30\n").unwrap();
+        let marks = crate::bookmarks::marks_path(&file);
+        let mut a = App::isolated();
+        // a program with no file has nowhere to keep them
+        assert_eq!(said(a.save_marks(false)), Some(Msg::BmNoFile));
+        a.open(&file);
+        assert!(a.bookmarks.is_empty());
+        a.bookmarks.toggle(1);
+        a.bookmarks.toggle(3);
+        assert_eq!(said(a.save_marks(false)), Some(Msg::BmSaved));
+        assert!(marks.exists());
+        // the same bookmarks again: nothing is written and nothing is asked
+        assert_eq!(said(a.save_marks(false)), Some(Msg::BmSame));
+        // other bookmarks over a file that is there: the question comes first and the file is as it was
+        a.bookmarks.toggle(4);
+        let before = std::fs::read_to_string(&marks).unwrap();
+        assert!(matches!(a.save_marks(false), MarksOutcome::Ask));
+        assert_eq!(std::fs::read_to_string(&marks).unwrap(), before);
+        // the answer Replace writes it
+        assert_eq!(said(a.save_marks(true)), Some(Msg::BmSaved));
+        assert_ne!(std::fs::read_to_string(&marks).unwrap(), before);
+        // opening the program again brings them back, and the log says so
+        let mut b = App::isolated();
+        b.open(&file);
+        assert_eq!(b.bookmarks.lines(), [1, 3, 4]);
+        assert!(b.session.log.iter().any(|l| l.contains("bookmarks read")));
+        // with the question turned off the file is replaced at once
+        a.settings.tuning.bookmarks_confirm_replace = false;
+        a.bookmarks.toggle(0);
+        assert_eq!(said(a.save_marks(false)), Some(Msg::BmSaved));
+        let mut c = App::isolated();
+        c.open(&file);
+        assert_eq!(c.bookmarks.lines(), [0, 1, 3, 4]);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_bookmarks_file_is_read_only_when_the_settings_say_so_and_only_for_the_same_program() {
+        let d = marks_folder("read");
+        let file = d.join("part.nc");
+        std::fs::write(&file, "G21 G90\nG0 X1\nG0 X2\nM30\n").unwrap();
+        let mut a = App::isolated();
+        a.open(&file);
+        a.bookmarks.toggle(2);
+        assert_eq!(said(a.save_marks(false)), Some(Msg::BmSaved));
+        // the settings turn the reading off: the program opens with none, and the button loads them
+        let mut off = App::isolated();
+        off.settings.tuning.bookmarks_load = false;
+        off.open(&file);
+        assert!(off.bookmarks.is_empty());
+        off.bookmarks.toggle(0);
+        let (m, args) = off.load_marks_button();
+        assert_eq!((m, args.len()), (Msg::BmLoadedFile, 2));
+        assert_eq!(
+            off.bookmarks.lines(),
+            [0, 2],
+            "the ones in the window are kept"
+        );
+        // a program that was edited since is another one: the file is left out and the log says so
+        std::fs::write(&file, "G21 G90\nG0 X9\nG0 X2\nM30\n").unwrap();
+        let mut edited = App::isolated();
+        edited.open(&file);
+        assert!(edited.bookmarks.is_empty());
+        assert!(edited
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("another version")));
+        assert_eq!(edited.load_marks_button().0, Msg::BmStale);
+        // no file at all, and a file that is not a bookmarks file
+        let other = d.join("other.nc");
+        std::fs::write(&other, "G0 X1\n").unwrap();
+        let mut c = App::isolated();
+        c.open(&other);
+        assert!(c.session.log.iter().all(|l| !l.contains("bookmarks")));
+        assert_eq!(c.load_marks_button().0, Msg::BmNoMarksFile);
+        std::fs::write(crate::bookmarks::marks_path(&other), "nonsense\n").unwrap();
+        assert_eq!(c.load_marks_button().0, Msg::BmUnreadable);
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

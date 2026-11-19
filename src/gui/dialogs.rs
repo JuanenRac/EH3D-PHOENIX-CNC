@@ -424,33 +424,30 @@ impl App {
                 self.open_window("bookmarks");
                 ui.close();
             }
-            if ui
-                .add_enabled(
-                    self.selected_line().is_some(),
-                    egui::Button::new(self.w(Msg::MenuBookmarkToggle)),
-                )
-                .clicked()
-            {
+            if self.menu_item(
+                ui,
+                self.w(Msg::MenuBookmarkToggle),
+                Shortcut::BookmarkToggle,
+                self.selected_line().is_some(),
+            ) {
                 self.toggle_bookmark_selected();
                 ui.close();
             }
-            if ui
-                .add_enabled(
-                    !self.bookmarks.is_empty(),
-                    egui::Button::new(self.w(Msg::MenuBookmarkNext)),
-                )
-                .clicked()
-            {
+            if self.menu_item(
+                ui,
+                self.w(Msg::MenuBookmarkNext),
+                Shortcut::BookmarkNext,
+                !self.bookmarks.is_empty(),
+            ) {
                 self.bookmark_step(true);
                 ui.close();
             }
-            if ui
-                .add_enabled(
-                    !self.bookmarks.is_empty(),
-                    egui::Button::new(self.w(Msg::MenuBookmarkPrev)),
-                )
-                .clicked()
-            {
+            if self.menu_item(
+                ui,
+                self.w(Msg::MenuBookmarkPrev),
+                Shortcut::BookmarkPrev,
+                !self.bookmarks.is_empty(),
+            ) {
                 self.bookmark_step(false);
                 ui.close();
             }

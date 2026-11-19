@@ -25,6 +25,9 @@ pub(super) enum Shortcut {
     ViewFront,
     ViewSide,
     ViewIso,
+    BookmarkToggle,
+    BookmarkNext,
+    BookmarkPrev,
 }
 
 /// A key, the words it is shown with and the text of what it does.
@@ -41,7 +44,7 @@ pub(super) struct Binding {
 const CMD: egui::Modifiers = egui::Modifiers::COMMAND;
 const NONE: egui::Modifiers = egui::Modifiers::NONE;
 
-pub(super) const BINDINGS: [Binding; 15] = [
+pub(super) const BINDINGS: [Binding; 18] = [
     Binding {
         shortcut: Shortcut::Open,
         modifiers: CMD,
@@ -161,6 +164,31 @@ pub(super) const BINDINGS: [Binding; 15] = [
         label: "Ctrl+4",
         text: Text::ViewMachine,
         msg: Some(Msg::ViewIso),
+    },
+    Binding {
+        shortcut: Shortcut::BookmarkToggle,
+        modifiers: CMD,
+        key: egui::Key::B,
+        label: "Ctrl+B",
+        text: Text::ViewMachine,
+        msg: Some(Msg::MenuBookmarkToggle),
+    },
+    // the key with Ctrl comes before the plain one, so that Ctrl+F2 is never taken for F2
+    Binding {
+        shortcut: Shortcut::BookmarkPrev,
+        modifiers: CMD,
+        key: egui::Key::F2,
+        label: "Ctrl+F2",
+        text: Text::ViewMachine,
+        msg: Some(Msg::MenuBookmarkPrev),
+    },
+    Binding {
+        shortcut: Shortcut::BookmarkNext,
+        modifiers: NONE,
+        key: egui::Key::F2,
+        label: "F2",
+        text: Text::ViewMachine,
+        msg: Some(Msg::MenuBookmarkNext),
     },
 ];
 
@@ -287,6 +315,11 @@ impl App {
             Shortcut::ViewFront => self.set_preset(crate::view::Preset::Front),
             Shortcut::ViewSide => self.set_preset(crate::view::Preset::Side),
             Shortcut::ViewIso => self.set_preset(crate::view::Preset::Iso),
+            Shortcut::BookmarkToggle => {
+                self.toggle_bookmark_selected();
+            }
+            Shortcut::BookmarkNext => self.bookmark_step(true),
+            Shortcut::BookmarkPrev => self.bookmark_step(false),
         }
     }
 }
@@ -328,6 +361,18 @@ mod tests {
             Some(Shortcut::ViewFront)
         );
         assert_eq!(label_of(Shortcut::ViewIso), "Ctrl+4");
+        // the keys of the bookmarks
+        assert_eq!(label_of(Shortcut::BookmarkToggle), "Ctrl+B");
+        assert_eq!(label_of(Shortcut::BookmarkNext), "F2");
+        assert_eq!(label_of(Shortcut::BookmarkPrev), "Ctrl+F2");
+        assert_eq!(
+            shortcut_of(egui::Key::F2, egui::Modifiers::COMMAND),
+            Some(Shortcut::BookmarkPrev)
+        );
+        assert_eq!(
+            shortcut_of(egui::Key::F2, egui::Modifiers::NONE),
+            Some(Shortcut::BookmarkNext)
+        );
         // the keys that have words of their own show them
         for b in BINDINGS.iter().filter(|b| b.msg.is_some()) {
             assert!(!b.label.is_empty());
@@ -344,6 +389,33 @@ mod tests {
         );
         assert_eq!(shortcut_of(egui::Key::F6, egui::Modifiers::NONE), None);
         assert_eq!(shortcut_of(egui::Key::F8, egui::Modifiers::NONE), None);
+    }
+
+    #[test]
+    fn the_keys_of_the_bookmarks_toggle_and_step_and_do_nothing_behind_a_window() {
+        let mut a = app();
+        a.session
+            .load("G21 G90\nG0 X1\nG0 X2\nG0 X3\nG0 X4\nG0 X5\nM30");
+        a.refresh_path();
+        // nothing selected: nothing is bookmarked
+        a.shortcut(Shortcut::BookmarkToggle);
+        assert!(a.bookmarks.is_empty());
+        for line in [1, 3, 5] {
+            a.focus_line = Some(line);
+            a.shortcut(Shortcut::BookmarkToggle);
+        }
+        assert_eq!(a.bookmarks.lines(), [1, 3, 5]);
+        a.focus_line = Some(1);
+        a.shortcut(Shortcut::BookmarkNext);
+        assert_eq!(a.focus_line, Some(3));
+        a.shortcut(Shortcut::BookmarkPrev);
+        assert_eq!(a.focus_line, Some(1));
+        a.shortcut(Shortcut::BookmarkPrev);
+        assert_eq!(a.focus_line, Some(5), "it goes round");
+        // while a window is open the keys do not reach the program behind it
+        a.win = Some(Win::About);
+        a.shortcut(Shortcut::BookmarkToggle);
+        assert_eq!(a.bookmarks.lines(), [1, 3, 5]);
     }
 
     #[test]

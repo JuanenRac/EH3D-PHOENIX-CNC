@@ -305,10 +305,22 @@ pub enum Msg {
     MatErrRange,
     MatErrRepeated,
     MatErrTooMany,
+    BmSave,
+    BmLoadFile,
+    BmSaved,
+    BmSame,
+    BmLoadedFile,
+    BmNoFile,
+    BmNoMarksFile,
+    BmStale,
+    BmUnreadable,
+    BmReplaceAsk,
+    SetBmLoad,
+    SetBmConfirm,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 297] = [
+pub const ALL: [Msg; 309] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -606,6 +618,18 @@ pub const ALL: [Msg; 297] = [
     Msg::MatErrRange,
     Msg::MatErrRepeated,
     Msg::MatErrTooMany,
+    Msg::BmSave,
+    Msg::BmLoadFile,
+    Msg::BmSaved,
+    Msg::BmSame,
+    Msg::BmLoadedFile,
+    Msg::BmNoFile,
+    Msg::BmNoMarksFile,
+    Msg::BmStale,
+    Msg::BmUnreadable,
+    Msg::BmReplaceAsk,
+    Msg::SetBmLoad,
+    Msg::SetBmConfirm,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -3581,6 +3605,126 @@ fn table(m: Msg) -> [&'static str; 8] {
             "第 {0} 行：材料库最多容纳 64 种材料",
             "linha {0}: a biblioteca admite no máximo 64 materiais",
         ],
+        Msg::BmSave => [
+            "Save the bookmarks next to the program",
+            "Guardar los marcadores junto al programa",
+            "Lesezeichen neben dem Programm speichern",
+            "Enregistrer les signets à côté du programme",
+            "Salva i segnalibri accanto al programma",
+            "しおりをプログラムの隣に保存",
+            "将书签保存在程序旁边",
+            "Guardar os marcadores junto ao programa",
+        ],
+        Msg::BmLoadFile => [
+            "Load the saved bookmarks",
+            "Cargar los marcadores guardados",
+            "Gespeicherte Lesezeichen laden",
+            "Charger les signets enregistrés",
+            "Carica i segnalibri salvati",
+            "保存したしおりを読み込む",
+            "载入已保存的书签",
+            "Carregar os marcadores guardados",
+        ],
+        Msg::BmSaved => [
+            "Bookmarks saved: {0}",
+            "Marcadores guardados: {0}",
+            "Lesezeichen gespeichert: {0}",
+            "Signets enregistrés : {0}",
+            "Segnalibri salvati: {0}",
+            "しおりを保存しました：{0}",
+            "书签已保存：{0}",
+            "Marcadores guardados: {0}",
+        ],
+        Msg::BmSame => [
+            "The bookmarks file has these bookmarks already",
+            "El fichero de marcadores ya tiene estos marcadores",
+            "Die Lesezeichendatei enthält diese Lesezeichen schon",
+            "Le fichier des signets a déjà ces signets",
+            "Il file dei segnalibri ha già questi segnalibri",
+            "しおりのファイルにはすでにこのしおりがあります",
+            "书签文件中已经有这些书签",
+            "O ficheiro de marcadores já tem estes marcadores",
+        ],
+        Msg::BmLoadedFile => [
+            "{0} bookmarks read from {1}",
+            "{0} marcadores leídos de {1}",
+            "{0} Lesezeichen aus {1} gelesen",
+            "{0} signets lus dans {1}",
+            "{0} segnalibri letti da {1}",
+            "{1} から {0} 個のしおりを読み込みました",
+            "已从 {1} 读取 {0} 个书签",
+            "{0} marcadores lidos de {1}",
+        ],
+        Msg::BmNoFile => [
+            "The program has no file yet: save it first, the bookmarks are kept next to it",
+            "El programa aún no tiene fichero: guárdalo primero, los marcadores se guardan junto a él",
+            "Das Programm hat noch keine Datei: speichere es zuerst, die Lesezeichen liegen daneben",
+            "Le programme n'a pas encore de fichier : enregistrez-le d'abord, les signets sont gardés à côté",
+            "Il programma non ha ancora un file: salvalo prima, i segnalibri restano accanto",
+            "プログラムにはまだファイルがありません。先に保存してください。しおりはその隣に保存されます",
+            "程序还没有文件：请先保存，书签保存在它旁边",
+            "O programa ainda não tem ficheiro: guarde-o primeiro, os marcadores ficam junto dele",
+        ],
+        Msg::BmNoMarksFile => [
+            "There is no bookmarks file next to the program: {0}",
+            "No hay fichero de marcadores junto al programa: {0}",
+            "Neben dem Programm gibt es keine Lesezeichendatei: {0}",
+            "Il n'y a pas de fichier de signets à côté du programme : {0}",
+            "Accanto al programma non c'è un file di segnalibri: {0}",
+            "プログラムの隣にしおりのファイルがありません：{0}",
+            "程序旁边没有书签文件：{0}",
+            "Não há ficheiro de marcadores junto ao programa: {0}",
+        ],
+        Msg::BmStale => [
+            "The bookmarks file belongs to another version of the program and was left out",
+            "El fichero de marcadores es de otra versión del programa y se ha dejado fuera",
+            "Die Lesezeichendatei gehört zu einer anderen Fassung des Programms und wurde ausgelassen",
+            "Le fichier des signets appartient à une autre version du programme et a été écarté",
+            "Il file dei segnalibri appartiene a un'altra versione del programma ed è stato escluso",
+            "しおりのファイルはプログラムの別のバージョンのものなので、使いませんでした",
+            "该书签文件属于程序的另一个版本，已被忽略",
+            "O ficheiro de marcadores pertence a outra versão do programa e foi deixado de fora",
+        ],
+        Msg::BmUnreadable => [
+            "The bookmarks file is too big, cannot be read or is not a bookmarks file",
+            "El fichero de marcadores es demasiado grande, no se puede leer o no es un fichero de marcadores",
+            "Die Lesezeichendatei ist zu groß, nicht lesbar oder keine Lesezeichendatei",
+            "Le fichier des signets est trop gros, illisible ou n'est pas un fichier de signets",
+            "Il file dei segnalibri è troppo grande, illeggibile o non è un file di segnalibri",
+            "しおりのファイルが大きすぎるか、読み込めないか、しおりのファイルではありません",
+            "书签文件过大、无法读取或不是书签文件",
+            "O ficheiro de marcadores é demasiado grande, não pode ser lido ou não é um ficheiro de marcadores",
+        ],
+        Msg::BmReplaceAsk => [
+            "The bookmarks file is there already. Replace it with these bookmarks?",
+            "El fichero de marcadores ya existe. ¿Sustituirlo por estos marcadores?",
+            "Die Lesezeichendatei gibt es schon. Durch diese Lesezeichen ersetzen?",
+            "Le fichier des signets existe déjà. Le remplacer par ces signets ?",
+            "Il file dei segnalibri esiste già. Sostituirlo con questi segnalibri?",
+            "しおりのファイルはすでにあります。このしおりで置き換えますか？",
+            "书签文件已存在。要用这些书签替换吗？",
+            "O ficheiro de marcadores já existe. Substituí-lo por estes marcadores?",
+        ],
+        Msg::SetBmLoad => [
+            "Read the bookmarks file of a program when it is opened",
+            "Leer el fichero de marcadores de un programa al abrirlo",
+            "Beim Öffnen eines Programms dessen Lesezeichendatei lesen",
+            "Lire le fichier des signets d'un programme à son ouverture",
+            "Leggere il file dei segnalibri di un programma quando lo si apre",
+            "プログラムを開くときにそのしおりのファイルを読み込む",
+            "打开程序时读取其书签文件",
+            "Ler o ficheiro de marcadores de um programa ao abri-lo",
+        ],
+        Msg::SetBmConfirm => [
+            "Ask before replacing a bookmarks file",
+            "Preguntar antes de sustituir un fichero de marcadores",
+            "Vor dem Ersetzen einer Lesezeichendatei nachfragen",
+            "Demander avant de remplacer un fichier de signets",
+            "Chiedere prima di sostituire un file di segnalibri",
+            "しおりのファイルを置き換える前に確認する",
+            "替换书签文件前先询问",
+            "Perguntar antes de substituir um ficheiro de marcadores",
+        ],
     }
 }
 
@@ -3644,7 +3788,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 297);
+        assert_eq!(seen.len(), 309);
     }
 
     #[test]

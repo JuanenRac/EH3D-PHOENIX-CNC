@@ -673,6 +673,11 @@ impl App {
             &mut d.s.tuning.startline_confirm,
             self.w(Msg::SetStartConfirm),
         );
+        ui.checkbox(&mut d.s.tuning.bookmarks_load, self.w(Msg::SetBmLoad));
+        ui.checkbox(
+            &mut d.s.tuning.bookmarks_confirm_replace,
+            self.w(Msg::SetBmConfirm),
+        );
         ui.add_space(6.0);
         egui::Grid::new("set-queue")
             .num_columns(2)

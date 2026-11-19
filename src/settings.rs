@@ -465,6 +465,8 @@ impl Settings {
         t.macro_max_lines = d.macro_max_lines;
         t.tool_change_s = d.tool_change_s;
         t.startline_confirm = d.startline_confirm;
+        t.bookmarks_load = d.bookmarks_load;
+        t.bookmarks_confirm_replace = d.bookmarks_confirm_replace;
     }
 
     /// The tool changer goes back to its defaults (off); the table of slots lives in its own file and stays.

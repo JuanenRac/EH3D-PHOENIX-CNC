@@ -34,6 +34,10 @@ pub struct Tuning {
     /// Starting a program from one of its lines asks for a tick that says the tool, the spindle and the zero were checked
     /// (`startline_confirm`).
     pub startline_confirm: bool,
+    /// The bookmarks file next to a program is read when the program is opened (`bookmarks_load`), and a bookmarks file that is there is
+    /// replaced only after a question (`bookmarks_confirm_replace`).
+    pub bookmarks_load: bool,
+    pub bookmarks_confirm_replace: bool,
     /// The automatic tool changer worked out in simulation (`atc`): off unless the line says `on`.
     pub atc: AtcCfg,
 }
@@ -55,6 +59,8 @@ impl Default for Tuning {
             macro_max_lines: 200,
             tool_change_s: 30.0,
             startline_confirm: true,
+            bookmarks_load: true,
+            bookmarks_confirm_replace: true,
             atc: AtcCfg::default(),
         }
     }
@@ -147,6 +153,8 @@ impl Tuning {
                         .unwrap_or(t.macro_max_lines)
                 }
                 "startline_confirm" => t.startline_confirm = on(v),
+                "bookmarks_load" => t.bookmarks_load = on(v),
+                "bookmarks_confirm_replace" => t.bookmarks_confirm_replace = on(v),
                 "atc" => {
                     if let Some(c) = AtcCfg::parse(v) {
                         t.atc = c;
@@ -195,6 +203,11 @@ impl Tuning {
         put(
             "startline_confirm",
             yes_no(self.startline_confirm).to_string(),
+        );
+        put("bookmarks_load", yes_no(self.bookmarks_load).to_string());
+        put(
+            "bookmarks_confirm_replace",
+            yes_no(self.bookmarks_confirm_replace).to_string(),
         );
         if self.atc != AtcCfg::default() {
             put("atc", self.atc.to_line());
@@ -257,6 +270,11 @@ mod tests {
         // starting from a line asks for the tick
         assert!(d.startline_confirm);
         assert!(!Tuning::parse("startline_confirm = no").startline_confirm);
+        // the bookmarks file is read when a program is opened and is never replaced without a question
+        assert!(d.bookmarks_load && d.bookmarks_confirm_replace);
+        let t = Tuning::parse("bookmarks_load = no\nbookmarks_confirm_replace = off\n");
+        assert!(!t.bookmarks_load && !t.bookmarks_confirm_replace);
+        assert_eq!(Tuning::parse(&t.to_text()), t);
         // a program that enters a box does not start, and the queue kept in the file waits for the operator
         assert!(d.keepout_reject && d.queue_remember);
         assert_eq!(d.sim_speed, 10.0);
