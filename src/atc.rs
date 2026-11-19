@@ -24,6 +24,11 @@ pub const MAX_TOOL: u32 = 255;
 pub const MAX_FILE_BYTES: u64 = 16 * 1024;
 /// The biggest X or Y of a slot, in mm.
 const LIMIT_MM: f64 = 100_000.0;
+/// The ranges the line of the settings accepts (the settings window offers a number only inside them): a coordinate, a step or a height in
+/// mm, the number of an output, and the seconds of a wait.
+pub const COORD_RANGE: (f64, f64) = (-LIMIT_MM, LIMIT_MM);
+pub const PIN_RANGE: (f64, f64) = (0.0, 255.0);
+pub const SECONDS_RANGE: (f64, f64) = (0.0, 60.0);
 /// Two slots closer than this (mm) are the same place.
 pub const MIN_APART_MM: f64 = 1.0;
 
@@ -214,14 +219,32 @@ fn pair(v: &str) -> Option<(f64, f64)> {
     (a.is_finite() && b.is_finite()).then_some((a, b))
 }
 
+/// The example table that is shipped, to be copied and edited.
+const SHIPPED_TABLE: &str = include_str!("../examples/atc.txt");
+
+/// Writes the example table as the file of the operator, next to the settings. A file that is there is never written over (the error is
+/// `AlreadyExists`).
+pub fn create_sample(settings: &std::path::Path) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(table_path(settings))?;
+    f.write_all(SHIPPED_TABLE.as_bytes())
+}
+
 fn pin_and_seconds(v: &str) -> Option<(u32, f64)> {
     let (p, s) = v.split_once(',')?;
-    let pin = p.trim().parse::<u32>().ok().filter(|p| *p <= 255)?;
+    let pin = p
+        .trim()
+        .parse::<u32>()
+        .ok()
+        .filter(|p| f64::from(*p) <= PIN_RANGE.1)?;
     let s = s
         .trim()
         .parse::<f64>()
         .ok()
-        .filter(|s| (0.0..=60.0).contains(s))?;
+        .filter(|s| (SECONDS_RANGE.0..=SECONDS_RANGE.1).contains(s))?;
     Some((pin, s))
 }
 
@@ -262,7 +285,10 @@ impl AtcCfg {
                     cfg.rack = r;
                 }
                 "pitch" => {
-                    let (dx, dy) = pair(v)?;
+                    let (dx, dy) = pair(v).filter(|(a, b)| {
+                        (COORD_RANGE.0..=COORD_RANGE.1).contains(a)
+                            && (COORD_RANGE.0..=COORD_RANGE.1).contains(b)
+                    })?;
                     cfg.pitch = [dx, dy];
                 }
                 "lock" => (cfg.lock_pin, cfg.lock_wait_s) = pin_and_seconds(v)?,
@@ -891,5 +917,59 @@ mod tests {
             said[0].contains("16 KiB") && !said[0].contains("line"),
             "{said:?}"
         );
+    }
+
+    #[test]
+    fn the_ranges_the_window_offers_are_the_ones_the_line_accepts() {
+        let (c0, c1) = COORD_RANGE;
+        for v in [c0, c1, 0.0] {
+            for field in [
+                format!("safe={v}"),
+                format!("rack={v},{v},{v}"),
+                format!("pitch={v},{v}"),
+            ] {
+                assert!(AtcCfg::parse(&format!("on | {field}")).is_some(), "{field}");
+            }
+        }
+        for v in [c1 + 1.0, c0 - 1.0] {
+            for field in [
+                format!("safe={v}"),
+                format!("rack={v},0,0"),
+                format!("pitch=0,{v}"),
+            ] {
+                assert!(AtcCfg::parse(&format!("on | {field}")).is_none(), "{field}");
+            }
+        }
+        let (p0, p1) = PIN_RANGE;
+        let (s0, s1) = SECONDS_RANGE;
+        for (pin, secs) in [(p0, s0), (p1, s1)] {
+            let line = format!("on | lock={pin},{secs} | blow={pin},{secs}");
+            let c = AtcCfg::parse(&line).expect(&line);
+            assert_eq!((f64::from(c.lock_pin), c.lock_wait_s), (pin, secs));
+            assert_eq!((f64::from(c.blow_pin), c.blow_s), (pin, secs));
+        }
+        for bad in [
+            format!("on | lock={},1", p1 + 1.0),
+            format!("on | lock=1,{}", s1 + 0.5),
+            format!("on | blow=1,{}", s0 - 0.5),
+        ] {
+            assert!(AtcCfg::parse(&bad).is_none(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn the_example_table_file_is_made_once_and_never_written_over() {
+        let dir = std::env::temp_dir().join(format!("eh3d-atc-sample-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("phoenix-cnc.cfg");
+        assert!(create_sample(&settings).is_ok());
+        let table = load_table(&settings);
+        assert_eq!((table.slots.len(), table.issues.len()), (6, 0));
+        // the operator changes it; asking again leaves it as it is
+        std::fs::write(table_path(&settings), "tool = 9 | pos=1,1\n").unwrap();
+        let err = create_sample(&settings).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(load_table(&settings).slots.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

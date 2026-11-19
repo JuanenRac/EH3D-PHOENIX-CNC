@@ -530,14 +530,14 @@
         {
           "name": "gui/prefs.rs",
           "desc": {
-            "en": "the settings sections of the program tools: checks, probe, queue",
-            "es": "las secciones de ajustes de las herramientas: revisiones, sonda, cola",
-            "de": "die Einstellungsgruppen der Werkzeuge: Prüfungen, Taster, Warteschlange",
-            "fr": "les sections de réglages des outils : vérifications, palpeur, file",
-            "it": "le sezioni delle impostazioni degli strumenti: controlli, sonda, coda",
-            "ja": "ツールの設定セクション：チェック、プローブ、キュー",
-            "zh": "程序工具的设置分区：检查、探针、队列",
-            "pt": "as secções de definições das ferramentas: verificações, sonda, fila"
+            "en": "the settings sections of the program tools: checks, probe, queue, tool changer, materials",
+            "es": "las secciones de ajustes de las herramientas: revisiones, sonda, cola, cambiador, materiales",
+            "de": "die Einstellungsgruppen der Werkzeuge: Prüfungen, Taster, Warteschlange, Wechsler, Materialien",
+            "fr": "les sections de réglages des outils : vérifications, palpeur, file, changeur, matériaux",
+            "it": "le sezioni delle impostazioni degli strumenti: controlli, sonda, coda, cambio, materiali",
+            "ja": "ツールの設定セクション：チェック、プローブ、キュー、ツールチェンジャー、材料",
+            "zh": "程序工具的设置分区：检查、探针、队列、换刀器、材料",
+            "pt": "as secções de definições das ferramentas: verificações, sonda, fila, trocador, materiais"
           }
         },
         {

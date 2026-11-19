@@ -450,7 +450,8 @@ impl Settings {
         self.jog_soft_limits = d.jog_soft_limits;
     }
 
-    /// The queue, the simulation, the session log, the macros and the time of a tool change go back to their defaults (the keep-out boxes stay).
+    /// The queue, the simulation, the session log, the macros and the time of a tool change go back to their defaults (the keep-out boxes
+    /// stay).
     pub fn reset_queue(&mut self) {
         let d = Tuning::default();
         let t = &mut self.tuning;
@@ -464,10 +465,20 @@ impl Settings {
         t.macro_max_lines = d.macro_max_lines;
         t.tool_change_s = d.tool_change_s;
         t.startline_confirm = d.startline_confirm;
-        // the table of slots lives in its own file: the values of the line go back, the table stays
-        let table = std::mem::take(&mut t.atc.table);
-        t.atc = d.atc;
-        t.atc.table = table;
+    }
+
+    /// The tool changer goes back to its defaults (off); the table of slots lives in its own file and stays.
+    pub fn reset_atc(&mut self) {
+        let table = std::mem::take(&mut self.tuning.atc.table);
+        self.tuning.atc = Tuning::default().atc;
+        self.tuning.atc.table = table;
+    }
+
+    /// No material is chosen (the library, which is a file of its own, stays).
+    pub fn reset_materials(&mut self) {
+        self.material.clear();
+        self.lint.material_feed = None;
+        self.lint.material_rpm = None;
     }
 
     /// Puts a file at the head of the recent ones (it is not listed twice).

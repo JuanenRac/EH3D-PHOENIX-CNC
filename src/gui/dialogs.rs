@@ -54,6 +54,8 @@ pub(super) enum Win {
 pub(super) struct Draft {
     pub s: Settings,
     pub section: usize,
+    /// The editors of the tool changer table and of the library of materials, inside the settings window.
+    pub mats: prefs::MatEdit,
 }
 
 impl App {
@@ -119,17 +121,19 @@ impl App {
     /// Opens a window by its name (for the pictures and the command line).
     pub(super) fn open_window(&mut self, name: &str) {
         self.win = match name {
-            "settings" | "settings-checks" | "settings-probe" | "settings-queue" => {
-                Some(Win::Settings(Box::new(Draft {
-                    s: self.settings.clone(),
-                    section: match name {
-                        "settings-checks" => prefs::FIRST_SECTION,
-                        "settings-probe" => prefs::FIRST_SECTION + 1,
-                        "settings-queue" => prefs::FIRST_SECTION + 2,
-                        _ => 1,
-                    },
-                })))
-            }
+            "settings" | "settings-checks" | "settings-probe" | "settings-queue"
+            | "settings-atc" | "settings-materials" => Some(Win::Settings(Box::new(Draft {
+                s: self.settings.clone(),
+                section: match name {
+                    "settings-checks" => prefs::FIRST_SECTION,
+                    "settings-probe" => prefs::FIRST_SECTION + 1,
+                    "settings-queue" => prefs::FIRST_SECTION + 2,
+                    "settings-atc" => prefs::FIRST_SECTION + 3,
+                    "settings-materials" => prefs::FIRST_SECTION + 4,
+                    _ => 1,
+                },
+                mats: Default::default(),
+            }))),
             "open" => Some(Win::Open(self.browser(Mode::Open))),
             "save" => Some(Win::Save(self.browser(Mode::Save))),
             "edit" => Some(Win::Edit(self.edit_state())),
@@ -277,6 +281,7 @@ impl App {
                 self.win = Some(Win::Settings(Box::new(Draft {
                     s: self.settings.clone(),
                     section: 0,
+                    mats: Default::default(),
                 })));
                 ui.close();
             }
@@ -1123,6 +1128,8 @@ impl App {
                             tools[0],
                             tools[1],
                             tools[2],
+                            tools[3],
+                            tools[4],
                         ]
                         .into_iter()
                         .enumerate()
@@ -1284,7 +1291,7 @@ impl App {
                                     );
                                 });
                             }
-                            prefs::FIRST_SECTION..=8 => {
+                            prefs::FIRST_SECTION..=prefs::LAST_SECTION => {
                                 egui::ScrollArea::vertical()
                                     .id_salt("set-tools-scroll")
                                     .max_height(340.0)
@@ -1340,6 +1347,8 @@ impl App {
         if cancel {
             return None;
         }
+        // the buttons of the tool changer and of the materials act on files, which needs the whole program
+        self.tool_file_actions(&mut d);
         Some(Win::Settings(d))
     }
 }
@@ -1458,6 +1467,8 @@ mod tests {
             ("settings-checks", true),
             ("settings-probe", true),
             ("settings-queue", true),
+            ("settings-atc", true),
+            ("settings-materials", true),
             ("open", true),
             ("about", true),
             ("edit", true),

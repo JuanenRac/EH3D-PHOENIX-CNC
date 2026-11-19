@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::heightmap::num;
 use crate::lint::LintCfg;
 use crate::profiles::clean_name;
 
@@ -38,7 +39,63 @@ fn range(v: &str) -> Option<(f64, f64)> {
         .then_some((lo, hi))
 }
 
+/// Why a material of the editor cannot be written to the file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowError {
+    /// The name is empty or has characters the file cannot keep (it would be read back as another name).
+    Name,
+    /// Neither a range of feed nor a range of speed.
+    NoRange,
+    /// A range that does not go from 0 or more up to something bigger, within 1000000.
+    Range,
+    /// The name is the one of an earlier material (capitals do not matter).
+    Repeated,
+    /// More than `MAX_MATERIALS`.
+    TooMany,
+}
+
+/// Why the library could not be written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SaveError {
+    /// The file is there and nobody said it could be replaced.
+    Exists,
+    /// A row (from 0) cannot be written.
+    Invalid(usize, RowError),
+    /// The system refused (the text of its error).
+    Io(String),
+}
+
+fn range_ok((lo, hi): (f64, f64)) -> bool {
+    lo.is_finite() && hi.is_finite() && lo >= 0.0 && hi > lo && hi <= 1_000_000.0
+}
+
 impl Material {
+    /// Whether this material is written to the file and read back as it is.
+    pub fn check(&self) -> Result<(), RowError> {
+        if clean_name(&self.name).as_deref() != Some(self.name.as_str()) {
+            return Err(RowError::Name);
+        }
+        if self.feed.is_none() && self.rpm.is_none() {
+            return Err(RowError::NoRange);
+        }
+        if self.feed.into_iter().chain(self.rpm).any(|r| !range_ok(r)) {
+            return Err(RowError::Range);
+        }
+        Ok(())
+    }
+
+    /// The line of the file for this material.
+    pub fn to_line(&self) -> String {
+        let mut s = format!("material = {}", self.name);
+        if let Some((lo, hi)) = self.feed {
+            s.push_str(&format!(" | feed={},{}", num(lo), num(hi)));
+        }
+        if let Some((lo, hi)) = self.rpm {
+            s.push_str(&format!(" | rpm={},{}", num(lo), num(hi)));
+        }
+        s
+    }
+
     /// Reads what follows `material =` in a line of the file.
     pub fn parse(value: &str) -> Option<Material> {
         let mut parts = value.split('|');
@@ -84,6 +141,67 @@ pub fn parse_library(text: &str) -> Vec<Material> {
         }
     }
     out
+}
+
+/// Whether a library can be written as it is: the first row that cannot, with the reason.
+pub fn check_library(rows: &[Material]) -> Result<(), (usize, RowError)> {
+    for (i, m) in rows.iter().enumerate() {
+        if i >= MAX_MATERIALS {
+            return Err((i, RowError::TooMany));
+        }
+        m.check().map_err(|e| (i, e))?;
+        if rows[..i]
+            .iter()
+            .any(|o| o.name.eq_ignore_ascii_case(&m.name))
+        {
+            return Err((i, RowError::Repeated));
+        }
+    }
+    Ok(())
+}
+
+/// The text of the file for a library.
+pub fn to_text(rows: &[Material]) -> String {
+    let mut s = String::from(
+        "# The library of materials (material = NAME | feed=LOW,HIGH | rpm=LOW,HIGH), written by the editor of the settings window.\n",
+    );
+    for m in rows {
+        s.push_str(&m.to_line());
+        s.push('\n');
+    }
+    s
+}
+
+/// Writes the library of the operator next to the settings. A file that is there is replaced only when `replace` is true; a library that
+/// could not be read back as it is (see `check_library`) is not written.
+pub fn save(settings: &Path, rows: &[Material], replace: bool) -> Result<(), SaveError> {
+    check_library(rows).map_err(|(i, e)| SaveError::Invalid(i, e))?;
+    write_file(&library_path(settings), &to_text(rows), replace)
+}
+
+/// Writes the library that is shipped as the file of the operator, to be edited. A file that is there is never written over.
+pub fn create_sample(settings: &Path) -> Result<(), SaveError> {
+    write_file(&library_path(settings), SHIPPED, false)
+}
+
+fn write_file(path: &Path, text: &str, replace: bool) -> Result<(), SaveError> {
+    use std::io::Write;
+    if text.len() as u64 > MAX_FILE_BYTES {
+        return Err(SaveError::Io("too big".to_string()));
+    }
+    let mut open = std::fs::OpenOptions::new();
+    open.write(true);
+    if replace {
+        open.create(true).truncate(true);
+    } else {
+        open.create_new(true);
+    }
+    let mut f = open.open(path).map_err(|e| match e.kind() {
+        std::io::ErrorKind::AlreadyExists => SaveError::Exists,
+        _ => SaveError::Io(e.to_string()),
+    })?;
+    f.write_all(text.as_bytes())
+        .map_err(|e| SaveError::Io(e.to_string()))
 }
 
 /// Where the library of the operator is: next to the settings, with the name of the settings file in front (`phoenix-cnc-materials.txt`).
@@ -212,5 +330,125 @@ mod tests {
         assert_eq!(lint.material_rpm, Some((8000.0, 16000.0)));
         Material::parse("B | feed=1,2").unwrap().apply(&mut lint);
         assert_eq!(lint.material_rpm, None);
+    }
+
+    fn mat(name: &str, feed: Option<(f64, f64)>, rpm: Option<(f64, f64)>) -> Material {
+        Material {
+            name: name.to_string(),
+            feed,
+            rpm,
+        }
+    }
+
+    #[test]
+    fn a_material_is_written_as_the_line_the_file_reads_back() {
+        for m in [
+            mat("Oak", Some((300.0, 900.0)), Some((9000.0, 18000.0))),
+            mat("Felt", Some((10.5, 20.25)), None),
+            mat("Cork board", None, Some((1.0, 2.0))),
+        ] {
+            assert_eq!(m.check(), Ok(()));
+            assert_eq!(
+                Material::parse(m.to_line().trim_start_matches("material = ")),
+                Some(m)
+            );
+        }
+        assert_eq!(
+            mat("A", Some((1.0, 2.0)), Some((3.0, 4.0))).to_line(),
+            "material = A | feed=1,2 | rpm=3,4"
+        );
+    }
+
+    #[test]
+    fn a_material_that_would_not_read_back_as_it_is_says_why() {
+        let ok = Some((1.0, 2.0));
+        for (m, why) in [
+            (mat("", ok, None), RowError::Name),
+            (mat(" A", ok, None), RowError::Name),
+            (mat("A | B", ok, None), RowError::Name),
+            (mat("A=B", ok, None), RowError::Name),
+            (mat("A", None, None), RowError::NoRange),
+            (mat("A", Some((5.0, 5.0)), None), RowError::Range),
+            (mat("A", Some((9.0, 2.0)), None), RowError::Range),
+            (mat("A", ok, Some((-1.0, 2.0))), RowError::Range),
+            (mat("A", Some((1.0, 1.0e9)), None), RowError::Range),
+            (mat("A", Some((f64::NAN, 2.0)), None), RowError::Range),
+        ] {
+            assert_eq!(m.check(), Err(why), "{m:?}");
+        }
+    }
+
+    #[test]
+    fn a_library_is_checked_row_by_row_and_written_as_text_that_reads_back() {
+        let lib = vec![
+            mat("Oak", Some((300.0, 900.0)), None),
+            mat("Brass", None, Some((6000.0, 14000.0))),
+        ];
+        assert_eq!(check_library(&lib), Ok(()));
+        assert_eq!(parse_library(&to_text(&lib)), lib);
+        let mut bad = lib.clone();
+        bad.push(mat("oak", Some((1.0, 2.0)), None));
+        assert_eq!(check_library(&bad), Err((2, RowError::Repeated)));
+        bad[2] = mat("Wood", None, None);
+        assert_eq!(check_library(&bad), Err((2, RowError::NoRange)));
+        let many: Vec<Material> = (0..=MAX_MATERIALS)
+            .map(|i| mat(&format!("M{i}"), Some((1.0, 2.0)), None))
+            .collect();
+        assert_eq!(
+            check_library(&many),
+            Err((MAX_MATERIALS, RowError::TooMany))
+        );
+        assert!(to_text(&[]).starts_with('#'));
+    }
+
+    #[test]
+    fn the_library_is_saved_next_to_the_settings_and_a_file_is_replaced_only_when_asked() {
+        let d = std::env::temp_dir().join(format!("eh3d_materials_save_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let settings = d.join("phoenix-cnc.cfg");
+        let first = vec![mat("Mine", Some((1.0, 2.0)), None)];
+        assert_eq!(save(&settings, &first, false), Ok(()));
+        assert_eq!(load(&settings), first);
+        // the file is there: it is not written over unless the caller says so
+        let second = vec![mat("Other", None, Some((5.0, 6.0)))];
+        assert_eq!(save(&settings, &second, false), Err(SaveError::Exists));
+        assert_eq!(load(&settings), first);
+        assert_eq!(save(&settings, &second, true), Ok(()));
+        assert_eq!(load(&settings), second);
+        // a replacement that is shorter leaves nothing of the old file
+        assert_eq!(save(&settings, &first, true), Ok(()));
+        assert_eq!(
+            std::fs::read_to_string(library_path(&settings)).unwrap(),
+            to_text(&first)
+        );
+        // a library that cannot be read back is not written
+        let bad = vec![mat("", Some((1.0, 2.0)), None)];
+        assert_eq!(
+            save(&settings, &bad, true),
+            Err(SaveError::Invalid(0, RowError::Name))
+        );
+        assert_eq!(load(&settings), first);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_example_file_is_made_once_and_never_written_over() {
+        let d = std::env::temp_dir().join(format!("eh3d_materials_sample_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let settings = d.join("phoenix-cnc.cfg");
+        assert_eq!(create_sample(&settings), Ok(()));
+        let file = library_path(&settings);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), SHIPPED);
+        assert_eq!(load(&settings), parse_library(SHIPPED));
+        // the operator edits it; asking again changes nothing
+        std::fs::write(&file, "material = Mine | feed=1,2\n").unwrap();
+        assert_eq!(create_sample(&settings), Err(SaveError::Exists));
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "material = Mine | feed=1,2\n"
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

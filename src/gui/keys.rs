@@ -261,6 +261,7 @@ impl App {
                 self.win = Some(Win::Settings(Box::new(Draft {
                     s: self.settings.clone(),
                     section: 0,
+                    mats: Default::default(),
                 })))
             }
             Shortcut::Start => {
