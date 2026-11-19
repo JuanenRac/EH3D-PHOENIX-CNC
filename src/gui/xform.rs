@@ -86,6 +86,8 @@ impl App {
         let mut close = false;
         let mut apply = false;
         let free = self.program_free() && !self.session.program.is_empty();
+        // a first move that leaves out X or Y depends on where the tool stands before the program: the window asks
+        let start_line = crate::transform::needs_start(&self.session.program);
         let t = self.theme.clone();
         self.window(self.w(Msg::TfTitle))
             .default_width(460.0)
@@ -140,6 +142,17 @@ impl App {
                     });
                 ui.checkbox(&mut st.t.mirror_x, self.w(Msg::TfMirrorX));
                 ui.checkbox(&mut st.t.mirror_y, self.w(Msg::TfMirrorY));
+                if let Some(line) = start_line {
+                    ui.add_space(4.0);
+                    ui.colored_label(col(t.warn), self.ws(Msg::TfStartWarn, &[line.to_string()]));
+                    ui.horizontal(|ui| {
+                        ui.label(self.w(Msg::TfStart));
+                        ui.label("X");
+                        numfield::field(ui, "xform-start-x", &mut st.t.start.0, big, 1.0, "");
+                        ui.label("Y");
+                        numfield::field(ui, "xform-start-y", &mut st.t.start.1, big, 1.0, "");
+                    });
+                }
                 ui.add_space(4.0);
                 ui.label(RichText::new(self.w(Msg::TfHint)).color(col(t.dim)).small());
                 match st.said {
@@ -209,6 +222,27 @@ mod tests {
         // nothing to change says so and changes nothing
         assert_eq!(a.transform_program(&Transform::default()), Outcome::Nothing);
         assert!(!a.can_undo_transform());
+    }
+
+    #[test]
+    fn the_start_of_the_tool_given_in_the_window_reaches_the_coordinate_the_first_move_leaves_out()
+    {
+        let mut a = app_with("G21 G90\nG1 X10 F100\nM30");
+        assert_eq!(crate::transform::needs_start(&a.session.program), Some(2));
+        let t = Transform {
+            start: (0.0, 3.0),
+            shift: [1.0, 2.0, 0.0],
+            ..Transform::default()
+        };
+        assert_eq!(a.transform_program(&t), Outcome::Done);
+        assert_eq!(a.session.program[1], "G1 X11 Y5 F100");
+        // the start alone is no change
+        let mut b = app_with("G1 X10");
+        let only = Transform {
+            start: (7.0, 7.0),
+            ..Transform::default()
+        };
+        assert_eq!(b.transform_program(&only), Outcome::Nothing);
     }
 
     #[test]

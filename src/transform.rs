@@ -20,6 +20,9 @@ pub struct Transform {
     /// X changes sign about the centre / Y changes sign about the centre.
     pub mirror_x: bool,
     pub mirror_y: bool,
+    /// Where the tool is (X, Y) before the first move, for a program whose first move does not say both X and Y (see `needs_start`): the
+    /// coordinate it leaves out is taken from here. The path of the window assumes the origin, which is the default.
+    pub start: (f64, f64),
 }
 
 impl Default for Transform {
@@ -31,8 +34,22 @@ impl Default for Transform {
             scale: 1.0,
             mirror_x: false,
             mirror_y: false,
+            start: (0.0, 0.0),
         }
     }
+}
+
+/// The line (from 1) of the first move that says X or Y but not both, or `None` when the first such move says both (or there is none).
+/// A program like that depends on where the tool stands before it starts, so the transformation has to be told.
+pub fn needs_start(lines: &[String]) -> Option<usize> {
+    for (n, raw) in lines.iter().enumerate() {
+        let ws = scan(raw);
+        let has = |l: char| ws.iter().any(|w| w.letter == l);
+        if has('X') || has('Y') {
+            return (!(has('X') && has('Y'))).then_some(n + 1);
+        }
+    }
+    None
 }
 
 /// Why a program was not transformed.
@@ -132,7 +149,11 @@ fn scan(line: &str) -> Vec<Word> {
 impl Transform {
     /// Whether the change changes nothing.
     pub fn is_identity(&self) -> bool {
-        *self == Transform::default()
+        // where the tool starts changes nothing by itself
+        Transform {
+            start: (0.0, 0.0),
+            ..*self
+        } == Transform::default()
     }
 
     fn valid(&self) -> bool {
@@ -143,6 +164,8 @@ impl Transform {
             && self.rotate_deg.is_finite()
             && self.centre.0.is_finite()
             && self.centre.1.is_finite()
+            && self.start.0.is_finite()
+            && self.start.1.is_finite()
     }
 
     /// Where a point goes (X and Y; the centre is the fixed point of the mirror, the scale and the turn).
@@ -188,8 +211,9 @@ impl Transform {
         }
         let turns = self.rotate_deg.rem_euclid(360.0) != 0.0;
         let mut out = Vec::with_capacity(lines.len());
-        // the position in the program's own coordinates (the program starts at the origin, as the path of the window assumes)
-        let (mut px, mut py) = (0.0_f64, 0.0_f64);
+        // the position in the program's own coordinates (the start given, the origin unless the operator said otherwise)
+        let (mut px, mut py) = self.start;
+        let mut seen_xy = false;
         let mut motion: Option<u8> = None;
         for (n, raw) in lines.iter().enumerate() {
             let refuse = |why| Refusal { why, line: n + 1 };
@@ -229,7 +253,10 @@ impl Transform {
             if wx.is_some() || wy.is_some() {
                 let (ox, oy) = (wx.map_or(px, |w| w.value), wy.map_or(py, |w| w.value));
                 let (nx, ny) = self.point(ox, oy);
-                // a turn changes both coordinates, so a missing one is written
+                // a turn changes both coordinates, so a missing one is written; so is the one the first move leaves out, which comes from
+                // the start, whenever the change moves it
+                let first = !seen_xy;
+                seen_xy = true;
                 let both = turns;
                 match (wx, wy) {
                     (Some(a), Some(b)) => {
@@ -238,13 +265,13 @@ impl Transform {
                     }
                     (Some(a), None) => {
                         put(&mut edits, a, nx);
-                        if both {
+                        if both || (first && (ny - oy).abs() >= 1e-9) {
                             edits.push((a.end, a.end, format!(" Y{}", num(ny))));
                         }
                     }
                     (None, Some(b)) => {
                         put(&mut edits, b, ny);
-                        if both {
+                        if both || (first && (nx - ox).abs() >= 1e-9) {
                             // in front of the letter of the word
                             edits.push((b.at, b.at, format!("X{} ", num(nx))));
                         }
@@ -367,6 +394,60 @@ mod tests {
         let same = "G1  X1.50   Y2 F10 (a)";
         assert_eq!(run(&Transform::default(), same), [same]);
         assert!(Transform::default().is_identity() && !t.is_identity());
+    }
+
+    #[test]
+    fn a_first_move_that_leaves_out_x_or_y_needs_the_start_of_the_tool() {
+        assert_eq!(needs_start(&lines("G21\nG1 X10 F100\nG1 Y5")), Some(2));
+        assert_eq!(needs_start(&lines("G21\nG1 Y3\nG1 X1 Y1")), Some(2));
+        assert_eq!(needs_start(&lines("G0 Z5\nG0 X1 Y2\nG1 X3")), None);
+        // words in comments do not count, and a program with no move in X or Y needs nothing
+        assert_eq!(needs_start(&lines("G0 Z5 (X1)\nM30 ; Y2")), None);
+        assert_eq!(needs_start(&[]), None);
+    }
+
+    #[test]
+    fn the_coordinate_the_first_move_leaves_out_comes_from_the_start_and_is_written_when_it_moves()
+    {
+        // the tool stands at the origin unless it is said: the shift in Y reaches the Y the line leaves out
+        let t = shifted(1.0, 2.0, 0.0);
+        assert_eq!(run(&t, "G1 X10 F100\nG1 X20"), ["G1 X11 Y2 F100", "G1 X21"]);
+        assert_eq!(run(&t, "G1 Y4\nG1 Y6"), ["G1 X1 Y6", "G1 Y8"]);
+        // a change that does not move the missing coordinate leaves the line as it was
+        assert_eq!(run(&shifted(1.0, 0.0, 0.0), "G1 X10"), ["G1 X11"]);
+        // with a start given, the coordinate comes from there
+        let at = Transform {
+            start: (5.0, 3.0),
+            shift: [1.0, 2.0, 0.0],
+            ..Transform::default()
+        };
+        assert_eq!(run(&at, "G1 X10"), ["G1 X11 Y5"]);
+        assert_eq!(run(&at, "G1 Y9"), ["G1 X6 Y11"]);
+        // a turn takes the start into account too: (10, 5) a quarter turn is (-5, 10)
+        let turn = Transform {
+            start: (0.0, 5.0),
+            rotate_deg: 90.0,
+            ..Transform::default()
+        };
+        assert_eq!(run(&turn, "G1 X10"), ["G1 X-5 Y10"]);
+        // a first move that says both does not look at the start
+        let both = Transform {
+            start: (50.0, 60.0),
+            ..shifted(1.0, 2.0, 0.0)
+        };
+        assert_eq!(run(&both, "G1 X10 Y5\nG1 X20"), ["G1 X11 Y7", "G1 X21"]);
+        // the start alone changes nothing, and a start that is not a number is refused
+        let alone = Transform {
+            start: (4.0, 4.0),
+            ..Transform::default()
+        };
+        assert!(alone.is_identity());
+        assert_eq!(run(&alone, "G1 X10"), ["G1 X10"]);
+        let bad = Transform {
+            start: (f64::NAN, 0.0),
+            ..shifted(1.0, 0.0, 0.0)
+        };
+        assert_eq!(refused(&bad, "G1 X1").why, Why::BadScale);
     }
 
     #[test]

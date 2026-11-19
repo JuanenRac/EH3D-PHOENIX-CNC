@@ -206,10 +206,12 @@ pub enum Msg {
     TfWhyZero,
     TfWhyCentre,
     ProfileUnknown,
+    TfStart,
+    TfStartWarn,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 198] = [
+pub const ALL: [Msg; 200] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -408,6 +410,8 @@ pub const ALL: [Msg; 198] = [
     Msg::TfWhyZero,
     Msg::TfWhyCentre,
     Msg::ProfileUnknown,
+    Msg::TfStart,
+    Msg::TfStartWarn,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2393,6 +2397,26 @@ fn table(m: Msg) -> [&'static str; 8] {
             "没有名为 '{0}' 的机床配置文件：设置保持不变",
             "Nenhum perfil de máquina se chama '{0}': as definições ficam como estão",
         ],
+        Msg::TfStart => [
+            "Tool position before the program",
+            "Posición de la herramienta antes del programa",
+            "Werkzeugposition vor dem Programm",
+            "Position de l'outil avant le programme",
+            "Posizione dell'utensile prima del programma",
+            "プログラム開始前の工具位置",
+            "程序开始前的刀具位置",
+            "Posição da ferramenta antes do programa",
+        ],
+        Msg::TfStartWarn => [
+            "Line {0} moves only X or only Y: the other one is taken from the position the tool has before the program (0, 0 unless you set it here)",
+            "La línea {0} mueve solo X o solo Y: el otro se toma de la posición que tiene la herramienta antes del programa (0, 0 salvo que la indiques aquí)",
+            "Zeile {0} bewegt nur X oder nur Y: der andere Wert kommt aus der Position des Werkzeugs vor dem Programm (0, 0, wenn Sie sie hier nicht angeben)",
+            "La ligne {0} ne déplace que X ou que Y : l'autre vient de la position de l'outil avant le programme (0, 0 sauf si vous l'indiquez ici)",
+            "La riga {0} muove solo X o solo Y: l'altro viene dalla posizione dell'utensile prima del programma (0, 0 se non la indichi qui)",
+            "{0} 行目は X か Y の一方だけを動かします。もう一方はプログラム開始前の工具位置から取ります（ここで指定しなければ 0, 0）",
+            "第 {0} 行只移动 X 或只移动 Y：另一个坐标取自程序开始前的刀具位置（不在此处设置则为 0, 0）",
+            "A linha {0} move só X ou só Y: o outro é tirado da posição que a ferramenta tem antes do programa (0, 0 a não ser que a indique aqui)",
+        ],
     }
 }
 
@@ -2456,7 +2480,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 198);
+        assert_eq!(seen.len(), 200);
     }
 
     #[test]
