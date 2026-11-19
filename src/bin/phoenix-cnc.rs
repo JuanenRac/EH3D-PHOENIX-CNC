@@ -50,7 +50,13 @@ fn print_report(o: &Options) -> i32 {
     let text: String = bytes.iter().map(|&b| b as char).collect();
     let lines: Vec<String> = text.lines().map(str::to_string).collect();
     let file = std::fs::read_to_string(settings::settings_path()).unwrap_or_default();
-    let s = settings::Settings::parse(&file);
+    let mut s = settings::Settings::parse(&file);
+    if let Some(name) = o.profile.as_ref() {
+        if !s.use_profile(name) {
+            eprintln!("phoenix-cnc: no machine profile is named '{name}'");
+            return 2;
+        }
+    }
     let cfg = report::Cfg {
         travel: s.travel,
         offset: [0.0; 3],

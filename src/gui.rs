@@ -263,6 +263,12 @@ impl App {
         if let Some(th) = o.theme {
             settings.theme = th;
         }
+        // the values of a machine profile asked for on the command line; one that is not saved is said in the log
+        let profile_missing = o
+            .profile
+            .as_ref()
+            .filter(|name| !settings.use_profile(name))
+            .cloned();
         if let Some(v) = o.view_3d {
             settings.view_3d = v;
         }
@@ -357,6 +363,10 @@ impl App {
         // the queue of the last run comes back waiting: nothing starts until the operator says so
         if o.file.is_none() && o.window.is_none() && o.shot.is_none() && !cfg!(test) {
             app.restore_queue();
+        }
+        if let Some(name) = profile_missing {
+            let said = app.ws(crate::words::Msg::ProfileUnknown, &[name]);
+            app.session.log.push(said);
         }
         if let Some(w) = &o.window {
             app.open_window(w);

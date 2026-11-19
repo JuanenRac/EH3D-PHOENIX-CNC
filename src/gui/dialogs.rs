@@ -1410,4 +1410,26 @@ mod tests {
             assert_eq!(a.win.is_some(), ok, "{name}");
         }
     }
+
+    #[test]
+    fn a_machine_profile_asked_for_on_the_command_line_is_said_when_it_is_not_there() {
+        let o = Options {
+            profile: Some("no such machine profile 7q".to_string()),
+            ..Options::default()
+        };
+        let a = App::new(&o);
+        assert!(
+            a.session
+                .log
+                .iter()
+                .any(|l| l.contains("no such machine profile 7q")),
+            "{:?}",
+            a.session.log
+        );
+        assert!(!App::new(&Options::default())
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("7q")));
+    }
 }

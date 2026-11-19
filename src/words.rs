@@ -205,10 +205,11 @@ pub enum Msg {
     TfWhyCycle,
     TfWhyZero,
     TfWhyCentre,
+    ProfileUnknown,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 197] = [
+pub const ALL: [Msg; 198] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -406,6 +407,7 @@ pub const ALL: [Msg; 197] = [
     Msg::TfWhyCycle,
     Msg::TfWhyZero,
     Msg::TfWhyCentre,
+    Msg::ProfileUnknown,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2381,6 +2383,16 @@ fn table(m: Msg) -> [&'static str; 8] {
             "第 {0} 行：绝对圆弧圆心 (G90.1) 无法变换",
             "Linha {0}: os centros de arco absolutos (G90.1) não se podem transformar",
         ],
+        Msg::ProfileUnknown => [
+            "No machine profile is named '{0}': the settings stay as they are",
+            "Ningún perfil de máquina se llama '{0}': los ajustes quedan como están",
+            "Kein Maschinenprofil heißt '{0}': die Einstellungen bleiben wie sie sind",
+            "Aucun profil de machine ne s'appelle '{0}' : les réglages restent tels quels",
+            "Nessun profilo macchina si chiama '{0}': le impostazioni restano come sono",
+            "'{0}' という名前のマシンプロファイルはありません。設定はそのままです",
+            "没有名为 '{0}' 的机床配置文件：设置保持不变",
+            "Nenhum perfil de máquina se chama '{0}': as definições ficam como estão",
+        ],
     }
 }
 
@@ -2444,7 +2456,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 197);
+        assert_eq!(seen.len(), 198);
     }
 
     #[test]

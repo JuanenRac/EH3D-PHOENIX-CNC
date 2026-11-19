@@ -23,6 +23,8 @@ pub struct Options {
     pub start: bool,
     /// Says that `--start` with `--grbl` is meant: a real machine starts the program as soon as the window is open.
     pub start_real: bool,
+    /// The machine profile whose values the settings take at the start (`--profile NAME`); the name must be one of the profiles saved.
+    pub profile: Option<String>,
     /// A window to open at the start (`--window NAME`, one of `WINDOWS`): for the pictures.
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
@@ -83,6 +85,7 @@ pub fn help_text() -> String {
          \x20 --view plan|3d     how the path is seen at the start\n\
          \x20 --color MODE       how the path is coloured at the start ({})\n\
          \x20 --select LINE      select the move of that line of the program (from 1) at the start\n\
+         \x20 --profile NAME     start with the values of a machine profile saved in the settings (travel, spindle, feeds, probe)\n\
          \x20 --window NAME      open a window at the start ({})\n\
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
@@ -126,6 +129,13 @@ impl Options {
                 "--start" => o.start = true,
                 "--start-real" => o.start_real = true,
                 "--window" => o.window = Some(value("--window")?),
+                "--profile" => {
+                    let v = value("--profile")?;
+                    if crate::profiles::clean_name(&v).is_none() {
+                        return Err("--profile needs the name of a machine profile".to_string());
+                    }
+                    o.profile = Some(v);
+                }
                 "--view" => {
                     let v = value("--view")?;
                     o.view_3d = Some(match v.as_str() {
@@ -275,6 +285,7 @@ mod tests {
             "--theme",
             "--view",
             "--window",
+            "--profile",
             "--color",
             "--select",
             "--shot",
@@ -334,6 +345,22 @@ mod tests {
         for c in ColorBy::ALL {
             assert!(h.contains(c.key()), "{} is not in the help", c.key());
         }
+    }
+
+    #[test]
+    fn a_machine_profile_is_asked_for_by_name() {
+        assert_eq!(
+            parse("--profile Mill").unwrap().profile.as_deref(),
+            Some("Mill")
+        );
+        assert_eq!(parse("job.nc").unwrap().profile, None);
+        // it goes with the report as well as with the window
+        let o = parse("--report job.nc --profile Mill").unwrap();
+        assert!(o.report && o.profile.is_some());
+        // a name with nothing in it, or none, is refused
+        assert!(parse("--profile").is_err());
+        assert!(parse("--profile |").is_err());
+        assert!(help_text().contains("--profile"));
     }
 
     #[test]
