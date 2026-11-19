@@ -43,6 +43,7 @@ pub enum Msg {
     StatsChanges,
     StatsLength,
     StatsTime,
+    StatsDepth,
     ReportClean,
     ReportMoves,
     MenuCheck,
@@ -208,6 +209,7 @@ pub enum Msg {
     ProfileUnknown,
     TfStart,
     TfStartWarn,
+    TfStartHere,
     MenuBookmarks,
     MenuBookmarkToggle,
     MenuBookmarkNext,
@@ -336,7 +338,7 @@ pub enum Msg {
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 325] = [
+pub const ALL: [Msg; 327] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -372,6 +374,7 @@ pub const ALL: [Msg; 325] = [
     Msg::StatsChanges,
     Msg::StatsLength,
     Msg::StatsTime,
+    Msg::StatsDepth,
     Msg::ReportClean,
     Msg::ReportMoves,
     Msg::MenuCheck,
@@ -537,6 +540,7 @@ pub const ALL: [Msg; 325] = [
     Msg::ProfileUnknown,
     Msg::TfStart,
     Msg::TfStartWarn,
+    Msg::TfStartHere,
     Msg::MenuBookmarks,
     Msg::MenuBookmarkToggle,
     Msg::MenuBookmarkNext,
@@ -1016,6 +1020,16 @@ fn table(m: Msg) -> [&'static str; 8] {
             "推定時間 {0}",
             "预计时间 {0}",
             "Tempo estimado {0}",
+        ],
+        Msg::StatsDepth => [
+            "Cutting depth: lowest Z {0} mm, {1} depth levels",
+            "Profundidad de corte: Z más baja {0} mm, {1} niveles de profundidad",
+            "Schnitttiefe: tiefstes Z {0} mm, {1} Tiefenstufen",
+            "Profondeur de coupe : Z le plus bas {0} mm, {1} niveaux de profondeur",
+            "Profondità di taglio: Z più bassa {0} mm, {1} livelli di profondità",
+            "切削深さ：最低 Z {0} mm、深さの段数 {1}",
+            "切削深度：最低 Z {0} mm，共 {1} 个深度层",
+            "Profundidade de corte: Z mais baixo {0} mm, {1} níveis de profundidade",
         ],
         Msg::ReportClean => [
             "Nothing looks wrong",
@@ -2667,6 +2681,16 @@ fn table(m: Msg) -> [&'static str; 8] {
             "第 {0} 行只移动 X 或只移动 Y：另一个坐标取自程序开始前的刀具位置（不在此处设置则为 0, 0）",
             "A linha {0} move só X ou só Y: o outro é tirado da posição que a ferramenta tem antes do programa (0, 0 a não ser que a indique aqui)",
         ],
+        Msg::TfStartHere => [
+            "Use the tool position",
+            "Usar la posición de la herramienta",
+            "Werkzeugposition übernehmen",
+            "Utiliser la position de l'outil",
+            "Usa la posizione dell'utensile",
+            "工具の現在位置を使う",
+            "使用刀具当前位置",
+            "Usar a posição da ferramenta",
+        ],
         Msg::MenuBookmarks => [
             "Bookmarks and start from a line...",
             "Marcadores y empezar desde una línea...",
@@ -3980,7 +4004,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 325);
+        assert_eq!(seen.len(), 327);
     }
 
     #[test]

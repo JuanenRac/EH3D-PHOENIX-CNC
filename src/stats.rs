@@ -32,6 +32,10 @@ pub struct Stats {
     pub program_lines: usize,
     /// Arc moves, whose length is that of the curve (their chord when the centre or the radius is missing).
     pub arcs: usize,
+    /// The lowest Z (mm) a cutting move ends at when it is below the zero of the work, and how many different levels of depth the
+    /// cutting moves end at (to a hundredth of a mm); nothing when no cutting move goes below zero.
+    pub deepest_mm: Option<f64>,
+    pub depth_levels: usize,
 }
 
 /// The tool in force after each line, and the lines where a different tool is taken.
@@ -77,6 +81,7 @@ pub fn measure(lines: &[String], rates: Rates, change_s: f64) -> Stats {
         program_lines: lines.iter().filter(|l| !words(l).is_empty()).count(),
         ..Stats::default()
     };
+    let mut levels: Vec<i64> = Vec::new();
     for s in toolpath(lines) {
         let tool = by_line.get(s.line).copied().flatten();
         let chord = ((s.to.0 - s.from.0).powi(2)
@@ -119,7 +124,16 @@ pub fn measure(lines: &[String], rates: Rates, change_s: f64) -> Stats {
         if s.arc {
             st.arcs += 1;
         }
+        // the depth the cutting moves reach
+        if !s.rapid && s.to.2 < -0.005 {
+            st.deepest_mm = Some(st.deepest_mm.map_or(s.to.2, |d| d.min(s.to.2)));
+            let level = (s.to.2 * 100.0).round() as i64;
+            if !levels.contains(&level) {
+                levels.push(level);
+            }
+        }
     }
+    st.depth_levels = levels.len();
     let change = if change_s.is_finite() && change_s > 0.0 {
         change_s
     } else {
@@ -152,6 +166,14 @@ impl Stats {
                 "{name}: {} - {}",
                 say(lang, Msg::StatsLength, &[mm(t.cut_mm), mm(t.rapid_mm)]),
                 hms(t.seconds)
+            ));
+        }
+        // after the tools, so the lines above keep their places
+        if let Some(d) = self.deepest_mm {
+            out.push(say(
+                lang,
+                Msg::StatsDepth,
+                &[crate::heightmap::num(d), self.depth_levels.to_string()],
             ));
         }
         out
@@ -274,5 +296,35 @@ mod tests {
         assert_eq!(s.tools[0].tool, None);
         assert_eq!(s.tools[1].tool, Some(1));
         assert!(s.lines("en")[4].starts_with("No tool chosen: "));
+    }
+
+    #[test]
+    fn the_deepest_cut_and_its_levels_are_counted_from_the_cutting_moves() {
+        // a rapid down to -5 is not a cut; the cuts end at -1, -2, -2 again and -2.004 (the same level to a hundredth as -2)
+        let s = measure(
+            &prog("G21 G90\nG0 Z-5\nG0 Z5\nG1 Z-1 F100\nG1 X5 Z-2\nG1 X10\nG1 Z-2.004\nG0 Z5\nM30"),
+            R,
+            0.0,
+        );
+        assert_eq!(s.deepest_mm, Some(-2.004));
+        assert_eq!(s.depth_levels, 2, "{s:?}");
+        // the line comes after the tools and says both numbers
+        let en = s.lines("en");
+        assert!(
+            en.last().unwrap().contains("-2.004") && en.last().unwrap().contains(", 2 "),
+            "{en:?}"
+        );
+        assert_eq!(en.len(), 6);
+        // a program that never cuts below zero says nothing about depth, and a rapid alone neither
+        let flat = measure(&prog("G1 X5 F100\nG1 Z0.5\nG0 Z-3\nM30"), R, 0.0);
+        assert_eq!((flat.deepest_mm, flat.depth_levels), (None, 0));
+        assert_eq!(flat.lines("en").len(), 5);
+        // a helix or an arc that ends below zero counts too
+        let arc = measure(&prog("G3 X10 Y0 Z-1.5 I5 J0 F300\nM30"), R, 0.0);
+        assert_eq!(arc.deepest_mm, Some(-1.5));
+        // in every language
+        for l in ["es", "de", "fr", "it", "ja", "zh", "pt"] {
+            assert_ne!(s.lines(l).last(), en.last(), "{l}");
+        }
     }
 }

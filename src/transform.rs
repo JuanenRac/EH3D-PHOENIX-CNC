@@ -52,6 +52,28 @@ pub fn needs_start(lines: &[String]) -> Option<usize> {
     None
 }
 
+/// Where the tool stands in the numbers of the program, from its position in the work (mm): the same position in inches when the
+/// program works in inches (`G20` comes before any `G21`), so the start offered to a transformation is the one the lines would use.
+pub fn start_from_tool(lines: &[String], work_mm: [f64; 3]) -> (f64, f64) {
+    let mut inches = false;
+    'program: for raw in lines {
+        for w in scan(raw) {
+            if w.letter == 'G' {
+                match (w.value * 10.0).round() as i32 {
+                    200 => {
+                        inches = true;
+                        break 'program;
+                    }
+                    210 => break 'program,
+                    _ => {}
+                }
+            }
+        }
+    }
+    let k = if inches { 25.4 } else { 1.0 };
+    (work_mm[0] / k, work_mm[1] / k)
+}
+
 /// Why a program was not transformed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Why {
@@ -646,5 +668,33 @@ mod tests {
                 "{p:?} {q:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_start_taken_from_the_tool_follows_the_units_of_the_program() {
+        let at = [25.4, 50.8, -3.0];
+        // metric, or no unit at all: the position as it is
+        assert_eq!(start_from_tool(&lines("G21 G90\nG1 X1"), at), (25.4, 50.8));
+        assert_eq!(start_from_tool(&lines("G1 X1"), at), (25.4, 50.8));
+        assert_eq!(start_from_tool(&[], at), (25.4, 50.8));
+        // inches: the same place written in inches
+        assert_eq!(start_from_tool(&lines("G20 G90\nG1 X1"), at), (1.0, 2.0));
+        // the first of the two wins, and a comment is not a code
+        assert_eq!(start_from_tool(&lines("G21\nG20\nG1 X1"), at), (25.4, 50.8));
+        assert_eq!(
+            start_from_tool(&lines("(G20)\n; G20\nG1 X1"), at),
+            (25.4, 50.8)
+        );
+        assert_eq!(start_from_tool(&lines("G1 X1\nG20"), at), (1.0, 2.0));
+    }
+
+    #[test]
+    fn a_start_that_is_the_position_of_the_tool_reaches_the_coordinate_a_move_leaves_out() {
+        let t = Transform {
+            start: start_from_tool(&lines("G21 G90\nG1 X10 F100\nM30"), [12.5, 3.0, -1.0]),
+            shift: [0.0, 1.0, 0.0],
+            ..Transform::default()
+        };
+        assert_eq!(run(&t, "G21 G90\nG1 X10 F100\nM30")[1], "G1 X10 Y4 F100");
     }
 }

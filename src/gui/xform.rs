@@ -45,6 +45,13 @@ impl App {
         }
     }
 
+    /// Where the tool stands now (X and Y of the work position), in the units of the program that is loaded: what the Transform window
+    /// puts in the start of the tool when the operator asks for the real position.
+    pub(super) fn tool_start(&self) -> (f64, f64) {
+        let w = self.session.status.work_mm;
+        crate::transform::start_from_tool(&self.session.program, [w[0], w[1], w[2]])
+    }
+
     /// Whether the last transformation can be undone: the program is still the one it made.
     pub(super) fn can_undo_transform(&self) -> bool {
         self.program_free()
@@ -151,6 +158,10 @@ impl App {
                         numfield::field(ui, "xform-start-x", &mut st.t.start.0, big, 1.0, "");
                         ui.label("Y");
                         numfield::field(ui, "xform-start-y", &mut st.t.start.1, big, 1.0, "");
+                        // where the tool really is, in the units of the program
+                        if ui.button(self.w(Msg::TfStartHere)).clicked() {
+                            st.t.start = self.tool_start();
+                        }
                     });
                 }
                 ui.add_space(4.0);
@@ -321,5 +332,34 @@ mod tests {
             .clear();
             assert!(matches!(a.win, Some(Win::Transform(_))));
         }
+    }
+
+    #[test]
+    fn the_start_of_the_tool_can_be_the_real_position_of_the_machine_in_the_units_of_the_program() {
+        let mut a = app_with("G21 G90\nG1 X10 F100\nM30");
+        a.session.status.work_mm = [12.5, 3.0, -1.0, 0.0, 0.0, 0.0];
+        assert_eq!(a.tool_start(), (12.5, 3.0));
+        // the position goes to the start and the first move that leaves out Y takes it
+        let t = Transform {
+            start: a.tool_start(),
+            shift: [0.0, 1.0, 0.0],
+            ..Transform::default()
+        };
+        assert_eq!(a.transform_program(&t), Outcome::Done);
+        assert_eq!(a.session.program[1], "G1 X10 Y4 F100");
+        // a program in inches gets the position in inches
+        let mut b = app_with("G20 G90\nG1 X1 F10");
+        b.session.status.work_mm = [25.4, 50.8, 0.0, 0.0, 0.0, 0.0];
+        assert_eq!(b.tool_start(), (1.0, 2.0));
+        // the window draws with the button
+        let mut c = app_with("G21 G90\nG1 X1 F10");
+        c.open_window("transform");
+        let ctx = egui::Context::default();
+        ctx.run_pass(egui::RawInput::default(), |ctx| {
+            c.windows(ctx);
+        })
+        .textures_delta
+        .clear();
+        assert!(matches!(c.win, Some(Win::Transform(_))));
     }
 }
