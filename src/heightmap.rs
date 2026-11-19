@@ -564,4 +564,36 @@ mod tests {
         assert_eq!(num(2.50004), "2.5");
         assert_eq!(num(-0.1234), "-0.1234");
     }
+
+    #[test]
+    fn a_number_is_written_as_short_as_it_can_be() {
+        assert_eq!(num(0.0), "0");
+        assert_eq!(num(-0.0), "0");
+        assert_eq!(num(100.0), "100");
+        assert_eq!(num(2.5), "2.5");
+        assert_eq!(num(-2.50), "-2.5");
+        assert_eq!(num(1234.56789), "1234.5679");
+        assert_eq!(num(0.00004), "0");
+        assert_eq!(num(-0.00004), "0");
+        assert_eq!(num(0.0001), "0.0001");
+        assert_eq!(num(10.0), "10");
+    }
+
+    #[test]
+    fn a_grid_of_points_that_is_too_big_or_not_finite_is_refused_with_its_reason() {
+        assert!(probe_points([0.0, 0.0, 10.0, 10.0], 1, 5).is_err());
+        assert!(probe_points([0.0, 0.0, 10.0, 10.0], 5, 1).is_err());
+        assert!(probe_points([0.0, 0.0, 10.0, f64::NAN], 3, 3).is_err());
+        assert!(probe_points([0.0, 0.0, f64::INFINITY, 10.0], 3, 3).is_err());
+        assert!(probe_points([5.0, 0.0, 5.0, 10.0], 3, 3).is_err());
+        assert!(probe_points([0.0, 5.0, 10.0, 0.0], 3, 3).is_err());
+        let side = (MAX_POINTS as f64).sqrt() as usize + 1;
+        assert!(probe_points([0.0, 0.0, 10.0, 10.0], side, side).is_err());
+        // the smallest grid that is allowed is 2 by 2, with its corners
+        let two = probe_points([0.0, 0.0, 10.0, 20.0], 2, 2).unwrap();
+        assert_eq!(
+            two,
+            vec![(0.0, 0.0), (10.0, 0.0), (10.0, 20.0), (0.0, 20.0)]
+        );
+    }
 }

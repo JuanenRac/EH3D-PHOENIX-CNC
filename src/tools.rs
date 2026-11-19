@@ -4,15 +4,18 @@
 //! report and the statistics list the tools a program takes with what the table says of each, and a tool that the table does not have is
 //! named as a warning (a program may still use it). Nothing here moves anything.
 //!
-//! A line of the file: `tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N`; the diameter is needed, the rest may be left out.
-//! Empty lines and lines that start with `#` or `;` are skipped; every other line that cannot be used is left out and named, with its
-//! number and the reason, in the report.
+//! A line of the file: `tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N | life=MIN | used=MIN`; the diameter is needed, the
+//! rest may be left out. `life` is the minutes of work the tool is good for and `used` the minutes it has worked already: with a life, the
+//! report says a tool that is worn out, one that the program would wear out and one that has little life left. Empty lines and lines that
+//! start with `#` or `;` are skipped; every other line that cannot be used is left out and named, with its number and the reason, in the
+//! report.
 
 use std::path::{Path, PathBuf};
 
 use crate::atc::changes_of;
 use crate::heightmap::num;
 use crate::profiles::clean_name;
+use crate::stats::Stats;
 use crate::words::{say, Msg};
 
 /// The most tools a table holds, the highest tool number, the biggest file that is read and the limits of the numbers.
@@ -22,6 +25,10 @@ pub const MAX_FILE_BYTES: u64 = 16 * 1024;
 pub const MAX_DIAMETER_MM: f64 = 1000.0;
 pub const MAX_LENGTH_MM: f64 = 10_000.0;
 pub const MAX_FLUTES: u32 = 64;
+/// The biggest life, or minutes used, a line may say.
+pub const MAX_LIFE_MIN: f64 = 100_000.0;
+/// A tool with this share of its life left or less (in percent) is said to have little left.
+pub const LOW_LIFE_PERCENT: f64 = 20.0;
 
 /// The most lines of a kind the report lists one by one.
 const LISTED: usize = 20;
@@ -37,6 +44,9 @@ pub struct Tool {
     pub length_mm: f64,
     /// The number of flutes (0 when the line has none).
     pub flutes: u32,
+    /// The minutes of work the tool is good for (0 when the line has none: its wear is not followed) and the minutes it has worked.
+    pub life_min: f64,
+    pub used_min: f64,
 }
 
 /// What is wrong with a line of the table.
@@ -52,6 +62,8 @@ pub enum ToolError {
     Diameter,
     /// The length or the number of flutes is not a number inside its limit.
     Other,
+    /// The life or the minutes used are not numbers from 0 to `MAX_LIFE_MIN`.
+    Life,
     /// The tool is in the table already (the first line stays).
     Repeated,
     /// The table holds `MAX_TOOLS` already.
@@ -71,6 +83,7 @@ impl ToolError {
             ToolError::Name => Msg::ToolsErrName,
             ToolError::Diameter => Msg::ToolsErrDiameter,
             ToolError::Other => Msg::ToolsErrOther,
+            ToolError::Life => Msg::ToolsErrLife,
             ToolError::Repeated => Msg::ToolsErrRepeated,
             ToolError::Full => Msg::ToolsErrFull,
             ToolError::TooBig => Msg::AtcErrTooBig,
@@ -108,6 +121,14 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
         .filter(|n| (1..=MAX_TOOL).contains(n))
         .ok_or(ToolError::Number)?;
     let (mut name, mut diameter, mut length, mut flutes) = (String::new(), None, 0.0, 0);
+    let (mut life, mut used) = (0.0, 0.0);
+    let minutes = |v: &str| {
+        v.trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|m| m.is_finite() && (0.0..=MAX_LIFE_MIN).contains(m))
+            .ok_or(ToolError::Life)
+    };
     for p in parts {
         let (k, v) = p.split_once('=').ok_or(ToolError::Syntax)?;
         match k.trim().to_ascii_lowercase().as_str() {
@@ -137,6 +158,8 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
                     .filter(|f| *f <= MAX_FLUTES)
                     .ok_or(ToolError::Other)?
             }
+            "life" => life = minutes(v)?,
+            "used" => used = minutes(v)?,
             _ => {}
         }
     }
@@ -146,6 +169,8 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
         diameter_mm: diameter.ok_or(ToolError::Diameter)?,
         length_mm: length,
         flutes,
+        life_min: life,
+        used_min: used,
     })
 }
 
@@ -276,6 +301,98 @@ pub fn report_lines(lines: &[String], table: &ToolTable, lang: &str) -> Vec<Stri
     out
 }
 
+/// How a tool stands against its life once the program has run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Wear {
+    /// The life is used up already.
+    WornOut,
+    /// The program works the tool longer than the life it has left.
+    WillWear,
+    /// The tool has `LOW_LIFE_PERCENT` of its life left or less.
+    Low,
+}
+
+/// One tool of the program that the table follows by its life.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WearNote {
+    pub tool: u32,
+    pub wear: Wear,
+    pub life_min: f64,
+    pub used_min: f64,
+    /// The minutes the program works the tool and the minutes of life it has left before the program (never below 0).
+    pub program_min: f64,
+    pub left_min: f64,
+}
+
+/// The tools of the program whose life the table follows (a `life` above 0) that are worn out, that the program would wear out or that
+/// have little life left, in the order the program takes them. `stats` holds the time each tool works.
+pub fn wear_notes(stats: &Stats, table: &ToolTable) -> Vec<WearNote> {
+    let mut out = Vec::new();
+    for t in &stats.tools {
+        let Some(tool) = t.tool else { continue };
+        let Some(entry) = table.find(tool).filter(|e| e.life_min > 0.0) else {
+            continue;
+        };
+        let left = (entry.life_min - entry.used_min).max(0.0);
+        let program = t.seconds / 60.0;
+        let wear = if left <= 0.0 {
+            Wear::WornOut
+        } else if program > left {
+            Wear::WillWear
+        } else if left / entry.life_min * 100.0 <= LOW_LIFE_PERCENT {
+            Wear::Low
+        } else {
+            continue;
+        };
+        out.push(WearNote {
+            tool,
+            wear,
+            life_min: entry.life_min,
+            used_min: entry.used_min,
+            program_min: program,
+            left_min: left,
+        });
+    }
+    out
+}
+
+/// The sentences of `wear_notes`, in a language, indented as the other lines of the tool table in the report. Nothing when no tool
+/// has a problem.
+pub fn wear_lines(stats: &Stats, table: &ToolTable, lang: &str) -> Vec<String> {
+    wear_notes(stats, table)
+        .into_iter()
+        .take(LISTED)
+        .map(|n| {
+            let said = match n.wear {
+                Wear::WornOut => say(
+                    lang,
+                    Msg::ToolsWornOut,
+                    &[n.tool.to_string(), num(n.used_min), num(n.life_min)],
+                ),
+                Wear::WillWear => say(
+                    lang,
+                    Msg::ToolsWillWear,
+                    &[
+                        n.tool.to_string(),
+                        format!("{:.1}", n.program_min),
+                        format!("{:.1}", n.left_min),
+                    ],
+                ),
+                Wear::Low => say(
+                    lang,
+                    Msg::ToolsLow,
+                    &[
+                        n.tool.to_string(),
+                        format!("{:.1}", n.left_min),
+                        format!("{:.0}", n.left_min / n.life_min * 100.0),
+                    ],
+                ),
+            };
+            format!("  {said}")
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,7 +414,9 @@ mod tests {
                 name: "End mill 3 mm".to_string(),
                 diameter_mm: 3.0,
                 length_mm: -2.5,
-                flutes: 2
+                flutes: 2,
+                life_min: 0.0,
+                used_min: 0.0
             }
         );
         assert_eq!(
@@ -307,7 +426,9 @@ mod tests {
                 name: String::new(),
                 diameter_mm: 0.8,
                 length_mm: 0.0,
-                flutes: 0
+                flutes: 0,
+                life_min: 0.0,
+                used_min: 0.0
             }
         );
         assert_eq!(t.tools[2].name, "V bit");
@@ -475,6 +596,124 @@ mod tests {
         assert!(
             said[0].contains("16 KiB") && !said[0].contains("T1"),
             "{said:?}"
+        );
+    }
+
+    const RATES: crate::sim::Rates = crate::sim::Rates {
+        rapid: 6000.0,
+        default_feed: 300.0,
+    };
+
+    /// Four tools that each work 2 minutes (120 mm at 60 mm/min).
+    const FOUR: &str = "T1 M6\nG1 X120 F60\nT2 M6\nG1 X240\nT3 M6\nG1 X360\nT4 M6\nG1 X480\nM30";
+
+    fn worn(table: &str, program: &str) -> Vec<WearNote> {
+        let stats = crate::stats::measure(&lines(program), RATES, 0.0);
+        wear_notes(&stats, &ToolTable::parse(table))
+    }
+
+    #[test]
+    fn the_life_and_the_minutes_used_of_a_tool_are_read_and_checked() {
+        let t = ToolTable::parse(
+            "tool = 1 | diameter=3 | life=120 | used=30.5\ntool = 2 | diameter=3 | life=60\ntool = 3 | diameter=3 | used=5\ntool = 4 | diameter=3\n",
+        );
+        assert!(t.issues.is_empty(), "{:?}", t.issues);
+        let got: Vec<(f64, f64)> = t.tools.iter().map(|x| (x.life_min, x.used_min)).collect();
+        assert_eq!(
+            got,
+            vec![(120.0, 30.5), (60.0, 0.0), (0.0, 5.0), (0.0, 0.0)]
+        );
+        // a life or minutes that are not numbers inside 0 to 100000 leave the line out
+        let bad = ToolTable::parse(
+            "tool = 1 | diameter=3 | life=-1\ntool = 2 | diameter=3 | used=x\ntool = 3 | diameter=3 | life=100001\ntool = 4 | diameter=3 | life=NaN\ntool = 5 | diameter=3 | used=inf\ntool = 6 | diameter=3 | life=100000 | used=0\n",
+        );
+        assert_eq!(bad.tools.len(), 1);
+        assert_eq!(
+            bad.issues.iter().map(|i| i.error).collect::<Vec<_>>(),
+            vec![ToolError::Life; 5]
+        );
+    }
+
+    #[test]
+    fn a_tool_that_is_worn_out_one_the_program_would_wear_out_and_one_with_little_left_are_found() {
+        let table = "tool = 1 | diameter=3 | life=100 | used=100\n\
+                     tool = 2 | diameter=3 | life=10 | used=9\n\
+                     tool = 3 | diameter=3 | life=100 | used=85\n\
+                     tool = 4 | diameter=3 | life=100 | used=10\n";
+        let got = worn(table, FOUR);
+        let kinds: Vec<(u32, Wear)> = got.iter().map(|n| (n.tool, n.wear)).collect();
+        assert_eq!(
+            kinds,
+            vec![(1, Wear::WornOut), (2, Wear::WillWear), (3, Wear::Low)]
+        );
+        // the second one works 2 minutes and has 1 left
+        assert!((got[1].program_min - 2.0).abs() < 1e-9 && (got[1].left_min - 1.0).abs() < 1e-9);
+        assert!((got[2].left_min - 15.0).abs() < 1e-9);
+        // 20 % left is little, a bit more is not
+        assert_eq!(
+            worn("tool = 1 | diameter=3 | life=100 | used=80", FOUR)[0].wear,
+            Wear::Low
+        );
+        assert!(worn("tool = 1 | diameter=3 | life=100 | used=79", FOUR).is_empty());
+        // more used than the life is worn out and has nothing left, and a program that just fits the life does not wear it out
+        let over = worn("tool = 1 | diameter=3 | life=10 | used=50", FOUR);
+        assert_eq!((over[0].wear, over[0].left_min), (Wear::WornOut, 0.0));
+        assert!(worn("tool = 1 | diameter=3 | life=300 | used=200", FOUR)
+            .iter()
+            .all(|n| n.wear != Wear::WillWear));
+    }
+
+    #[test]
+    fn a_tool_with_no_life_a_tool_not_in_the_table_and_moves_with_no_tool_are_not_followed() {
+        // no life, so no wear; tool 9 is not in the table; the move before any tool has none
+        let table = "tool = 1 | diameter=3 | used=500\ntool = 2 | diameter=3 | life=1000\n";
+        let p = "G1 X10 F60\nT1 M6\nG1 X130\nT9 M6\nG1 X250\nT2 M6\nG1 X370\nM30";
+        assert!(worn(table, p).is_empty());
+        assert!(worn("", p).is_empty());
+        assert!(wear_lines(
+            &crate::stats::measure(&lines(p), RATES, 0.0),
+            &ToolTable::default(),
+            "en"
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn the_wear_lines_follow_the_language_and_carry_the_minutes() {
+        let table = ToolTable::parse(
+            "tool = 1 | diameter=3 | life=100 | used=100\ntool = 2 | diameter=3 | life=10 | used=9\ntool = 3 | diameter=3 | life=100 | used=85\n",
+        );
+        let stats = crate::stats::measure(&lines(FOUR), RATES, 0.0);
+        let en = wear_lines(&stats, &table, "en");
+        assert_eq!(en.len(), 3);
+        assert_eq!(
+            en[0],
+            "  Tool 1 is worn out: 100 min used of 100 min of life"
+        );
+        assert!(
+            en[1].contains("Tool 2 works 2.0 min") && en[1].contains("1.0 min of life left"),
+            "{en:?}"
+        );
+        assert_eq!(en[2], "  Tool 3 has 15.0 min of life left (15 % of it)");
+        for lang in ["es", "de", "fr", "it", "ja", "zh", "pt"] {
+            let o = wear_lines(&stats, &table, lang);
+            assert_eq!(o.len(), 3, "{lang}");
+            for (a, b) in o.iter().zip(&en) {
+                assert_ne!(a, b, "{lang}");
+                assert!(!a.contains('{'), "{lang}: {a}");
+            }
+        }
+        // the list is cut at the limit of the report
+        let many: String = (1..=30)
+            .map(|n| format!("tool = {n} | diameter=3 | life=1 | used=1\n"))
+            .collect();
+        let program: String = (1..=30)
+            .map(|n| format!("T{n} M6\nG1 X{n} F60\n"))
+            .collect();
+        let stats = crate::stats::measure(&lines(&program), RATES, 0.0);
+        assert_eq!(
+            wear_lines(&stats, &ToolTable::parse(&many), "en").len(),
+            LISTED
         );
     }
 }

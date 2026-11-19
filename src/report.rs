@@ -7,7 +7,7 @@ use crate::gcode::{arc_curves, toolpath};
 use crate::lint::{lint, Kind as LintKind, LintCfg};
 use crate::progcheck::{check, Level};
 use crate::sim::{hms, Extras, Rates, Timeline};
-use crate::stats::measure;
+use crate::stats::measure_accel;
 use crate::tuning::Tuning;
 use crate::words::{say, Msg};
 
@@ -159,10 +159,12 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
         default_feed: cfg.default_feed,
     };
     let change_s = tuning.change_seconds(cfg.rapid_mm_min);
-    let stats = measure(lines, rates, change_s);
+    let accel = tuning.accel_mm_s2;
+    let stats = measure_accel(lines, rates, change_s, accel);
     let path = toolpath(lines);
-    let timeline = Timeline::build_with(&path, rates, &Extras::of(lines), change_s);
+    let timeline = Timeline::build_accel(&path, rates, &Extras::of(lines), change_s, accel);
     let mut out: Vec<String> = stats.lines(lang);
+    out.extend(stats.layer_lines(lang));
     out.extend(crate::atc::report_lines(
         lines,
         &tuning.atc,
@@ -170,6 +172,7 @@ pub fn build(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
         lang,
     ));
     out.extend(crate::tools::report_lines(lines, &tuning.tools, lang));
+    out.extend(crate::tools::wear_lines(&stats, &tuning.tools, lang));
     out.push(say(
         lang,
         Msg::ReportMoves,
@@ -241,6 +244,49 @@ mod tests {
         assert!(r.text.contains("leaves the travel of axis X"));
         // 1 lint + 1 danger + 2 boxes (lines 5 and 6 cross the clamp... the first move starts at X0, the second goes on from X30)
         assert!(r.problems >= 4, "{}", r.problems);
+    }
+
+    #[test]
+    fn the_report_lists_the_levels_of_depth_the_wear_of_the_tools_and_takes_the_acceleration() {
+        let p =
+            prog("G21 G90\nM3 S1000\nT1 M6\nG1 Z-1 F60\nG1 X120\nG1 Z-2\nT2 M6\nG1 X0 F60\nM30");
+        let tools = crate::tools::ToolTable::parse(
+            "tool = 1 | diameter=3 | life=3 | used=2.5\ntool = 2 | diameter=6 | life=500\n",
+        );
+        let t = Tuning {
+            tools,
+            ..Tuning::default()
+        };
+        let r = build(&p, &t, &LintCfg::default(), &cfg("en"));
+        // the levels come from the surface down, in their own lines
+        let one = r.text.find("Level Z -1 mm").expect(&r.text);
+        let two = r.text.find("Level Z -2 mm").expect(&r.text);
+        assert!(one < two);
+        // tool 1 works 3 minutes and has half a minute of life left
+        assert!(r.text.contains("Tool 1 works"), "{}", r.text);
+        assert!(!r.text.contains("Tool 2 is worn"), "{}", r.text);
+        // no levels and no wear when there is nothing to say
+        let flat = prog("G21 G90\nM3 S1000\nG1 X5 F100\nM30");
+        let plain = build(&flat, &Tuning::default(), &LintCfg::default(), &cfg("en"));
+        assert!(!plain.text.contains("Level Z"), "{}", plain.text);
+        assert!(!plain.text.contains("worn"), "{}", plain.text);
+        // the acceleration lengthens the estimated time in the last line of the moves
+        let slow = Tuning {
+            accel_mm_s2: 1.0,
+            ..Tuning::default()
+        };
+        let at = |t: &Tuning| -> String {
+            let r = build(&prog(GOOD), t, &LintCfg::default(), &cfg("en"));
+            r.text
+                .lines()
+                .find(|l| l.contains("estimated time"))
+                .unwrap()
+                .to_string()
+        };
+        assert_ne!(at(&Tuning::default()), at(&slow));
+        // in the other languages too
+        let es = build(&p, &t, &LintCfg::default(), &cfg("es"));
+        assert!(es.text.contains("Nivel Z -1 mm"), "{}", es.text);
     }
 
     #[test]

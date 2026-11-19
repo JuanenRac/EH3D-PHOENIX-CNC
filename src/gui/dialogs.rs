@@ -202,6 +202,8 @@ impl App {
         if self.theme.id != self.settings.theme {
             self.theme = Theme::for_id(self.settings.theme);
         }
+        // the time estimate follows the acceleration of the settings
+        self.path_extras.accel_mm_s2 = self.settings.tuning.accel_mm_s2;
         let travel = self.settings.travel;
         self.session.set_travel(travel);
         if self.settings.read_controller_travel && !self.session.travel_asked {

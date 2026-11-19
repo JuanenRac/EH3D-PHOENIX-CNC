@@ -12,7 +12,7 @@ use crate::lint::LintCfg;
 use crate::progcheck::Level;
 use crate::report::{notes, Cfg};
 use crate::sim::{hms, Rates};
-use crate::stats::measure;
+use crate::stats::measure_accel;
 use crate::tuning::Tuning;
 use crate::words::{say, text, Msg};
 
@@ -202,7 +202,12 @@ pub fn html(i: &Input) -> String {
         rapid: i.cfg.rapid_mm_min,
         default_feed: i.cfg.default_feed,
     };
-    let stats = measure(i.lines, rates, i.tuning.change_seconds(i.cfg.rapid_mm_min));
+    let stats = measure_accel(
+        i.lines,
+        rates,
+        i.tuning.change_seconds(i.cfg.rapid_mm_min),
+        i.tuning.accel_mm_s2,
+    );
     let found = notes(i.lines, i.tuning, i.lint, i.cfg);
     let path = toolpath(i.lines);
     let mut out = String::new();
@@ -264,6 +269,30 @@ pub fn html(i: &Input) -> String {
                 t.cut_mm,
                 t.rapid_mm,
                 escape(&hms(t.seconds))
+            );
+        }
+        out.push_str("</table>\n");
+    }
+    // the tools that are worn out or would be worn out by the program
+    for line in crate::tools::wear_lines(&stats, &i.tuning.tools, lang) {
+        let _ = writeln!(out, "<p>{}</p>", escape(line.trim()));
+    }
+    // the levels of depth of the cuts, from the surface down
+    if !stats.layers.is_empty() {
+        let _ = writeln!(
+            out,
+            "<h2>{}</h2>\n<table><tr><th>Z</th><th class=\"n\">{}</th><th class=\"n\">{}</th></tr>",
+            w(Msg::RepLayers),
+            w(Msg::RepMoves),
+            w(Msg::RepCut)
+        );
+        for l in stats.layers.iter().take(crate::stats::LAYERS_LISTED) {
+            let _ = writeln!(
+                out,
+                "<tr><td class=\"n\">{} mm</td><td class=\"n\">{}</td><td class=\"n\">{:.1} mm</td></tr>",
+                escape(&crate::heightmap::num(l.z_mm)),
+                l.moves,
+                l.cut_mm
             );
         }
         out.push_str("</table>\n");
@@ -405,7 +434,7 @@ mod tests {
     #[test]
     fn the_numbers_of_the_summary_are_those_of_the_statistics() {
         let p = page(GOOD, "en", None);
-        let s = measure(
+        let s = crate::stats::measure(
             &prog(GOOD),
             Rates {
                 rapid: 6000.0,
@@ -417,6 +446,70 @@ mod tests {
         assert!(p.contains(&hms(s.seconds)));
         assert!(p.contains("Tool 1"));
         assert!(p.contains("<h2>Tools</h2>"));
+    }
+
+    #[test]
+    fn the_levels_of_depth_and_the_wear_of_the_tools_are_in_the_page() {
+        let lines = prog("G21 G90\nM3 S1000\nT1 M6\nG1 Z-1 F60\nG1 X120\nG1 Z-2\nM30");
+        let tuning = Tuning {
+            tools: crate::tools::ToolTable::parse("tool = 1 | diameter=3 | life=3 | used=2.5\n"),
+            ..Tuning::default()
+        };
+        let (lint, cfg) = (LintCfg::default(), cfg("en"));
+        let p = html(&Input {
+            name: "job.nc",
+            lines: &lines,
+            tuning: &tuning,
+            lint: &lint,
+            cfg: &cfg,
+            height_map: None,
+            version: "9.9.9",
+        });
+        assert!(p.contains("<h2>Depth levels</h2>"), "{p}");
+        let one = p.find("<td class=\"n\">-1 mm</td>").expect("level -1");
+        let two = p.find("<td class=\"n\">-2 mm</td>").expect("level -2");
+        assert!(one < two);
+        assert!(p.contains("<p>Tool 1 works"), "{p}");
+        // a program that cuts nowhere below zero has no levels, and a tool table with no life says nothing
+        let flat = page("G21 G90\nM3 S1000\nG1 X5 F100\nM30", "en", None);
+        assert!(!flat.contains("Depth levels"));
+        assert!(!page(GOOD, "en", None).contains("<p>Tool"));
+        // the heading follows the language
+        assert!(page(GOOD, "de", None).contains("<h2>Tiefenstufen</h2>"));
+    }
+
+    #[test]
+    fn the_time_of_the_page_takes_the_acceleration_of_the_settings() {
+        let lines = prog(GOOD);
+        let (lint, cfg) = (LintCfg::default(), cfg("en"));
+        let time_of = |accel: f64| -> String {
+            let tuning = Tuning {
+                accel_mm_s2: accel,
+                ..Tuning::default()
+            };
+            let p = html(&Input {
+                name: "job.nc",
+                lines: &lines,
+                tuning: &tuning,
+                lint: &lint,
+                cfg: &cfg,
+                height_map: None,
+                version: "9.9.9",
+            });
+            let seconds = crate::stats::measure_accel(&lines, rates_of(&cfg), 30.0, accel).seconds;
+            assert!(p.contains(&hms(seconds)), "{accel}: {}", hms(seconds));
+            hms(seconds)
+        };
+        let plain = time_of(0.0);
+        let slow = time_of(2.0);
+        assert_ne!(plain, slow);
+    }
+
+    fn rates_of(c: &Cfg) -> Rates {
+        Rates {
+            rapid: c.rapid_mm_min,
+            default_feed: c.default_feed,
+        }
     }
 
     #[test]

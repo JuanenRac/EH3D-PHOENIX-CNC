@@ -335,10 +335,23 @@ pub enum Msg {
     ToolsErrOther,
     ToolsErrRepeated,
     ToolsErrFull,
+    SetLintArcs,
+    SetLintReversal,
+    SetLintZeroFeed,
+    SetArcGap,
+    SetAccel,
+    StatsLayer,
+    StatsLayersMore,
+    ToolsWornOut,
+    ToolsWillWear,
+    ToolsLow,
+    ToolsErrLife,
+    ToolNoNumber,
+    RepLayers,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 327] = [
+pub const ALL: [Msg; 340] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -666,6 +679,19 @@ pub const ALL: [Msg; 327] = [
     Msg::ToolsErrOther,
     Msg::ToolsErrRepeated,
     Msg::ToolsErrFull,
+    Msg::SetLintArcs,
+    Msg::SetLintReversal,
+    Msg::SetLintZeroFeed,
+    Msg::SetArcGap,
+    Msg::SetAccel,
+    Msg::StatsLayer,
+    Msg::StatsLayersMore,
+    Msg::ToolsWornOut,
+    Msg::ToolsWillWear,
+    Msg::ToolsLow,
+    Msg::ToolsErrLife,
+    Msg::ToolNoNumber,
+    Msg::RepLayers,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -3941,6 +3967,136 @@ fn table(m: Msg) -> [&'static str; 8] {
             "表最多容纳 64 把刀具",
             "a tabela admite no máximo 64 ferramentas",
         ],
+        Msg::SetLintArcs => [
+            "Check the arcs that a controller refuses (radius error)",
+            "Revisar los arcos que un controlador rechaza (error de radio)",
+            "Kreisbögen prüfen, die eine Steuerung ablehnt (Radiusfehler)",
+            "Vérifier les arcs qu'un contrôleur refuse (erreur de rayon)",
+            "Controllare gli archi che un controllore rifiuta (errore di raggio)",
+            "コントローラーが拒否する円弧（半径エラー）を確認する",
+            "检查控制器会拒绝的圆弧（半径错误）",
+            "Verificar os arcos que um controlador recusa (erro de raio)",
+        ],
+        Msg::SetLintReversal => [
+            "Check a spindle told to reverse without stopping",
+            "Revisar un husillo al que se manda invertir sin parar",
+            "Spindel prüfen, die ohne Anhalten umkehren soll",
+            "Vérifier une broche à qui l'on ordonne d'inverser sans arrêt",
+            "Controllare un mandrino a cui si ordina di invertire senza fermarsi",
+            "停止せずにスピンドルを逆転させる指示を確認する",
+            "检查未停转就让主轴反转的指令",
+            "Verificar um fuso a quem se ordena que inverta sem parar",
+        ],
+        Msg::SetLintZeroFeed => [
+            "Check a feed rate of zero",
+            "Revisar un avance de cero",
+            "Vorschub von null prüfen",
+            "Vérifier une avance égale à zéro",
+            "Controllare un avanzamento pari a zero",
+            "送り速度 0 を確認する",
+            "检查进给速度为零的情况",
+            "Verificar um avanço igual a zero",
+        ],
+        Msg::SetArcGap => [
+            "Gap allowed at the end of an arc before it is said",
+            "Desvío permitido al final de un arco antes de avisar",
+            "Erlaubte Abweichung am Ende eines Kreisbogens vor einer Warnung",
+            "Écart permis à la fin d'un arc avant l'avertissement",
+            "Scarto consentito alla fine di un arco prima dell'avviso",
+            "警告する前に許容する円弧の終点のずれ",
+            "圆弧终点在警告前允许的偏差",
+            "Desvio permitido no fim de um arco antes do aviso",
+        ],
+        Msg::SetAccel => [
+            "Acceleration for the time estimate (0: none)",
+            "Aceleración para el tiempo estimado (0: ninguna)",
+            "Beschleunigung für die Zeitschätzung (0: keine)",
+            "Accélération pour le temps estimé (0 : aucune)",
+            "Accelerazione per il tempo stimato (0: nessuna)",
+            "推定時間に使う加速度（0：なし）",
+            "用于预计时间的加速度（0：无）",
+            "Aceleração para o tempo estimado (0: nenhuma)",
+        ],
+        Msg::StatsLayer => [
+            "Level Z {0} mm: {1} cutting moves, {2} mm",
+            "Nivel Z {0} mm: {1} movimientos de corte, {2} mm",
+            "Ebene Z {0} mm: {1} Schnittbewegungen, {2} mm",
+            "Niveau Z {0} mm : {1} déplacements de coupe, {2} mm",
+            "Livello Z {0} mm: {1} movimenti di taglio, {2} mm",
+            "Z {0} mm の層：切削移動 {1} 件、{2} mm",
+            "Z {0} mm 层：{1} 个切削移动，{2} mm",
+            "Nível Z {0} mm: {1} movimentos de corte, {2} mm",
+        ],
+        Msg::StatsLayersMore => [
+            "and {0} more depth levels",
+            "y {0} niveles de profundidad más",
+            "und {0} weitere Tiefenstufen",
+            "et {0} niveaux de profondeur de plus",
+            "e altri {0} livelli di profondità",
+            "ほか {0} 段",
+            "另有 {0} 个深度层",
+            "e mais {0} níveis de profundidade",
+        ],
+        Msg::ToolsWornOut => [
+            "Tool {0} is worn out: {1} min used of {2} min of life",
+            "La herramienta {0} está gastada: {1} min usados de {2} min de vida",
+            "Werkzeug {0} ist verschlissen: {1} min von {2} min Standzeit verbraucht",
+            "L'outil {0} est usé : {1} min utilisées sur {2} min de durée de vie",
+            "L'utensile {0} è consumato: {1} min usati su {2} min di vita",
+            "工具 {0} は寿命です：寿命 {2} 分のうち {1} 分使用済み",
+            "刀具 {0} 已用尽寿命：已用 {1} 分钟，寿命 {2} 分钟",
+            "A ferramenta {0} está gasta: {1} min usados de {2} min de vida",
+        ],
+        Msg::ToolsWillWear => [
+            "Tool {0} works {1} min in this program and has {2} min of life left: it will wear out",
+            "La herramienta {0} trabaja {1} min en este programa y le quedan {2} min de vida: se gastará",
+            "Werkzeug {0} arbeitet in diesem Programm {1} min und hat noch {2} min Standzeit: es verschleißt",
+            "L'outil {0} travaille {1} min dans ce programme et il lui reste {2} min de vie : il s'usera",
+            "L'utensile {0} lavora {1} min in questo programma e gli restano {2} min di vita: si consumerà",
+            "工具 {0} はこのプログラムで {1} 分稼働しますが、寿命は残り {2} 分です：摩耗します",
+            "刀具 {0} 在此程序中工作 {1} 分钟，但只剩 {2} 分钟寿命：会磨损报废",
+            "A ferramenta {0} trabalha {1} min neste programa e restam-lhe {2} min de vida: vai gastar-se",
+        ],
+        Msg::ToolsLow => [
+            "Tool {0} has {1} min of life left ({2} % of it)",
+            "A la herramienta {0} le quedan {1} min de vida ({2} % de ella)",
+            "Werkzeug {0} hat noch {1} min Standzeit ({2} %)",
+            "Il reste {1} min de vie à l'outil {0} ({2} %)",
+            "All'utensile {0} restano {1} min di vita ({2} %)",
+            "工具 {0} の寿命は残り {1} 分（{2} %）です",
+            "刀具 {0} 还剩 {1} 分钟寿命（{2} %）",
+            "À ferramenta {0} restam {1} min de vida ({2} %)",
+        ],
+        Msg::ToolsErrLife => [
+            "the life and the minutes used must be numbers from 0 to 100000",
+            "la vida y los minutos usados deben ser números de 0 a 100000",
+            "die Standzeit und die verbrauchten Minuten müssen Zahlen von 0 bis 100000 sein",
+            "la durée de vie et les minutes utilisées doivent être des nombres de 0 à 100000",
+            "la vita e i minuti usati devono essere numeri da 0 a 100000",
+            "寿命と使用済みの分数は 0 から 100000 までの数値にしてください",
+            "寿命和已用分钟数必须是 0 到 100000 的数",
+            "a vida e os minutos usados têm de ser números de 0 a 100000",
+        ],
+        Msg::RepLayers => [
+            "Depth levels",
+            "Niveles de profundidad",
+            "Tiefenstufen",
+            "Niveaux de profondeur",
+            "Livelli di profondità",
+            "深さの段",
+            "深度层",
+            "Níveis de profundidade",
+        ],
+        Msg::ToolNoNumber => [
+            "Line {0}: M6 changes the tool and no tool number (T) was chosen before it",
+            "Línea {0}: M6 cambia la herramienta y no se eligió antes ningún número de herramienta (T)",
+            "Zeile {0}: M6 wechselt das Werkzeug, aber davor wurde keine Werkzeugnummer (T) gewählt",
+            "Ligne {0} : M6 change l'outil et aucun numéro d'outil (T) n'a été choisi avant",
+            "Riga {0}: M6 cambia l'utensile e prima non è stato scelto alcun numero di utensile (T)",
+            "{0} 行目：M6 が工具を交換しますが、それ以前に工具番号（T）が選ばれていません",
+            "第 {0} 行：M6 换刀，但之前没有选择刀具号（T）",
+            "Linha {0}: M6 troca a ferramenta e nenhum número de ferramenta (T) foi escolhido antes",
+        ],
     }
 }
 
@@ -4004,7 +4160,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 327);
+        assert_eq!(seen.len(), 340);
     }
 
     #[test]
@@ -4042,6 +4198,47 @@ mod tests {
             let pt = table(m)[7];
             for brazilian in ["arquivo", "tela", "celular", "usuário", "salvo "] {
                 assert!(!pt.contains(brazilian), "{m:?}: {pt}");
+            }
+        }
+    }
+
+    #[test]
+    fn no_message_has_a_space_at_its_ends() {
+        for m in ALL {
+            for (i, s) in table(m).iter().enumerate() {
+                assert_eq!(s.trim(), *s, "{m:?} in {}", LANGS[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn the_messages_of_the_new_checks_and_the_wear_of_the_tools_say_what_they_mean() {
+        assert_eq!(
+            say("en", Msg::StatsLayer, &["-1.5", "4", "32.5"]),
+            "Level Z -1.5 mm: 4 cutting moves, 32.5 mm"
+        );
+        assert_eq!(
+            say("pt", Msg::ToolsWornOut, &["3", "120", "100"]),
+            "A ferramenta 3 está gasta: 120 min usados de 100 min de vida"
+        );
+        assert_eq!(
+            say("de", Msg::ToolsLow, &["2", "12.0", "12"]),
+            "Werkzeug 2 hat noch 12.0 min Standzeit (12 %)"
+        );
+        assert_eq!(
+            say("fr", Msg::ToolNoNumber, &["7"]),
+            "Ligne 7 : M6 change l'outil et aucun numéro d'outil (T) n'a été choisi avant"
+        );
+        // the labels of the switches and of the two numbers have no hole to fill
+        for m in [
+            Msg::SetLintArcs,
+            Msg::SetLintReversal,
+            Msg::SetLintZeroFeed,
+            Msg::SetArcGap,
+            Msg::SetAccel,
+        ] {
+            for l in LANGS {
+                assert!(!text(l, m).contains('{'), "{m:?} {l}");
             }
         }
     }

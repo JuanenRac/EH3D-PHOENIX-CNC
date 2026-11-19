@@ -43,6 +43,7 @@ pub fn fingerprint_with(path: &[Segment], r: Rates, extras: &Extras, change_s: f
         }
     };
     put(change_s.to_bits());
+    put(extras.accel_mm_s2.to_bits());
     put(extras.arc_mm.len() as u64);
     for (line, mm) in &extras.arc_mm {
         put(*line as u64);
@@ -118,6 +119,17 @@ impl Cache {
 
     /// The same, with the arcs by their curve and `change_s` seconds for every tool change.
     pub fn file_seconds_with(&mut self, file: &Path, r: Rates, change_s: f64) -> Option<f64> {
+        self.file_seconds_accel(file, r, change_s, 0.0)
+    }
+
+    /// The same, with the acceleration of the machine (mm/s2) in the time of every move; 0 is the plain time.
+    pub fn file_seconds_accel(
+        &mut self,
+        file: &Path,
+        r: Rates,
+        change_s: f64,
+        accel_mm_s2: f64,
+    ) -> Option<f64> {
         let meta = std::fs::metadata(file).ok()?;
         if !meta.is_file() || meta.len() > MAX_FILE_BYTES {
             return None;
@@ -128,7 +140,9 @@ impl Cache {
             .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
             .map_or(0, |d| d.as_nanos());
         let rates = (
-            r.rapid.to_bits() ^ change_s.to_bits().rotate_left(17),
+            r.rapid.to_bits()
+                ^ change_s.to_bits().rotate_left(17)
+                ^ accel_mm_s2.to_bits().rotate_left(31),
             r.default_feed.to_bits(),
         );
         if let Some(e) = self.files.get(file) {
@@ -142,8 +156,8 @@ impl Cache {
         // every byte is a character, as the program reads a file
         let text: String = bytes.iter().map(|&b| b as char).collect();
         let lines: Vec<String> = text.lines().map(str::to_string).collect();
-        let seconds =
-            Timeline::build_with(&toolpath(&lines), r, &Extras::of(&lines), change_s).total_s;
+        let extras = Extras::of(&lines).with_accel(accel_mm_s2);
+        let seconds = Timeline::build_with(&toolpath(&lines), r, &extras, change_s).total_s;
         if self.files.len() >= self.max_files && !self.files.contains_key(file) {
             // the room is made by dropping one that is not the one asked for
             if let Some(old) = self.files.keys().next().cloned() {
@@ -263,6 +277,49 @@ mod tests {
         assert!((b - a - 30.0).abs() < 1e-9, "{a} {b}");
         assert_eq!(c.misses, 2);
         assert_eq!(c.file_seconds(&f, RATES), Some(a));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_acceleration_is_part_of_the_estimate_and_of_its_key() {
+        let lines: Vec<String> = "G1 X60 F600\nG1 Y30".lines().map(str::to_string).collect();
+        let p = toolpath(&lines);
+        let plain = Extras::of(&lines);
+        let slow = Extras::of(&lines).with_accel(100.0);
+        assert_eq!(plain.accel_mm_s2, 0.0);
+        assert_ne!(
+            fingerprint_with(&p, RATES, &plain, 0.0),
+            fingerprint_with(&p, RATES, &slow, 0.0)
+        );
+        let mut c = Cache::new(4);
+        let a = c.timeline_with(&p, RATES, &plain, 0.0).total_s;
+        let b = c.timeline_with(&p, RATES, &slow, 0.0).total_s;
+        // two moves that reach their speed take 0.1 s more each
+        assert!((a - 9.0).abs() < 1e-9 && (b - 9.2).abs() < 1e-9, "{a} {b}");
+        assert_eq!(c.misses, 2);
+        // the same acceleration is taken from the cache
+        assert_eq!(c.timeline_with(&p, RATES, &slow, 0.0).total_s, b);
+        assert_eq!((c.misses, c.hits), (2, 1));
+        // a number that is not an acceleration is none
+        for bad in [f64::NAN, -5.0, f64::INFINITY, 0.0] {
+            assert_eq!(Extras::of(&lines).with_accel(bad).accel_mm_s2, 0.0, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_file_in_the_queue_takes_the_acceleration_and_is_measured_again_when_it_changes() {
+        let d = temp("accel");
+        let f = d.join("a.nc");
+        std::fs::write(&f, "G1 X60 F600\n").unwrap();
+        let mut c = Cache::new(4);
+        let plain = c.file_seconds_accel(&f, RATES, 0.0, 0.0).unwrap();
+        assert_eq!(c.file_seconds_with(&f, RATES, 0.0), Some(plain));
+        assert_eq!((c.misses, c.hits), (1, 1));
+        let slow = c.file_seconds_accel(&f, RATES, 0.0, 100.0).unwrap();
+        assert!((slow - plain - 0.1).abs() < 1e-9, "{plain} {slow}");
+        assert_eq!(c.misses, 2);
+        assert_eq!(c.file_seconds_accel(&f, RATES, 0.0, 100.0), Some(slow));
+        assert_eq!(c.hits, 2);
         let _ = std::fs::remove_dir_all(&d);
     }
 

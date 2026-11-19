@@ -31,6 +31,9 @@ pub struct Tuning {
     pub macro_max_lines: usize,
     /// The time a tool change adds to the estimate, in seconds (`tool_change_time`).
     pub tool_change_s: f64,
+    /// The acceleration of the machine in mm/s2 for the time estimate (`accel`): every move speeds up and slows down, so it takes longer
+    /// than its length over its feed. 0 (the default) is no acceleration: the plain time.
+    pub accel_mm_s2: f64,
     /// Starting a program from one of its lines asks for a tick that says the tool, the spindle and the zero were checked
     /// (`startline_confirm`).
     pub startline_confirm: bool,
@@ -60,6 +63,7 @@ impl Default for Tuning {
             macros_confirm: true,
             macro_max_lines: 200,
             tool_change_s: 30.0,
+            accel_mm_s2: 0.0,
             startline_confirm: true,
             bookmarks_load: true,
             bookmarks_confirm_replace: true,
@@ -155,6 +159,11 @@ impl Tuning {
                         .filter(|x| (1..=10_000).contains(x))
                         .unwrap_or(t.macro_max_lines)
                 }
+                "accel" => {
+                    t.accel_mm_s2 = num(v)
+                        .filter(|x| (0.0..=100_000.0).contains(x))
+                        .unwrap_or(t.accel_mm_s2)
+                }
                 "startline_confirm" => t.startline_confirm = on(v),
                 "bookmarks_load" => t.bookmarks_load = on(v),
                 "bookmarks_confirm_replace" => t.bookmarks_confirm_replace = on(v),
@@ -203,6 +212,7 @@ impl Tuning {
         put("macros_confirm", yes_no(self.macros_confirm).to_string());
         put("macros_max_lines", self.macro_max_lines.to_string());
         put("tool_change_time", self.tool_change_s.to_string());
+        put("accel", self.accel_mm_s2.to_string());
         put(
             "startline_confirm",
             yes_no(self.startline_confirm).to_string(),
@@ -239,6 +249,28 @@ mod tests {
     fn the_example_is_the_defaults() {
         assert_eq!(Tuning::parse(&Tuning::example()), Tuning::default());
         assert_eq!(Tuning::parse(""), Tuning::default());
+    }
+
+    #[test]
+    fn the_acceleration_is_off_until_the_line_gives_one_inside_its_range() {
+        assert_eq!(Tuning::default().accel_mm_s2, 0.0);
+        assert_eq!(Tuning::parse("accel = 250").accel_mm_s2, 250.0);
+        assert_eq!(Tuning::parse("accel = 12,5").accel_mm_s2, 12.5);
+        assert_eq!(Tuning::parse("ACCEL = 100000").accel_mm_s2, 100_000.0);
+        // a value that is not valid keeps the default, or the value before it
+        for bad in ["-1", "100001", "fast", "NaN", "inf", ""] {
+            assert_eq!(
+                Tuning::parse(&format!("accel = {bad}")).accel_mm_s2,
+                0.0,
+                "{bad}"
+            );
+        }
+        assert_eq!(Tuning::parse("accel = 300\naccel = -4").accel_mm_s2, 300.0);
+        // written back and read again, and it is in the example
+        let t = Tuning::parse("accel = 150");
+        assert!(t.to_text().lines().any(|l| l == "accel = 150"));
+        assert_eq!(Tuning::parse(&t.to_text()), t);
+        assert!(Tuning::example().lines().any(|l| l == "accel = 0"));
     }
 
     #[test]
@@ -362,5 +394,35 @@ mod tests {
                 "{w}"
             );
         }
+    }
+
+    #[test]
+    fn every_value_that_is_not_the_default_is_written_and_read_back() {
+        let text = "progcheck = no\nkeepout_margin = 2.5\nkeepout_reject = no\nqueue_remember = no\nsim_speed = 25\nqueue_repeat_max = 12\nqueue_confirm_between = no\nqueue_pause = 8\nlog_max_entries = 300\nmacros_confirm = no\nmacros_max_lines = 40\ntool_change_time = 11\naccel = 175\nstartline_confirm = no\nbookmarks_load = no\nbookmarks_confirm_replace = no\nkeepout = clamp 0 0 -5 20 20 40\n";
+        let t = Tuning::parse(text);
+        assert!(!t.progcheck && !t.keepout_reject && !t.queue_remember && !t.macros_confirm);
+        assert!(!t.confirm_between && !t.startline_confirm && !t.bookmarks_load);
+        assert!(!t.bookmarks_confirm_replace);
+        assert_eq!(
+            (t.keepout_margin, t.sim_speed, t.repeat_max, t.pause_s),
+            (2.5, 25.0, 12, 8.0)
+        );
+        assert_eq!(
+            (t.log_max, t.macro_max_lines, t.tool_change_s, t.accel_mm_s2),
+            (300, 40, 11.0, 175.0)
+        );
+        assert_eq!(t.keepouts.len(), 1);
+        assert_ne!(t, Tuning::default());
+        assert_eq!(Tuning::parse(&t.to_text()), t);
+    }
+
+    #[test]
+    fn a_comment_a_line_with_no_equal_sign_and_a_key_in_capitals_are_read_as_they_should() {
+        let t = Tuning::parse(
+            "\u{feff}# accel = 9\n; accel = 8\nACCEL = 7\njust some words\n  sim_speed   =   3  \n",
+        );
+        assert_eq!((t.accel_mm_s2, t.sim_speed), (7.0, 3.0));
+        // an unknown key changes nothing
+        assert_eq!(Tuning::parse("colour = red\n"), Tuning::default());
     }
 }

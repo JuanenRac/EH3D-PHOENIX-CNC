@@ -210,12 +210,13 @@ impl App {
             let path = self.queue.items[i].path.clone();
             let one = self
                 .estimate
-                .file_seconds_with(
+                .file_seconds_accel(
                     &path,
                     rates,
                     self.settings
                         .tuning
                         .change_seconds(self.settings.rapid_mm_min),
+                    self.settings.tuning.accel_mm_s2,
                 )
                 .unwrap_or(0.0);
             runs += n;

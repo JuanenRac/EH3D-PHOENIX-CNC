@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::sim::{hms, Rates};
-use crate::stats::measure;
+use crate::stats::measure_accel;
 use crate::words::Msg;
 
 /// What the open window shows: the lines of the statistics (made again when the program changes) and the moment of the simulation.
@@ -32,7 +32,8 @@ impl App {
     /// Reads the path of the program again, with the length of its arcs and its tool changes.
     pub(super) fn refresh_path(&mut self) {
         self.path_toolpath = gcode::toolpath(&self.session.program);
-        self.path_extras = crate::sim::Extras::of(&self.session.program);
+        self.path_extras = crate::sim::Extras::of(&self.session.program)
+            .with_accel(self.settings.tuning.accel_mm_s2);
         self.viewer
             .refresh(&self.session.program, &self.path_toolpath);
     }
@@ -56,12 +57,14 @@ impl App {
         SimState {
             program_len: self.session.program.len(),
             lines: {
-                let mut lines = measure(
+                let stats = measure_accel(
                     &self.session.program,
                     self.sim_rates(),
                     self.change_seconds(),
-                )
-                .lines(self.lang.code());
+                    self.settings.tuning.accel_mm_s2,
+                );
+                let mut lines = stats.lines(self.lang.code());
+                lines.extend(stats.layer_lines(self.lang.code()));
                 lines.extend(crate::atc::report_lines(
                     &self.session.program,
                     &self.settings.tuning.atc,
@@ -70,6 +73,11 @@ impl App {
                 ));
                 lines.extend(crate::tools::report_lines(
                     &self.session.program,
+                    &self.settings.tuning.tools,
+                    self.lang.code(),
+                ));
+                lines.extend(crate::tools::wear_lines(
+                    &stats,
                     &self.settings.tuning.tools,
                     self.lang.code(),
                 ));

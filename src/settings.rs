@@ -281,6 +281,14 @@ impl Settings {
                         .filter(|x| (0.0..=1_000_000.0).contains(x))
                         .unwrap_or(s.lint.max_rpm)
                 }
+                "lint_arcs" => s.lint.arcs = on(v),
+                "lint_arc_gap" => {
+                    s.lint.arc_gap_mm = num(v)
+                        .filter(|x| (0.0001..=0.5).contains(x))
+                        .unwrap_or(s.lint.arc_gap_mm)
+                }
+                "lint_reversal" => s.lint.reversal = on(v),
+                "lint_zero_feed" => s.lint.zero_feed = on(v),
                 "probe_feed" => {
                     s.probe.feed_mm_min = num(v)
                         .filter(|x| (1.0..=1000.0).contains(x))
@@ -396,12 +404,16 @@ impl Settings {
             self.resume_backoff_lines
         );
         out.push_str(&format!(
-            "jog_soft_limits = {}\nlint = {}\nlint_rapid_floor = {}\nlint_max_feed = {}\nlint_max_rpm = {}\nprobe_feed = {}\nprobe_depth = {}\nprobe_retract = {}\nprobe_plate = {}\nprobe_clearance = {}\nprobe_grid = {}\nheightmap_segment = {}\n",
+            "jog_soft_limits = {}\nlint = {}\nlint_rapid_floor = {}\nlint_max_feed = {}\nlint_max_rpm = {}\nlint_arcs = {}\nlint_arc_gap = {}\nlint_reversal = {}\nlint_zero_feed = {}\nprobe_feed = {}\nprobe_depth = {}\nprobe_retract = {}\nprobe_plate = {}\nprobe_clearance = {}\nprobe_grid = {}\nheightmap_segment = {}\n",
             self.jog_soft_limits.key(),
             yes(self.lint.enabled),
             self.lint.rapid_floor_mm,
             self.lint.max_feed_mm_min,
             self.lint.max_rpm,
+            yes(self.lint.arcs),
+            self.lint.arc_gap_mm,
+            yes(self.lint.reversal),
+            yes(self.lint.zero_feed),
             self.probe.feed_mm_min,
             self.probe.depth_mm,
             self.probe.retract_mm,
@@ -736,6 +748,38 @@ mod tests {
             (s.busy_wait_s, s.resume_backoff_lines),
             (d.busy_wait_s, d.resume_backoff_lines)
         );
+    }
+
+    #[test]
+    fn the_checks_of_arcs_spindle_reversal_and_zero_feed_have_their_switches_in_the_settings_file()
+    {
+        let d = Settings::default();
+        assert!(d.lint.arcs && d.lint.reversal && d.lint.zero_feed);
+        assert_eq!(d.lint.arc_gap_mm, crate::gcode::ARC_GAP_MM);
+        let text = d.to_text();
+        for line in [
+            "lint_arcs = yes",
+            "lint_arc_gap = 0.005",
+            "lint_reversal = yes",
+            "lint_zero_feed = yes",
+        ] {
+            assert!(text.lines().any(|l| l == line), "{line} is not written");
+        }
+        let s = Settings::parse(
+            "lint_arcs = no\nlint_arc_gap = 0.05\nlint_reversal = off\nlint_zero_feed = no\n",
+        );
+        assert!(!s.lint.arcs && !s.lint.reversal && !s.lint.zero_feed);
+        assert_eq!(s.lint.arc_gap_mm, 0.05);
+        // written back and read again
+        let back = Settings::parse(&s.to_text());
+        assert_eq!(back.lint, s.lint);
+        // a gap outside its range or a word that is not a number keeps the default, and the switches are independent
+        for bad in ["0", "0.00001", "0.6", "-1", "wide"] {
+            let s = Settings::parse(&format!("lint_arc_gap = {bad}\n"));
+            assert_eq!(s.lint.arc_gap_mm, 0.005, "{bad}");
+        }
+        let one = Settings::parse("lint_reversal = no\n");
+        assert!(one.lint.arcs && !one.lint.reversal && one.lint.zero_feed);
     }
 
     #[test]

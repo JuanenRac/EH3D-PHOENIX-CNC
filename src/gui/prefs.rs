@@ -528,6 +528,9 @@ impl App {
     fn set_checks(&self, ui: &mut egui::Ui, d: &mut Draft) {
         ui.checkbox(&mut d.s.lint.enabled, self.w(Msg::SetLint));
         ui.checkbox(&mut d.s.tuning.progcheck, self.w(Msg::SetProgcheck));
+        ui.checkbox(&mut d.s.lint.arcs, self.w(Msg::SetLintArcs));
+        ui.checkbox(&mut d.s.lint.reversal, self.w(Msg::SetLintReversal));
+        ui.checkbox(&mut d.s.lint.zero_feed, self.w(Msg::SetLintZeroFeed));
         ui.checkbox(&mut d.s.tuning.keepout_reject, self.w(Msg::SetKeepReject));
         self.material_picker(ui, d);
         ui.add_space(6.0);
@@ -561,6 +564,15 @@ impl App {
                     &mut d.s.lint.max_rpm,
                     500.0,
                     "rpm",
+                );
+                self.set_row(
+                    ui,
+                    "arc-gap",
+                    Msg::SetArcGap,
+                    "lint_arc_gap",
+                    &mut d.s.lint.arc_gap_mm,
+                    0.005,
+                    "mm",
                 );
                 self.set_row(
                     ui,
@@ -736,6 +748,15 @@ impl App {
                     5.0,
                     "s",
                 );
+                self.set_row(
+                    ui,
+                    "accel",
+                    Msg::SetAccel,
+                    "accel",
+                    &mut d.s.tuning.accel_mm_s2,
+                    50.0,
+                    "mm/s2",
+                );
             });
     }
 }
@@ -864,6 +885,9 @@ mod tests {
         };
         d.s.tuning.repeat_max = 7;
         d.s.tuning.tool_change_s = 12.0;
+        d.s.tuning.accel_mm_s2 = 120.0;
+        d.s.lint.arcs = false;
+        d.s.lint.arc_gap_mm = 0.02;
         d.s.probe.feed_mm_min = 33.0;
         a.win = Some(Win::Settings(Box::new(d)));
         // Ok through the same path as the button
@@ -876,6 +900,9 @@ mod tests {
         let back = Settings::load(&a.settings_path);
         assert_eq!(back.tuning.repeat_max, 7);
         assert_eq!(back.tuning.tool_change_s, 12.0);
+        assert_eq!(back.tuning.accel_mm_s2, 120.0);
+        assert!(!back.lint.arcs && back.lint.reversal && back.lint.zero_feed);
+        assert_eq!(back.lint.arc_gap_mm, 0.02);
         assert_eq!(back.probe.feed_mm_min, 33.0);
         assert_eq!(back.tuning.keepouts.len(), 1);
         assert_eq!(back.server_token, "token");

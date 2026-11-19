@@ -67,6 +67,8 @@ pub fn check(lines: &[String], t: &Tuning) -> Vec<Finding> {
     let mut inches: Option<bool> = None;
     let (mut plane, mut wcs, mut absolute) = (17, 54, true);
     let (mut spindle, mut warned_units) = (false, false);
+    // a tool number (T) has been given, here or on an earlier line
+    let mut chosen = false;
     for (n, raw) in lines.iter().enumerate() {
         let trimmed = raw.trim_start();
         // a line for the controller itself ($...) or a program marker (%) is not G-code
@@ -75,6 +77,10 @@ pub fn check(lines: &[String], t: &Tuning) -> Vec<Finding> {
         }
         let ws = words(raw);
         let mut axis = false;
+        // the number of the tool may come after M6 on the same line
+        if ws.iter().any(|&(l, _)| l == 'T') {
+            chosen = true;
+        }
         for &(l, v) in &ws {
             let tenths = (v * 10.0).round() as i32;
             match l {
@@ -131,7 +137,14 @@ pub fn check(lines: &[String], t: &Tuning) -> Vec<Finding> {
                         Msg::Stop,
                         vec![format!("M{}", v as i32)],
                     ),
-                    6 if spindle => push(Some(n), Level::Warning, Msg::ToolSpindle, vec![]),
+                    6 => {
+                        if spindle {
+                            push(Some(n), Level::Warning, Msg::ToolSpindle, vec![]);
+                        }
+                        if !chosen {
+                            push(Some(n), Level::Warning, Msg::ToolNoNumber, vec![]);
+                        }
+                    }
                     112 => push(Some(n), Level::Danger, Msg::Emergency, vec![]),
                     3 | 4 => spindle = true,
                     5 => spindle = false,
@@ -319,6 +332,38 @@ T2 M6
 M30"
         )
         .contains(&Msg::ToolSpindle));
+    }
+
+    #[test]
+    fn a_tool_change_with_no_tool_chosen_is_flagged_once_per_change() {
+        let f = check(&prog("G21\nM6\nT3\nM6\nM30"), &Tuning::default());
+        let at: Vec<(Option<usize>, Msg)> = f
+            .iter()
+            .filter(|f| f.msg == Msg::ToolNoNumber)
+            .map(|f| (f.line, f.msg))
+            .collect();
+        // only the first M6 comes before any T
+        assert_eq!(at, vec![(Some(1), Msg::ToolNoNumber)]);
+        assert_eq!(f[0].level, Level::Warning);
+        // the number may come first on the line or after the change on the same line
+        assert!(!msgs("G21\nT1 M6\nM30").contains(&Msg::ToolNoNumber));
+        assert!(!msgs("G21\nM6 T1\nM30").contains(&Msg::ToolNoNumber));
+        // a program with no change says nothing, and a spindle that turns adds its own remark
+        assert!(!msgs("G21\nT2\nM30").contains(&Msg::ToolNoNumber));
+        let both = msgs("G21\nM3\nM6\nM30");
+        assert!(both.contains(&Msg::ToolNoNumber) && both.contains(&Msg::ToolSpindle));
+        // said in the eight languages with its line
+        let en = f[0].text("en");
+        assert!(en.starts_with("Line 2: M6"), "{en}");
+        for l in ["es", "de", "fr", "it", "ja", "zh", "pt"] {
+            assert_ne!(f[0].text(l), en, "{l}");
+        }
+        // with the checker off nothing is said
+        let off = Tuning {
+            progcheck: false,
+            ..Tuning::default()
+        };
+        assert!(check(&prog("M6"), &off).is_empty());
     }
 
     #[test]

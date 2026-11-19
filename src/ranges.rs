@@ -9,7 +9,7 @@ pub struct Range {
     pub hi: f64,
 }
 
-pub const RANGES: [Range; 17] = [
+pub const RANGES: [Range; 19] = [
     Range {
         key: "lint_rapid_floor",
         lo: -500.0,
@@ -24,6 +24,11 @@ pub const RANGES: [Range; 17] = [
         key: "lint_max_rpm",
         lo: 0.0,
         hi: 1_000_000.0,
+    },
+    Range {
+        key: "lint_arc_gap",
+        lo: 0.0001,
+        hi: 0.5,
     },
     Range {
         key: "keepout_margin",
@@ -95,6 +100,11 @@ pub const RANGES: [Range; 17] = [
         lo: 0.0,
         hi: 3600.0,
     },
+    Range {
+        key: "accel",
+        lo: 0.0,
+        hi: 100_000.0,
+    },
 ];
 
 /// The smallest and the biggest value of a key (anything for a key that is not in the table).
@@ -162,5 +172,24 @@ mod tests {
         }
         assert_eq!(range_of("probe_feed"), (1.0, 1000.0));
         assert_eq!(range_of("nothing"), (f64::MIN, f64::MAX));
+    }
+
+    #[test]
+    fn every_range_has_its_row_in_the_settings_window() {
+        // the window offers a number only for a key of this table, and every key of the table is offered
+        let window = include_str!("gui/prefs.rs");
+        for r in &RANGES {
+            assert!(
+                window.contains(&format!("\"{}\"", r.key)),
+                "{} has no row in the settings window",
+                r.key
+            );
+        }
+    }
+
+    #[test]
+    fn the_new_checks_and_the_acceleration_have_their_ranges() {
+        assert_eq!(range_of("lint_arc_gap"), (0.0001, 0.5));
+        assert_eq!(range_of("accel"), (0.0, 100_000.0));
     }
 }

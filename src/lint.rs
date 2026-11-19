@@ -21,6 +21,14 @@ pub struct LintCfg {
     /// move or a spindle speed outside it is said. `None` checks nothing.
     pub material_feed: Option<(f64, f64)>,
     pub material_rpm: Option<(f64, f64)>,
+    /// The arcs a controller refuses with a radius error are looked for (`lint_arcs`), and the gap in mm that an arc given by its centre
+    /// may end off its circle before it is said (`lint_arc_gap`).
+    pub arcs: bool,
+    pub arc_gap_mm: f64,
+    /// A spindle told to turn the other way with no stop between is said (`lint_reversal`).
+    pub reversal: bool,
+    /// A feed of zero is said (`lint_zero_feed`).
+    pub zero_feed: bool,
 }
 
 impl Default for LintCfg {
@@ -32,6 +40,10 @@ impl Default for LintCfg {
             max_rpm: 24_000.0,
             material_feed: None,
             material_rpm: None,
+            arcs: true,
+            arc_gap_mm: crate::gcode::ARC_GAP_MM,
+            reversal: true,
+            zero_feed: true,
         }
     }
 }
@@ -404,7 +416,12 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
     }
     // the arcs a controller refuses
     let (mut end_radius, mut too_small): (Option<Finding>, Option<Finding>) = (None, None);
-    for (line, fault, gap) in crate::gcode::arc_faults(lines) {
+    let faults = if cfg.arcs {
+        crate::gcode::arc_faults_within(lines, cfg.arc_gap_mm)
+    } else {
+        Vec::new()
+    };
+    for (line, fault, gap) in faults {
         let (slot, kind) = match fault {
             crate::gcode::ArcFault::EndRadius => (&mut end_radius, Kind::ArcEndRadius),
             crate::gcode::ArcFault::RadiusTooSmall => (&mut too_small, Kind::ArcRadiusSmall),
@@ -415,8 +432,20 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
         }
     }
     let mut out: Vec<Finding> = [
-        rapid, dry, nospeed, change, fast, spinning, feed_low, feed_high, speed_low, speed_high,
-        end_radius, too_small, reversal, zero_feed,
+        rapid,
+        dry,
+        nospeed,
+        change,
+        fast,
+        spinning,
+        feed_low,
+        feed_high,
+        speed_low,
+        speed_high,
+        end_radius,
+        too_small,
+        reversal.filter(|_| cfg.reversal),
+        zero_feed.filter(|_| cfg.zero_feed),
     ]
     .into_iter()
     .flatten()
@@ -722,5 +751,69 @@ mod tests {
             .message("en")
             .starts_with("2 feed rates are set to zero"));
         assert!(kinds("M3 S1000\nG1 X1 F0.1\nM30").is_empty());
+    }
+
+    #[test]
+    fn each_of_the_new_checks_has_its_own_switch_and_the_others_keep_working() {
+        let p = lines("M3 S1000\nG1 X1 F0\nM4\nG2 X4 Y0 I1 J0\nM30");
+        let all: Vec<Kind> = lint(&p, &LintCfg::default())
+            .iter()
+            .map(|f| f.kind)
+            .collect();
+        assert_eq!(
+            all,
+            vec![Kind::ArcEndRadius, Kind::SpindleReversal, Kind::FeedZero]
+        );
+        let kinds_of =
+            |cfg: LintCfg| -> Vec<Kind> { lint(&p, &cfg).iter().map(|f| f.kind).collect() };
+        assert_eq!(
+            kinds_of(LintCfg {
+                arcs: false,
+                ..LintCfg::default()
+            }),
+            vec![Kind::SpindleReversal, Kind::FeedZero]
+        );
+        assert_eq!(
+            kinds_of(LintCfg {
+                reversal: false,
+                ..LintCfg::default()
+            }),
+            vec![Kind::ArcEndRadius, Kind::FeedZero]
+        );
+        assert_eq!(
+            kinds_of(LintCfg {
+                zero_feed: false,
+                ..LintCfg::default()
+            }),
+            vec![Kind::ArcEndRadius, Kind::SpindleReversal]
+        );
+        let none = LintCfg {
+            arcs: false,
+            reversal: false,
+            zero_feed: false,
+            ..LintCfg::default()
+        };
+        assert!(kinds_of(none).is_empty());
+        // the switches only silence these three: the other checks still speak
+        assert_eq!(
+            lint(&lines("G1 X5 F100\nG0 Z-4"), &none)
+                .iter()
+                .map(|f| f.kind)
+                .collect::<Vec<_>>(),
+            vec![Kind::RapidDown, Kind::CutWithoutSpindle, Kind::NoEnd]
+        );
+    }
+
+    #[test]
+    fn the_gap_of_the_arcs_comes_from_the_settings() {
+        // 0.02 mm off on a circle of radius 5
+        let p = lines("M3 S1000\nG1 X5 F100\nG2 X10.02 Y0 I2.5 J0\nM30");
+        assert_eq!(lint(&p, &LintCfg::default()).len(), 1);
+        let loose = LintCfg {
+            arc_gap_mm: 0.05,
+            ..LintCfg::default()
+        };
+        assert!(lint(&p, &loose).is_empty());
+        assert_eq!(LintCfg::default().arc_gap_mm, crate::gcode::ARC_GAP_MM);
     }
 }

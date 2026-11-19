@@ -43,6 +43,8 @@ pub struct Extras {
     pub arc_mm: Vec<(usize, f64)>,
     /// The lines where a different tool is taken (`T` then `M6`).
     pub changes: Vec<usize>,
+    /// The acceleration of the machine in mm/s2 (0: none) that `Timeline::build_with` puts in the time of every move.
+    pub accel_mm_s2: f64,
 }
 
 impl Extras {
@@ -51,7 +53,18 @@ impl Extras {
         Extras {
             arc_mm: crate::gcode::arc_lengths(lines),
             changes: crate::stats::change_lines(lines),
+            accel_mm_s2: 0.0,
         }
+    }
+
+    /// The same with the acceleration of the machine (mm/s2) in the time of every move; 0 or a number that is not one means none.
+    pub fn with_accel(mut self, accel_mm_s2: f64) -> Extras {
+        self.accel_mm_s2 = if accel_mm_s2.is_finite() && accel_mm_s2 > 0.0 {
+            accel_mm_s2
+        } else {
+            0.0
+        };
+        self
     }
 
     /// The length of the arc at a line, when it is known.
@@ -88,6 +101,25 @@ pub fn seconds_along(s: &Segment, r: Rates, len: f64) -> f64 {
     }
 }
 
+/// The seconds a move of `len` mm takes at `rate_mm_min` when the machine speeds up and slows down at `accel_mm_s2` (mm/s2): a move long
+/// enough to reach its speed takes `len / speed + speed / accel`, a shorter one never reaches it and takes `2 * sqrt(len / accel)`. The
+/// move is taken from a stop to a stop, so the time is the longest the move can take. With an acceleration that is not a positive number
+/// the time is the plain `len / speed`; a speed that is not a positive number takes no time.
+pub fn seconds_accel(len: f64, rate_mm_min: f64, accel_mm_s2: f64) -> f64 {
+    if !(rate_mm_min > 0.0 && rate_mm_min.is_finite() && len.is_finite() && len > 0.0) {
+        return 0.0;
+    }
+    let v = rate_mm_min / 60.0;
+    if !(accel_mm_s2 > 0.0 && accel_mm_s2.is_finite()) {
+        return len / v;
+    }
+    if len >= v * v / accel_mm_s2 {
+        len / v + v / accel_mm_s2
+    } else {
+        2.0 * (len / accel_mm_s2).sqrt()
+    }
+}
+
 impl Timeline {
     pub fn build(path: &[Segment], r: Rates) -> Timeline {
         Timeline::build_with(path, r, &Extras::default(), 0.0)
@@ -96,6 +128,18 @@ impl Timeline {
     /// The program in time with the length of its arcs and `change_s` seconds for every tool change (a change comes before the move of
     /// its line; the ones after the last move are added to the total).
     pub fn build_with(path: &[Segment], r: Rates, extras: &Extras, change_s: f64) -> Timeline {
+        Timeline::build_accel(path, r, extras, change_s, extras.accel_mm_s2)
+    }
+
+    /// As `build_with`, with the acceleration `accel_mm_s2` of the machine in the time of every move (see `seconds_accel`) instead of
+    /// the one of `extras`; 0 gives the plain times.
+    pub fn build_accel(
+        path: &[Segment],
+        r: Rates,
+        extras: &Extras,
+        change_s: f64,
+        accel_mm_s2: f64,
+    ) -> Timeline {
         let change = if change_s.is_finite() && change_s > 0.0 {
             change_s
         } else {
@@ -114,7 +158,11 @@ impl Timeline {
             } else {
                 length(s)
             };
-            let d = seconds_along(s, r, len);
+            let d = if accel_mm_s2 > 0.0 {
+                seconds_accel(len, rate_of(s, r), accel_mm_s2)
+            } else {
+                seconds_along(s, r, len)
+            };
             steps.push(Step {
                 seg: *s,
                 t0: t,
@@ -445,5 +493,101 @@ mod tests {
         assert!((t.total_s - 26.0).abs() < 1e-9, "{}", t.total_s);
         // the tool stays where it ended
         assert_eq!(t.position_at(1e9), Some((60.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn a_move_that_reaches_its_speed_takes_the_ramps_on_top_and_a_short_one_never_does() {
+        // 600 mm/min is 10 mm/s; at 100 mm/s2 the speed is reached in 0.1 s and 0.5 mm, and the two ramps take 1 mm
+        assert!((seconds_accel(60.0, 600.0, 100.0) - 6.1).abs() < 1e-9);
+        // the plain time is the same length over the same speed
+        assert!((seconds_accel(60.0, 600.0, 0.0) - 6.0).abs() < 1e-9);
+        // a move of 0.5 mm never gets to 10 mm/s: it speeds up for half of it and slows down for the rest
+        assert!((seconds_accel(0.5, 600.0, 100.0) - 2.0 * (0.005_f64).sqrt()).abs() < 1e-9);
+        // the two formulas meet at the length of the ramps (1 mm here)
+        assert!((seconds_accel(1.0, 600.0, 100.0) - 0.2).abs() < 1e-9);
+        assert!((seconds_accel(1.0 - 1e-9, 600.0, 100.0) - 0.2).abs() < 1e-6);
+        // never faster than without the acceleration, and slower when the acceleration is lower
+        for len in [0.01, 0.3, 1.0, 5.0, 250.0] {
+            let plain = len / 10.0;
+            assert!(seconds_accel(len, 600.0, 100.0) >= plain - 1e-12, "{len}");
+            assert!(seconds_accel(len, 600.0, 50.0) >= seconds_accel(len, 600.0, 100.0));
+        }
+    }
+
+    #[test]
+    fn an_acceleration_speed_or_length_that_is_not_a_number_gives_the_plain_time_or_none() {
+        for bad in [f64::NAN, f64::INFINITY, -3.0] {
+            assert!(
+                (seconds_accel(60.0, 600.0, bad) - 6.0).abs() < 1e-9,
+                "{bad}"
+            );
+        }
+        for rate in [0.0, -600.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(seconds_accel(60.0, rate, 100.0), 0.0, "{rate}");
+        }
+        for len in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(seconds_accel(len, 600.0, 100.0), 0.0, "{len}");
+        }
+    }
+
+    #[test]
+    fn the_timeline_with_an_acceleration_is_longer_and_with_none_is_the_same() {
+        let path = crate::gcode::toolpath(&["G1 X60 F600".to_string(), "G1 Y30".to_string()]);
+        let plain = Timeline::build(&path, R);
+        let none = Timeline::build_accel(&path, R, &Extras::default(), 0.0, 0.0);
+        assert_eq!(plain, none);
+        let nan = Timeline::build_accel(&path, R, &Extras::default(), 0.0, f64::NAN);
+        assert_eq!(plain, nan);
+        let slow = Timeline::build_accel(&path, R, &Extras::default(), 0.0, 100.0);
+        // two moves of 60 and 30 mm at 10 mm/s with a ramp of 0.1 s each
+        assert!((plain.total_s - 9.0).abs() < 1e-9);
+        assert!((slow.total_s - 9.2).abs() < 1e-9, "{}", slow.total_s);
+        // the steps follow each other with no gap and the path is the same
+        assert_eq!(slow.steps[0].t1, slow.steps[1].t0);
+        assert_eq!(slow.steps.len(), plain.steps.len());
+        // a rapid uses the speed of the rapids and the default feed fills a missing F
+        let rapid = crate::gcode::toolpath(&["G0 X600".to_string()]);
+        assert!(
+            (Timeline::build_accel(&rapid, R, &Extras::default(), 0.0, 1000.0).total_s - 6.1).abs()
+                < 1e-9
+        );
+    }
+
+    #[test]
+    fn the_time_is_written_in_hours_minutes_and_seconds_rounded_to_the_second() {
+        assert_eq!(hms(0.0), "0 s");
+        assert_eq!(hms(0.4), "0 s");
+        assert_eq!(hms(0.5), "1 s");
+        assert_eq!(hms(59.4), "59 s");
+        assert_eq!(hms(59.6), "1 min 00 s");
+        assert_eq!(hms(187.0), "3 min 07 s");
+        assert_eq!(hms(3599.5), "1 h 00 min 00 s");
+        assert_eq!(hms(3725.0), "1 h 02 min 05 s");
+        assert_eq!(hms(86_399.0), "23 h 59 min 59 s");
+        assert_eq!(hms(360_000.0), "100 h 00 min 00 s");
+    }
+
+    #[test]
+    fn a_time_that_is_not_a_time_is_zero() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -0.0] {
+            assert_eq!(hms(bad), "0 s", "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_change_of_tool_before_the_first_move_and_one_after_the_last_both_count_once() {
+        let t = timeline_of("T1 M6\nG1 X60 F600\nT2 M6", 5.0);
+        assert!((t.total_s - 16.0).abs() < 1e-9, "{}", t.total_s);
+        assert_eq!(t.changes, vec![0, 2]);
+        assert_eq!(t.change_s, 5.0);
+        // the extras that are not given leave the times as they are
+        let plain = Timeline::build_with(
+            &t.steps.iter().map(|s| s.seg).collect::<Vec<_>>(),
+            R,
+            &Extras::default(),
+            99.0,
+        );
+        assert!((plain.total_s - 6.0).abs() < 1e-9);
+        assert!(plain.changes.is_empty());
     }
 }

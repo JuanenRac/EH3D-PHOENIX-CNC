@@ -191,12 +191,26 @@ pub enum ArcFault {
 /// by its centre may be off by 0.005 mm up to a thousandth of its radius and never more than 0.5 mm (what common controllers accept); an arc given
 /// by its radius may be smaller than half its chord by 0.0005 mm (the rounding of a number written with three decimals).
 pub fn arc_faults(lines: &[String]) -> Vec<(usize, ArcFault, f64)> {
+    arc_faults_within(lines, ARC_GAP_MM)
+}
+
+/// The gap in mm that an arc given by its centre may end off its circle before it is a fault (see `arc_faults_within`).
+pub const ARC_GAP_MM: f64 = 0.005;
+
+/// As `arc_faults`, with the smallest gap that counts (0.005 mm above) given: a bigger one is more forgiving of a program written with few
+/// decimals, a smaller one stricter. The gap is never taken above 0.5 mm, the most any controller accepts.
+pub fn arc_faults_within(lines: &[String], gap_mm: f64) -> Vec<(usize, ArcFault, f64)> {
+    let gap = if gap_mm.is_finite() {
+        gap_mm.clamp(0.0, 0.5)
+    } else {
+        ARC_GAP_MM
+    };
     let mut out = Vec::new();
     for a in trace(lines).1 {
         let Some(g) = arc_geo(&a) else { continue };
         if g.too_small > 0.0005 {
             out.push((a.line, ArcFault::RadiusTooSmall, g.too_small));
-        } else if g.end_gap > 0.5 || (g.end_gap > 0.005 && g.end_gap > 0.001 * g.radius) {
+        } else if g.end_gap > 0.5 || (g.end_gap > gap && g.end_gap > 0.001 * g.radius) {
             out.push((a.line, ArcFault::EndRadius, g.end_gap));
         }
     }
@@ -853,5 +867,83 @@ mod tests {
             arc_faults(&lines("G90.1\nG1 X10 F100\nG3 X0 Y1 I5 J0")).len(),
             1
         );
+    }
+
+    #[test]
+    fn the_gap_that_counts_can_be_made_stricter_or_more_forgiving() {
+        // 0.02 mm off on a circle of radius 5: a fault at the usual gap, fine with a gap of 0.05
+        let p = lines("G2 X10.02 Y0 I5 J0");
+        assert_eq!(arc_faults(&p).len(), 1);
+        assert_eq!(arc_faults_within(&p, ARC_GAP_MM), arc_faults(&p));
+        assert!(arc_faults_within(&p, 0.05).is_empty());
+        // on a big circle the thousandth of its radius still saves a small gap, whatever the setting
+        assert!(arc_faults_within(&lines("G2 X200.04 Y0 I100 J0"), 0.0).is_empty());
+        // a stricter gap catches what the usual one lets through
+        let tight = lines("G2 X2.003 Y0 I1 J0");
+        assert!(arc_faults(&tight).is_empty());
+        assert_eq!(arc_faults_within(&tight, 0.0005).len(), 1);
+        // nothing above 0.5 mm is ever accepted, and a number that is not a number falls back to the usual gap
+        assert_eq!(arc_faults_within(&lines("G2 X10.6 Y0 I5 J0"), 5.0).len(), 1);
+        assert_eq!(arc_faults_within(&p, f64::NAN).len(), 1);
+        // the radius of an arc given by R does not depend on the gap
+        assert_eq!(arc_faults_within(&lines("G3 X11 Y0 R4"), 0.5).len(), 1);
+    }
+
+    #[test]
+    fn the_words_are_read_with_no_spaces_signs_and_forms_of_numbers() {
+        assert_eq!(words("G1X5Y-3"), vec![('G', 1.0), ('X', 5.0), ('Y', -3.0)]);
+        assert_eq!(
+            words("X.5 Y+2 Z-.25"),
+            vec![('X', 0.5), ('Y', 2.0), ('Z', -0.25)]
+        );
+        assert_eq!(
+            words("n10 g0 x1"),
+            vec![('N', 10.0), ('G', 0.0), ('X', 1.0)]
+        );
+        // a letter with no number, a program marker and an empty line have no word
+        assert!(words("X Y Z").is_empty());
+        assert!(words("%").is_empty());
+        assert!(words("").is_empty());
+        assert!(words("   \t ").is_empty());
+        // a comment in brackets that is never closed runs to the end of the line, and one that is closed lets the line go on
+        assert_eq!(words("G1 X5 (open Y6"), vec![('G', 1.0), ('X', 5.0)]);
+        assert_eq!(
+            words("G1 X5 (a) Y6 (b) Z7"),
+            vec![('G', 1.0), ('X', 5.0), ('Y', 6.0), ('Z', 7.0)]
+        );
+        // a semicolon cuts the line even inside a bracket
+        assert_eq!(words("G1 (a ; b) X5"), vec![('G', 1.0)]);
+    }
+
+    #[test]
+    fn a_number_that_is_not_one_is_left_out_and_the_next_word_still_reads() {
+        // a double sign or two dots make no number; the words around them are kept
+        assert_eq!(words("X--5 Y3"), vec![('Y', 3.0)]);
+        assert_eq!(words("X1.2.3 Y3"), vec![('Y', 3.0)]);
+        // a letter inside a number starts a word of its own
+        assert_eq!(words("X1e3"), vec![('X', 1.0), ('E', 3.0)]);
+    }
+
+    #[test]
+    fn the_arcs_that_move_are_counted_even_when_the_g_code_is_in_force_from_before() {
+        assert_eq!(arc_moves(&lines("G2 X1\nG3 X2\nG1 X3\nG0 X4")), 2);
+        // G2 alone moves nothing, but the next line with an axis is an arc by the code in force
+        assert_eq!(arc_moves(&lines("G2\nX5 I1")), 1);
+        // a centre alone is a move of the arc too, and a line with no axis, centre or radius is not
+        assert_eq!(arc_moves(&lines("G3 I1 J0")), 1);
+        assert_eq!(arc_moves(&lines("G2\nF100\nM3")), 0);
+        assert_eq!(arc_moves(&[]), 0);
+        // a straight move after the arcs ends them
+        assert_eq!(arc_moves(&lines("G2 X1\nG1 X2\nX3")), 1);
+    }
+
+    #[test]
+    fn the_feed_is_read_in_the_units_in_force_and_kept_in_mm_per_minute() {
+        let p = toolpath(&lines("G20\nG1 X1 F10\nG21\nG1 X2 F10\nG1 X3\nG20\nG1 X4"));
+        // F10 in inches is 254 mm/min; a feed is kept in mm/min once it is read, so a change of units later does not change it
+        assert_eq!(p[0].feed, 254.0);
+        assert_eq!(p[1].feed, 10.0);
+        assert_eq!(p[2].feed, 10.0);
+        assert_eq!(p[3].feed, 10.0);
     }
 }
