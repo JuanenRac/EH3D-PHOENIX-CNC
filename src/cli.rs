@@ -47,7 +47,7 @@ pub struct Options {
 }
 
 /// The windows that `--window` opens, in the order of the help.
-pub const WINDOWS: [&str; 18] = [
+pub const WINDOWS: [&str; 19] = [
     "settings",
     "settings-checks",
     "settings-probe",
@@ -63,6 +63,7 @@ pub const WINDOWS: [&str; 18] = [
     "stats",
     "macros",
     "transform",
+    "bookmarks",
     "probe",
     "probe-grid",
     "resume",

@@ -30,6 +30,9 @@ pub struct Tuning {
     pub macro_max_lines: usize,
     /// The time a tool change adds to the estimate, in seconds (`tool_change_time`).
     pub tool_change_s: f64,
+    /// Starting a program from one of its lines asks for a tick that says the tool, the spindle and the zero were checked
+    /// (`startline_confirm`).
+    pub startline_confirm: bool,
 }
 
 impl Default for Tuning {
@@ -48,6 +51,7 @@ impl Default for Tuning {
             macros_confirm: true,
             macro_max_lines: 200,
             tool_change_s: 30.0,
+            startline_confirm: true,
         }
     }
 }
@@ -138,6 +142,7 @@ impl Tuning {
                         .filter(|x| (1..=10_000).contains(x))
                         .unwrap_or(t.macro_max_lines)
                 }
+                "startline_confirm" => t.startline_confirm = on(v),
                 "tool_change_time" => {
                     t.tool_change_s = num(v)
                         .filter(|x| (0.0..=3600.0).contains(x))
@@ -168,6 +173,10 @@ impl Tuning {
         put("macros_confirm", yes_no(self.macros_confirm).to_string());
         put("macros_max_lines", self.macro_max_lines.to_string());
         put("tool_change_time", self.tool_change_s.to_string());
+        put(
+            "startline_confirm",
+            yes_no(self.startline_confirm).to_string(),
+        );
         for b in &self.keepouts {
             s.push_str(&b.to_setting());
             s.push('\n');
@@ -197,6 +206,9 @@ mod tests {
     fn the_defaults_are_the_cautious_ones() {
         let d = Tuning::default();
         assert!(d.progcheck && d.confirm_between && d.macros_confirm);
+        // starting from a line asks for the tick
+        assert!(d.startline_confirm);
+        assert!(!Tuning::parse("startline_confirm = no").startline_confirm);
         // a program that enters a box does not start, and the queue kept in the file waits for the operator
         assert!(d.keepout_reject && d.queue_remember);
         assert_eq!(d.sim_speed, 10.0);

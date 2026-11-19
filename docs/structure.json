@@ -424,6 +424,32 @@
           }
         },
         {
+          "name": "bookmarks.rs",
+          "desc": {
+            "en": "bookmarks on the lines of a program: toggle, next, previous",
+            "es": "marcadores en las líneas de un programa: marcar, siguiente, anterior",
+            "de": "Lesezeichen auf den Zeilen eines Programms: setzen, nächstes, vorheriges",
+            "fr": "signets sur les lignes d'un programme : poser, suivant, précédent",
+            "it": "segnalibri sulle righe di un programma: segna, successivo, precedente",
+            "ja": "プログラムの行のブックマーク：付ける、次、前",
+            "zh": "程序行上的书签：添加、下一个、上一个",
+            "pt": "marcadores nas linhas de um programa: marcar, seguinte, anterior"
+          }
+        },
+        {
+          "name": "startline.rs",
+          "desc": {
+            "en": "what a program has in force at a line, and when starting there is refused",
+            "es": "lo que un programa tiene activo en una línea, y cuándo se rechaza empezar ahí",
+            "de": "was ein Programm in einer Zeile eingestellt hat und wann der Start dort abgelehnt wird",
+            "fr": "ce qu'un programme a en vigueur à une ligne, et quand démarrer là est refusé",
+            "it": "cosa un programma ha attivo a una riga e quando l'avvio da lì viene rifiutato",
+            "ja": "ある行でプログラムが有効にしているものと、そこからの開始を拒否する場合",
+            "zh": "程序在某一行生效的设置，以及何时拒绝从该行开始",
+            "pt": "o que um programa tem ativo numa linha e quando o arranque aí é recusado"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
@@ -551,6 +577,19 @@
             "ja": "プログラムメニューの変換ウィンドウと元に戻す",
             "zh": "程序菜单的变换窗口和撤销",
             "pt": "a janela Transformar e Anular do menu Programa"
+          }
+        },
+        {
+          "name": "gui/lines.rs",
+          "desc": {
+            "en": "the Bookmarks window and the start from a line, with its question",
+            "es": "la ventana de marcadores y el inicio desde una línea, con su pregunta",
+            "de": "das Lesezeichen-Fenster und der Start ab einer Zeile, mit seiner Frage",
+            "fr": "la fenêtre des signets et le démarrage depuis une ligne, avec sa question",
+            "it": "la finestra dei segnalibri e l'avvio da una riga, con la sua domanda",
+            "ja": "ブックマークのウィンドウと行からの開始（確認付き）",
+            "zh": "书签窗口以及从某行开始（带确认）",
+            "pt": "a janela de marcadores e o arranque a partir de uma linha, com a sua pergunta"
           }
         },
         {

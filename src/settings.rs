@@ -442,6 +442,7 @@ impl Settings {
         t.macros_confirm = d.macros_confirm;
         t.macro_max_lines = d.macro_max_lines;
         t.tool_change_s = d.tool_change_s;
+        t.startline_confirm = d.startline_confirm;
     }
 
     /// Puts a file at the head of the recent ones (it is not listed twice).
@@ -764,7 +765,7 @@ mod tests {
     }
     fn changed() -> Settings {
         let mut s = Settings::parse(
-            "lint = no\nlint_max_feed = 100\nprogcheck = no\nkeepout_margin = 9\nkeepout_reject = no\nkeepout = clamp 0 0 -5 20 20 40\n             probe_feed = 50\nprobe_grid = 40\nheightmap_segment = 5\njog_soft_limits = always\n             queue_repeat_max = 7\nqueue_pause = 60\nqueue_confirm_between = no\nqueue_remember = no\nsim_speed = 99\n             log_max_entries = 77\nmacros_confirm = no\nmacros_max_lines = 9\ntool_change_time = 5\nstep = 0.1\nserver_token = t\n",
+            "lint = no\nlint_max_feed = 100\nprogcheck = no\nkeepout_margin = 9\nkeepout_reject = no\nkeepout = clamp 0 0 -5 20 20 40\n             probe_feed = 50\nprobe_grid = 40\nheightmap_segment = 5\njog_soft_limits = always\n             queue_repeat_max = 7\nqueue_pause = 60\nqueue_confirm_between = no\nqueue_remember = no\nsim_speed = 99\n             log_max_entries = 77\nmacros_confirm = no\nmacros_max_lines = 9\ntool_change_time = 5\nstartline_confirm = no\nstep = 0.1\nserver_token = t\n",
         );
         s.recent = vec!["a.nc".into()];
         s

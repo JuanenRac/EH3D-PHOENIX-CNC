@@ -45,6 +45,8 @@ pub(super) enum Win {
     Macros,
     /// Shift, turn, scale and mirror the program.
     Transform(Box<xform::XformState>),
+    /// The bookmarks and the start from a line.
+    Lines(Box<lines::LinesState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -141,6 +143,7 @@ impl App {
             "stats" => Some(Win::Sim(Box::new(self.sim_state()))),
             "macros" => Some(Win::Macros),
             "transform" => Some(Win::Transform(Box::default())),
+            "bookmarks" => Some(Win::Lines(Box::default())),
             "probe" => Some(Win::Probe(probe::Ask::Z)),
             "probe-grid" => Some(Win::Probe(probe::Ask::Grid {
                 area: [0.0, 0.0, 50.0, 40.0],
@@ -359,6 +362,7 @@ impl App {
             }
             if ui.button(self.t(Text::McClearProgram)).clicked() {
                 self.session.clear_program();
+                self.bookmarks.clear();
                 self.path_toolpath.clear();
                 self.path_extras = crate::sim::Extras::default();
                 self.viewer.refresh(&[], &[]);
@@ -390,6 +394,41 @@ impl App {
                 .clicked()
             {
                 self.undo_transform();
+                ui.close();
+            }
+            ui.separator();
+            if ui.button(self.w(Msg::MenuBookmarks)).clicked() {
+                self.open_window("bookmarks");
+                ui.close();
+            }
+            if ui
+                .add_enabled(
+                    self.selected_line().is_some(),
+                    egui::Button::new(self.w(Msg::MenuBookmarkToggle)),
+                )
+                .clicked()
+            {
+                self.toggle_bookmark_selected();
+                ui.close();
+            }
+            if ui
+                .add_enabled(
+                    !self.bookmarks.is_empty(),
+                    egui::Button::new(self.w(Msg::MenuBookmarkNext)),
+                )
+                .clicked()
+            {
+                self.bookmark_step(true);
+                ui.close();
+            }
+            if ui
+                .add_enabled(
+                    !self.bookmarks.is_empty(),
+                    egui::Button::new(self.w(Msg::MenuBookmarkPrev)),
+                )
+                .clicked()
+            {
+                self.bookmark_step(false);
                 ui.close();
             }
         });
@@ -500,6 +539,7 @@ impl App {
             Win::Macro(n) => self.macro_window(ctx, n),
             Win::Macros => self.macros_list_window(ctx),
             Win::Transform(s) => self.xform_window(ctx, s),
+            Win::Lines(s) => self.lines_window(ctx, s),
         };
         // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
         if next.is_some() || self.win.is_none() {

@@ -28,6 +28,7 @@ mod files;
 mod icons;
 mod keepout;
 mod keys;
+mod lines;
 mod macros;
 mod numfield;
 mod pathview;
@@ -218,6 +219,8 @@ pub struct App {
     open_multi: Vec<PathBuf>,
     /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
     focus_line: Option<usize>,
+    /// The bookmarks on the lines of the program that is loaded.
+    bookmarks: crate::bookmarks::Bookmarks,
     focus_scroll: bool,
     /// What the file window that is open is for, the session log kept for export, how much of the log of the session it has taken, and the start of the session.
     file_purpose: Purpose,
@@ -317,6 +320,7 @@ impl App {
             queue_saved: String::new(),
             open_multi: Vec::new(),
             focus_line: None,
+            bookmarks: crate::bookmarks::Bookmarks::default(),
             focus_scroll: false,
             file_purpose: Purpose::Program,
             logbook: crate::logbook::Logbook::new(settings_log_max),
@@ -426,6 +430,7 @@ impl App {
             Ok(bytes) => {
                 let text: String = bytes.iter().map(|&b| b as char).collect();
                 self.session.load(&text);
+                self.bookmarks.clear();
                 self.focus_line = None;
                 self.refresh_path();
                 self.path = path.display().to_string();
@@ -1064,6 +1069,8 @@ impl App {
                 let running = self.session.running || self.server_busy();
                 let (focus, scroll_to_focus) = (self.focus_line, self.focus_scroll);
                 let mut scrolled = false;
+                let mut clicked: Option<usize> = None;
+                let mut double_clicked: Option<usize> = None;
                 egui::ScrollArea::vertical()
                     .id_salt("program")
                     .auto_shrink([false, false])
@@ -1071,7 +1078,10 @@ impl App {
                         for (n, line) in self.session.program.iter().enumerate() {
                             let current = running && n == next;
                             let marked = focus == Some(n);
-                            let text = RichText::new(format!("{:>4}  {line}", n + 1)).monospace();
+                            // a bookmarked line has a star after its number
+                            let star = if self.bookmarks.contains(n) { '*' } else { ' ' };
+                            let text =
+                                RichText::new(format!("{:>4}{star} {line}", n + 1)).monospace();
                             let text = if n < next {
                                 text.color(col(self.theme.ok))
                             } else if current {
@@ -1086,7 +1096,12 @@ impl App {
                             } else {
                                 text
                             };
-                            let r = ui.label(text);
+                            let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                            if r.double_clicked() {
+                                double_clicked = Some(n);
+                            } else if r.clicked() {
+                                clicked = Some(n);
+                            }
                             if current {
                                 r.scroll_to_me(None);
                             } else if marked && scroll_to_focus {
@@ -1097,6 +1112,13 @@ impl App {
                     });
                 if scrolled {
                     self.focus_scroll = false;
+                }
+                // a click selects a line and a double click bookmarks it
+                if let Some(n) = double_clicked {
+                    self.focus_line = Some(n);
+                    self.bookmarks.toggle(n);
+                } else if let Some(n) = clicked {
+                    self.focus_line = Some(n);
                 }
             });
     }

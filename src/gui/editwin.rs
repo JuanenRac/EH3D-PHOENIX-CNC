@@ -29,6 +29,7 @@ impl App {
     /// Puts the text of the editor in the program (what the Apply button does).
     pub(super) fn apply_edit(&mut self, st: &mut EditState) {
         self.session.load(&st.text);
+        self.bookmarks.cut_to(self.session.program.len());
         self.refresh_path();
         st.mark_applied();
     }

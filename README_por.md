@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-455-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-468-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 455 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
+**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 468 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.1.5` |
 | Maturidade | Funcional |
-| Testes | 455 |
+| Testes | 468 |
 | Tecnologias | Rust |
 | Em hardware real | Não: por defeito comanda uma máquina simulada; um controlador GRBL real (`--grbl`) nunca foi experimentado |
 
@@ -47,7 +47,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 | Biblioteca base | 🟡 | Um crate de Rust que reexporta `scene`, `texts` e `theme` do `eh3d-view` com o nome deste programa; precisa da pasta do EH3D-COMMON ao lado. |
 | Cena e vistas | 🟡 | Escrita e testada no EH3D-COMMON; a janela deste programa desenha a trajetória de um programa na mesa e a posição da ferramenta (vista num computador). |
 | Temas e textos | 🟡 | Onze temas e as palavras da interface em 37 idiomas, vistos na janela deste programa. |
-| Testes | 🟡 | Passam 455 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
+| Testes | 🟡 | Passam 468 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
 | Janela e jog | 🟡 | Funciona num computador com o controlador simulado: posição, teclado de jog, passos, avanço, referência, zero, desbloqueio, uma linha de comandos e um registo; sem máquina real. |
 | Controlo de máquina | 🟠 | Só o simulador: um programa corre linha a linha com pausa, paragem e paragem de emergência; ainda não se liga nenhum controlador real a partir daqui. |
 | Documentação | 🟡 | README em oito idiomas, as duas imagens, três programas de exemplo e o changelog. |
@@ -76,6 +76,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 * **Um editor para o programa:** o editor do programa (Ctrl+E) mostra o texto com os **números de linha** na margem (as linhas sobre as quais a verificação tem algo a dizer são coloridas), **procurar e substituir** (com ou sem maiúsculas; Enter procura a seguinte; substitui-se uma ou todas e diz-se quantas), **ir para a linha**, as **notas da verificação para o texto tal como é escrito** (um clique no número de uma nota leva à sua linha) e **Aplicar**, que passa o texto para o programa (não enquanto um programa corre). **Aplicar e guardar** pergunta no próprio editor, com Substituir e Cancelar, antes de escrever sobre o ficheiro de onde veio o programa (a pergunta desaparece se o texto mudar), e **Aplicar e guardar como...** passa pela janela Guardar, que pergunta antes de substituir um ficheiro existente. As regras (`src/editor.rs`) são testadas sem janela.
 * **Perfis de máquina:** na secção Geral das definições pode guardar-se uma máquina como perfil (o curso dos três eixos, a velocidade do fuso e o seu limite de aviso, o avanço do jog, a velocidade rápida e o limite de aviso do avanço, e os valores da sonda) e voltar a tomá-la com um clique; OK guarda a escolha e Cancelar deixa as definições como estavam. O ficheiro de definições guarda uma linha `profile = NOME | tx=0,500 | ty=0,300 | tz=-100,50 | spindle=10000 | ...` por perfil (até 16, nomes de até 40 caracteres, um valor inválido mantém o predefinido) e `profile_active = NOME` para o que está em uso. `phoenix-cnc --profile NOME` arranca a janela (ou `--report`) com os valores desse perfil; um nome que não está guardado é dito no registo (ou recusado por `--report`) e as definições ficam como estão. As regras (`src/profiles.rs`) são testadas sem janela.
 * **Transformar o programa:** **Programa > Transformar o programa...** desloca (X, Y, Z), roda (graus, em torno de um ponto), escala e espelha (X, Y) o programa carregado, e **Programa > Anular a transformação** repõe-no como estava. As linhas são reescritas no sítio (as palavras que não mudam, os comentários e os espaços ficam como estavam), os arcos mantêm os seus centros e um espelho ímpar transforma um arco horário em anti-horário (os códigos `G2` e `G3` são trocados). Um programa que a alteração poderia estragar é recusado, indicando a linha e o motivo: distâncias relativas (`G91`), um plano diferente de XY, ciclos fixos e movimentos de apalpação, códigos que usam posições da máquina ou deslocam o zero (`G10`, `G28`, `G30`, `G53`, `G92`, `G43.1`), centros de arco absolutos (`G90.1`) ou uma escala que não é superior a 0. Considera-se que o programa começa na origem, como faz a trajetória. Um programa em curso nunca é alterado. `--window transform` abre-a. Quando o primeiro movimento do programa omite X ou Y, a janela avisa e pergunta onde está a ferramenta antes do programa (a origem por defeito); a coordenada omitida é tirada daí e escrita sempre que a alteração a move. As regras (`src/transform.rs`) são testadas sem janela, incluindo que a trajetória do programa novo é a antiga transformada.
+* **Marcadores e começar a partir de uma linha:** clique numa linha do painel do programa para a selecionar e faça duplo clique para a marcar (uma linha marcada tem uma estrela a seguir ao número), ou use **Programa > Marcar a linha selecionada**, **Marcador seguinte** e **Marcador anterior**; **Programa > Marcadores e começar a partir de uma linha...** (`--window bookmarks`) lista os marcadores, salta para um e começa a partir dele ou da linha selecionada. Antes de preparar o que quer que seja, a janela lê as linhas anteriores e diz o que o programa tinha ativo aí: polegadas, um plano diferente de XY, as coordenadas de trabalho, a compensação do comprimento da ferramenta, a última ferramenta pedida (não é feita troca de ferramenta), o fuso e a sua velocidade, o refrigerante, um zero deslocado e um movimento de corte antes de qualquer avanço; é recusado um arranque com distâncias relativas (`G91`), um ciclo fixo ou uma compensação de raio ainda ativos. **Preparar o arranque** precisa de uma marca que diga que a ferramenta, o fuso e o zero foram verificados (`startline_confirm = no` no ficheiro de definições, ou a caixa da secção Fila, macros e registo, retira-a), devolve o controlador a esse estado como num programa deixado a meio (até à altura segura, o fuso com a sua espera, sobre o ponto que o programa tinha) e deixa o programa em pausa na linha: a máquina só se move ao carregar em Continuar, e um programa em execução nunca é tocado. Os marcadores pertencem ao programa carregado. As regras (`src/bookmarks.rs`, `src/startline.rs`) são testadas sem janela.
 * **Tab completa o código na caixa de comandos:** enquanto a caixa da parte de baixo da janela tem o teclado, Tab completa o código que se escreve (`G38` dá `G38.`, `M30` dá `M30 `, `$J` dá `$J=`) ou, quando servem vários, escreve o que têm em comum e lista-os ao lado da caixa (`G5` lista de `G53` a `G59`). Atua na última palavra da linha, não distingue maiúsculas de minúsculas e não envia nada: a linha continua a sair com Enter.
 
 ## 🧩 Papel no EH3D
@@ -143,7 +144,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testes
 
-`cargo test --features gui` executa 455 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
+`cargo test --features gui` executa 468 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
 
 ## 🏗️ Compilação e publicação
 
@@ -191,6 +192,8 @@ EH3D-PHOENIX-CNC/
 │   ├── editor.rs                                o editor do programa: procurar, substituir, linha, notas
 │   ├── profiles.rs                              perfis de máquina: curso, fuso, avanços e sonda de cada uma
 │   ├── transform.rs                             deslocar, rodar, escalar e espelhar um programa, com as suas regras
+│   ├── bookmarks.rs                             marcadores nas linhas de um programa: marcar, seguinte, anterior
+│   ├── startline.rs                             o que um programa tem ativo numa linha e quando o arranque aí é recusado
 │   ├── bin/phoenix-cnc.rs                       o programa que abre a janela
 │   ├── server.rs                                a ligação ao servidor EH3D: enviar, acompanhar, pausar, parar
 │   ├── settings.rs                              o que se recorda entre execuções
@@ -201,6 +204,7 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/pathview.rs                          a linha do visualizador: cores, camadas, ampliar, linha clicada
 │   ├── gui/editwin.rs                           a janela do editor: números de linha, procurar, notas, guardar
 │   ├── gui/xform.rs                             a janela Transformar e Anular do menu Programa
+│   ├── gui/lines.rs                             a janela de marcadores e o arranque a partir de uma linha, com a sua pergunta
 │   ├── gui/summary.rs                           a janela de resumo antes do arranque e a lista de teclas
 │   ├── gui/probe.rs                             a sonda na janela: perguntas e entradas do mapa de alturas
 │   ├── gui/numfield.rs                          um número definido com os botões menos e mais ou escrevendo-o

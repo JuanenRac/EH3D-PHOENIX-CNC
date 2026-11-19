@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-455-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-468-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 455 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch mit den erledigten Zeilen markiert und hält an, was die Steuerung ablehnt. Das Fenster spricht 37 Sprachen und trägt elf Themen. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) hat GRBL gegen eine geskriptete Leitung geschrieben und führt die übrigen Familien als noch nicht angesteuert. 468 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**, eine serielle Schnittstelle wird nur für GRBL geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird, und Bögen und die übrigen Codes werden vom Simulator weder gezeichnet noch ausgeführt.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.5` |
 | Reifegrad | Funktionsfähig |
-| Tests | 455 |
+| Tests | 468 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
@@ -47,7 +47,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche in 37 Sprachen, im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 455 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 468 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur der Simulator: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt; von hier ist noch keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -76,6 +76,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 * **Ein Editor für das Programm:** der Programmeditor (Strg+E) zeigt den Text mit den **Zeilennummern** am Rand (Zeilen, zu denen die Prüfung etwas zu sagen hat, sind eingefärbt), **Suchen und Ersetzen** (mit oder ohne Groß-/Kleinschreibung; Enter sucht das nächste; eines oder alle ersetzen, die Anzahl wird genannt), **Gehe zu Zeile**, die **Hinweise der Prüfung für den Text, wie er gerade geschrieben ist** (ein Klick auf die Nummer eines Hinweises springt zu seiner Zeile) und **Anwenden**, das den Text ins Programm übernimmt (nicht während ein Programm läuft). **Anwenden und speichern** fragt im Editor selbst, mit Ersetzen und Abbrechen, bevor es die Datei überschreibt, aus der das Programm kam (die Frage verschwindet, wenn sich der Text ändert), und **Anwenden und speichern unter ...** läuft über das Speichern-Fenster, das vor dem Ersetzen einer vorhandenen Datei fragt. Die Regeln (`src/editor.rs`) werden ohne Fenster getestet.
 * **Maschinenprofile:** im Abschnitt Allgemein der Einstellungen lässt sich eine Maschine als Profil speichern (Verfahrweg der drei Achsen, Spindeldrehzahl und ihre Warngrenze, Vorschub des Jog, Eilgangsgeschwindigkeit und Warngrenze des Vorschubs sowie die Taster-Werte) und mit einem Klick wieder übernehmen; OK behält die Wahl, Abbrechen lässt die Einstellungen, wie sie waren. Die Einstellungsdatei enthält je Profil eine Zeile `profile = NAME | tx=0,500 | ty=0,300 | tz=-100,50 | spindle=10000 | ...` (bis zu 16, Namen bis 40 Zeichen, ein ungültiger Wert behält den Standard) und `profile_active = NAME` für das benutzte. `phoenix-cnc --profile NAME` startet das Fenster (oder `--report`) mit den Werten dieses Profils; ein nicht gespeicherter Name wird im Protokoll gemeldet (bei `--report` abgelehnt) und die Einstellungen bleiben wie sie sind. Die Regeln (`src/profiles.rs`) werden ohne Fenster getestet.
 * **Programm transformieren:** **Programm > Programm transformieren ...** verschiebt (X, Y, Z), dreht (Grad, um einen Punkt), skaliert und spiegelt (X, Y) das geladene Programm, und **Programm > Transformation rückgängig machen** stellt es wieder her. Die Zeilen werden an Ort und Stelle umgeschrieben (unveränderte Wörter, Kommentare und Abstände bleiben, wie sie waren), Bögen behalten ihre Mittelpunkte, und eine ungerade Spiegelung macht aus einem Uhrzeigersinn-Bogen einen Gegenuhrzeigersinn-Bogen (die Codes `G2` und `G3` werden getauscht). Ein Programm, das die Änderung falsch machen könnte, wird mit Zeile und Grund abgelehnt: relative Maße (`G91`), eine andere Ebene als XY, Bohrzyklen und Tastbewegungen, Codes mit Maschinenpositionen oder Nullpunktverschiebung (`G10`, `G28`, `G30`, `G53`, `G92`, `G43.1`), absolute Bogenmittelpunkte (`G90.1`) oder ein Maßstab, der nicht über 0 liegt. Das Programm beginnt, wie bei der Bahn angenommen, im Ursprung. Ein laufendes Programm wird nie geändert. `--window transform` öffnet das Fenster. Lässt die erste Bewegung des Programms X oder Y weg, warnt das Fenster und fragt, wo das Werkzeug vor dem Programm steht (standardmäßig der Ursprung); die weggelassene Koordinate wird von dort genommen und geschrieben, sobald die Änderung sie verschiebt. Die Regeln (`src/transform.rs`) werden ohne Fenster getestet, auch dass die Bahn des neuen Programms die transformierte alte Bahn ist.
+* **Lesezeichen und Start ab einer Zeile:** Eine Zeile im Programmfeld anklicken wählt sie aus, ein Doppelklick setzt ein Lesezeichen (eine markierte Zeile hat einen Stern hinter der Nummer); oder **Programm > Ausgewählte Zeile mit Lesezeichen versehen**, **Nächstes Lesezeichen** und **Vorheriges Lesezeichen**. **Programm > Lesezeichen und ab einer Zeile starten ...** (`--window bookmarks`) listet die Lesezeichen, springt zu einem und startet von dort oder von der ausgewählten Zeile. Bevor etwas vorbereitet wird, liest das Fenster die Zeilen vor dem Start und sagt, was das Programm dort eingestellt hatte: Zoll, eine andere Ebene als XY, die Werkstückkoordinaten, die Werkzeuglängenkorrektur, das zuletzt verlangte Werkzeug (es wird kein Werkzeugwechsel gemacht), die Spindel mit Drehzahl, das Kühlmittel, einen verschobenen Nullpunkt und eine Schnittbewegung vor jedem Vorschub; ein Start bei relativen Maßen (`G91`), einem noch aktiven Bearbeitungszyklus oder einer noch aktiven Fräserradiuskorrektur wird abgelehnt. **Start vorbereiten** verlangt ein Häkchen, dass Werkzeug, Spindel und Nullpunkt geprüft wurden (`startline_confirm = no` in der Einstellungsdatei oder das Kästchen im Abschnitt Warteschlange, Makros und Protokoll schaltet es ab), bringt die Steuerung wie bei einem mittendrin verlassenen Programm in diesen Zustand (auf die sichere Höhe, Spindel mit Wartezeit, über den Punkt des Programms) und lässt das Programm in der Zeile angehalten: Die Maschine bewegt sich erst bei Fortsetzen, und ein laufendes Programm wird nie angefasst. Lesezeichen gehören zum geladenen Programm. Die Regeln (`src/bookmarks.rs`, `src/startline.rs`) werden ohne Fenster getestet.
 * **Tab vervollständigt den Code im Befehlsfeld:** solange das Feld unten im Fenster die Tastatur hat, vervollständigt Tab den Code, der gerade getippt wird (`G38` ergibt `G38.`, `M30` ergibt `M30 `, `$J` ergibt `$J=`) oder schreibt, wenn mehrere passen, was sie gemeinsam haben, und listet sie neben dem Feld auf (`G5` listet `G53` bis `G59`). Es wirkt auf das letzte Wort der Zeile, unterscheidet nicht zwischen Groß- und Kleinschreibung und sendet nichts: Die Zeile geht weiter mit der Eingabetaste ab.
 
 ## 🧩 Rolle in EH3D
@@ -143,7 +144,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 455 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 468 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 
@@ -191,6 +192,8 @@ EH3D-PHOENIX-CNC/
 │   ├── editor.rs                                der Programmeditor: Suchen, Ersetzen, Zeile, Hinweise
 │   ├── profiles.rs                              Maschinenprofile: Verfahrweg, Spindel, Vorschübe und Taster je Maschine
 │   ├── transform.rs                             Programm verschieben, drehen, skalieren, spiegeln, mit Regeln
+│   ├── bookmarks.rs                             Lesezeichen auf den Zeilen eines Programms: setzen, nächstes, vorheriges
+│   ├── startline.rs                             was ein Programm in einer Zeile eingestellt hat und wann der Start dort abgelehnt wird
 │   ├── bin/phoenix-cnc.rs                       das Programm, das das Fenster öffnet
 │   ├── server.rs                                die Verbindung zum EH3D-Server: senden, verfolgen, anhalten, stoppen
 │   ├── settings.rs                              was zwischen Läufen gemerkt wird
@@ -201,6 +204,7 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/pathview.rs                          die Zeile des Betrachters: Farben, Ebenen, Zoom, angeklickte Zeile
 │   ├── gui/editwin.rs                           das Editorfenster: Zeilennummern, Suchen, Hinweise, Speichern
 │   ├── gui/xform.rs                             das Transformationsfenster und Rückgängig im Programm-Menü
+│   ├── gui/lines.rs                             das Lesezeichen-Fenster und der Start ab einer Zeile, mit seiner Frage
 │   ├── gui/summary.rs                           das Zusammenfassungsfenster vor dem Start und die Tastenliste
 │   ├── gui/probe.rs                             der Taster im Fenster: Rückfragen und Höhenkarten-Einträge
 │   ├── gui/numfield.rs                          eine Zahl, die mit den Tasten Minus und Plus oder durch Eintippen gesetzt wird

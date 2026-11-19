@@ -4,6 +4,7 @@
 
 pub use eh3d_view::{crash, scene, texts, theme};
 
+pub mod bookmarks;
 pub mod boxes;
 pub mod cli;
 pub mod complete;
@@ -31,6 +32,7 @@ pub mod server;
 pub mod session;
 pub mod settings;
 pub mod sim;
+pub mod startline;
 pub mod stats;
 pub mod transform;
 pub mod tuning;

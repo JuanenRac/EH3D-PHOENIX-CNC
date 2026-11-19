@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-455-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-468-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 455 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
+**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 468 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.1.5` |
 | Maturité | Fonctionnel |
-| Tests | 455 |
+| Tests | 468 |
 | Pile technique | Rust |
 | Sur du matériel réel | Non : par défaut il pilote une machine simulée ; un vrai contrôleur GRBL (`--grbl`) n'a jamais été essayé |
 
@@ -47,7 +47,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Bibliothèque de base | 🟡 | Un crate Rust qui réexporte `scene`, `texts` et `theme` d'`eh3d-view` sous le nom de ce programme ; il a besoin du dossier d'EH3D-COMMON à côté. |
 | Scène et vues | 🟡 | Écrite et testée dans EH3D-COMMON ; la fenêtre de ce programme dessine la trajectoire d'un programme sur la table et la position de l'outil (vue sur un ordinateur). |
 | Thèmes et textes | 🟡 | Onze thèmes et les mots de l'interface en 37 langues, vus dans la fenêtre de ce programme. |
-| Tests | 🟡 | 455 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
+| Tests | 🟡 | 468 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
 | Fenêtre et jog | 🟡 | Fonctionne sur un ordinateur avec le contrôleur simulé : position, pavé de jog, pas, avance, prise d'origine, zéro, déverrouillage, une ligne de commandes et un journal ; pas de vraie machine. |
 | Commande de machine | 🟠 | Seulement le simulateur : un programme s'exécute ligne par ligne avec pause, arrêt et arrêt d'urgence ; aucun vrai contrôleur n'est encore connecté d'ici. |
 | Documentation | 🟡 | README en huit langues, les deux images, trois programmes d'exemple et le changelog. |
@@ -76,6 +76,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 * **Un éditeur pour le programme :** l'éditeur du programme (Ctrl+E) montre le texte avec les **numéros de ligne** en marge (les lignes sur lesquelles la vérification a quelque chose à dire sont colorées), **rechercher et remplacer** (avec ou sans casse ; Entrée cherche le suivant ; remplacer un ou tous, le nombre est annoncé), **aller à la ligne**, les **notes de la vérification pour le texte tel qu'il s'écrit** (un clic sur le numéro d'une note mène à sa ligne) et **Appliquer**, qui met le texte dans le programme (pas pendant qu'un programme tourne). **Appliquer et enregistrer** demande dans l'éditeur lui-même, avec Remplacer et Annuler, avant d'écrire sur le fichier d'où vient le programme (la question disparaît si le texte change), et **Appliquer et enregistrer sous...** passe par la fenêtre Enregistrer, qui demande avant de remplacer un fichier existant. Les règles (`src/editor.rs`) sont testées sans fenêtre.
 * **Profils de machine :** dans la section Général des réglages, une machine peut être enregistrée comme profil (la course des trois axes, la vitesse de broche et sa limite d'alerte, l'avance du jog, la vitesse rapide et la limite d'alerte de l'avance, et les valeurs de la sonde) puis reprise d'un clic ; OK garde le choix et Annuler laisse les réglages tels qu'ils étaient. Le fichier de réglages contient une ligne `profile = NOM | tx=0,500 | ty=0,300 | tz=-100,50 | spindle=10000 | ...` par profil (jusqu'à 16, des noms de 40 caractères au plus, une valeur non valide garde sa valeur par défaut) et `profile_active = NOM` pour celui en cours. `phoenix-cnc --profile NOM` démarre la fenêtre (ou `--report`) avec les valeurs de ce profil ; un nom non enregistré est signalé dans le journal (ou refusé par `--report`) et les réglages restent tels quels. Les règles (`src/profiles.rs`) sont testées sans fenêtre.
 * **Transformer le programme :** **Programme > Transformer le programme...** décale (X, Y, Z), tourne (degrés, autour d'un point), met à l'échelle et met en miroir (X, Y) le programme chargé, et **Programme > Annuler la transformation** le remet comme il était. Les lignes sont réécrites sur place (les mots inchangés, les commentaires et les espaces restent tels quels), les arcs gardent leurs centres et un nombre impair de miroirs transforme un arc horaire en arc antihoraire (les codes `G2` et `G3` sont échangés). Un programme que le changement pourrait fausser est refusé, avec la ligne et la raison : distances relatives (`G91`), un plan autre que XY, cycles fixes et mouvements de palpage, codes qui utilisent des positions machine ou décalent le zéro (`G10`, `G28`, `G30`, `G53`, `G92`, `G43.1`), centres d'arc absolus (`G90.1`) ou une échelle qui n'est pas supérieure à 0. Le programme est supposé partir de l'origine, comme le fait la trajectoire. Un programme en cours n'est jamais modifié. `--window transform` l'ouvre. Lorsque le premier déplacement du programme omet X ou Y, la fenêtre avertit et demande où se trouve l'outil avant le programme (l'origine par défaut) ; la coordonnée omise est prise de là et écrite chaque fois que le changement la déplace. Les règles (`src/transform.rs`) sont testées sans fenêtre, y compris le fait que la trajectoire du nouveau programme est l'ancienne transformée.
+* **Signets et démarrage depuis une ligne :** cliquez une ligne du panneau du programme pour la choisir et double-cliquez pour y mettre un signet (une ligne avec signet porte une étoile après son numéro), ou utilisez **Programme > Mettre un signet sur la ligne choisie**, **Signet suivant** et **Signet précédent** ; **Programme > Signets et démarrage depuis une ligne...** (`--window bookmarks`) liste les signets, saute à l'un d'eux et démarre depuis lui ou depuis la ligne choisie. Avant de préparer quoi que ce soit, la fenêtre lit les lignes précédentes et dit ce que le programme avait en vigueur : pouces, un plan autre que XY, les coordonnées de travail, la correction de longueur d'outil, le dernier outil demandé (aucun changement d'outil n'est fait), la broche et sa vitesse, l'arrosage, un zéro décalé et un déplacement de coupe avant tout avance ; un démarrage avec distances relatives (`G91`), un cycle fixe ou une correction de rayon encore actifs est refusé. **Préparer le démarrage** demande une coche qui dit que l'outil, la broche et le zéro ont été vérifiés (`startline_confirm = no` dans le fichier de réglages, ou la case de la section File, macros et journal, la retire), remet le contrôleur dans cet état comme pour un programme laissé à moitié (jusqu'à la hauteur de sécurité, la broche avec son attente, au-dessus du point du programme) et laisse le programme en pause à la ligne : la machine ne bouge qu'à l'appui sur Reprendre, et un programme en cours n'est jamais touché. Les signets appartiennent au programme chargé. Les règles (`src/bookmarks.rs`, `src/startline.rs`) sont testées sans fenêtre.
 * **Tab complète le code dans la zone de commande :** tant que la zone du bas de la fenêtre a le clavier, Tab complète le code en cours de saisie (`G38` donne `G38.`, `M30` donne `M30 `, `$J` donne `$J=`) ou, quand plusieurs conviennent, écrit ce qu'ils ont en commun et les liste à côté de la zone (`G5` liste `G53` à `G59`). Il agit sur le dernier mot de la ligne, ignore majuscules et minuscules et n'envoie rien : la ligne part toujours avec Entrée.
 
 ## 🧩 Rôle dans EH3D
@@ -143,7 +144,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` lance 455 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
+`cargo test --features gui` lance 468 tests : la session (jog et zéro, un programme ligne par ligne, pause et reprise, une ligne refusée, l'arrêt d'urgence et l'alarme, le journal des commandes, la prise d'origine), la trajectoire d'un programme et la ligne de commande ; la vue et le contrôleur simulé sont testés dans EH3D-COMMON. La CI lance aussi `cargo fmt --check` et `cargo clippy` avec les avertissements en erreurs, et `python -I tools/ci_validate.py` vérifie le manifeste, les versions, le changelog et les huit README.
 
 ## 🏗️ Compilation et publication
 
@@ -191,6 +192,8 @@ EH3D-PHOENIX-CNC/
 │   ├── editor.rs                                l'éditeur du programme : rechercher, remplacer, ligne, notes
 │   ├── profiles.rs                              profils de machine : course, broche, avances et sonde de chacune
 │   ├── transform.rs                             décaler, tourner, mettre à l'échelle et en miroir un programme
+│   ├── bookmarks.rs                             signets sur les lignes d'un programme : poser, suivant, précédent
+│   ├── startline.rs                             ce qu'un programme a en vigueur à une ligne, et quand démarrer là est refusé
 │   ├── bin/phoenix-cnc.rs                       le programme qui ouvre la fenêtre
 │   ├── server.rs                                la liaison au serveur EH3D : envoyer, suivre, mettre en pause, arrêter
 │   ├── settings.rs                              ce qui est mémorisé entre exécutions
@@ -201,6 +204,7 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/pathview.rs                          la ligne du visualiseur : couleurs, calques, zoom, ligne cliquée
 │   ├── gui/editwin.rs                           la fenêtre de l'éditeur : numéros de ligne, recherche, notes, enregistrer
 │   ├── gui/xform.rs                             la fenêtre Transformer et Annuler du menu Programme
+│   ├── gui/lines.rs                             la fenêtre des signets et le démarrage depuis une ligne, avec sa question
 │   ├── gui/summary.rs                           la fenêtre de résumé avant le démarrage et la liste des touches
 │   ├── gui/probe.rs                             la sonde dans la fenêtre : questions et entrées de la carte
 │   ├── gui/numfield.rs                          un nombre réglé avec les boutons moins et plus ou en l'écrivant
