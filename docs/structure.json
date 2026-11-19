@@ -450,6 +450,19 @@
           }
         },
         {
+          "name": "materials.rs",
+          "desc": {
+            "en": "the library of materials: suggested feed and speed ranges the checks hold a program to",
+            "es": "la biblioteca de materiales: rangos de avance y velocidad que las comprobaciones exigen",
+            "de": "die Materialbibliothek: empfohlene Vorschub- und Drehzahlbereiche für die Prüfungen",
+            "fr": "la bibliothèque de matériaux : plages d'avance et de vitesse que les vérifications exigent",
+            "it": "la libreria di materiali: intervalli di avanzamento e velocità richiesti dai controlli",
+            "ja": "材料ライブラリ：チェックが基準にする送り速度と回転数の推奨範囲",
+            "zh": "材料库：检查所依据的建议进给和转速范围",
+            "pt": "a biblioteca de materiais: intervalos de avanço e velocidade que as verificações exigem"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",

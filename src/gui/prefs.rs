@@ -125,6 +125,22 @@ impl App {
         ui.checkbox(&mut d.s.lint.enabled, self.w(Msg::SetLint));
         ui.checkbox(&mut d.s.tuning.progcheck, self.w(Msg::SetProgcheck));
         ui.checkbox(&mut d.s.tuning.keepout_reject, self.w(Msg::SetKeepReject));
+        ui.horizontal(|ui| {
+            ui.label(self.w(Msg::SetMaterial));
+            let shown = if d.s.material.is_empty() {
+                self.w(Msg::MatNone).to_string()
+            } else {
+                d.s.material.clone()
+            };
+            egui::ComboBox::from_id_salt("material")
+                .selected_text(shown)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut d.s.material, String::new(), self.w(Msg::MatNone));
+                    for m in &self.materials {
+                        ui.selectable_value(&mut d.s.material, m.name.clone(), m.name.as_str());
+                    }
+                });
+        });
         ui.add_space(6.0);
         egui::Grid::new("set-checks")
             .num_columns(2)

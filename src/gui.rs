@@ -219,6 +219,8 @@ pub struct App {
     open_multi: Vec<PathBuf>,
     /// A line of the program that a window asked to show (the Check window, the simulation), and whether the panel still has to scroll to it.
     focus_line: Option<usize>,
+    /// The library of materials (the file of the operator or the one shipped), for the choice in the settings.
+    materials: Vec<crate::materials::Material>,
     /// The bookmarks on the lines of the program that is loaded.
     bookmarks: crate::bookmarks::Bookmarks,
     focus_scroll: bool,
@@ -275,6 +277,8 @@ impl App {
         if let Some(v) = o.view_3d {
             settings.view_3d = v;
         }
+        let materials = crate::materials::load(&path);
+        settings.resolve_material(&materials);
         let settings_log_max = settings.tuning.log_max;
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;
@@ -320,6 +324,7 @@ impl App {
             queue_saved: String::new(),
             open_multi: Vec::new(),
             focus_line: None,
+            materials,
             bookmarks: crate::bookmarks::Bookmarks::default(),
             focus_scroll: false,
             file_purpose: Purpose::Program,

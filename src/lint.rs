@@ -17,6 +17,10 @@ pub struct LintCfg {
     /// A feed rate above this (mm/min) or a spindle speed above this (rpm) is said (5000 and 24000 by default); 0 turns the check off.
     pub max_feed_mm_min: f64,
     pub max_rpm: f64,
+    /// The range of cutting feed (mm/min) and of spindle speed (rpm) of the material in use, from the library of materials; a cutting
+    /// move or a spindle speed outside it is said. `None` checks nothing.
+    pub material_feed: Option<(f64, f64)>,
+    pub material_rpm: Option<(f64, f64)>,
 }
 
 impl Default for LintCfg {
@@ -26,6 +30,8 @@ impl Default for LintCfg {
             rapid_floor_mm: 0.0,
             max_feed_mm_min: 5000.0,
             max_rpm: 24_000.0,
+            material_feed: None,
+            material_rpm: None,
         }
     }
 }
@@ -44,6 +50,12 @@ pub enum Kind {
     FeedTooHigh,
     /// An `S` above the most the spindle turns.
     SpeedTooHigh,
+    /// A cutting move in X or Y below / above the range of feed of the material in use.
+    FeedBelowMaterial,
+    FeedAboveMaterial,
+    /// An `S` below / above the range of spindle speed of the material in use.
+    SpeedBelowMaterial,
+    SpeedAboveMaterial,
     /// The program moves and has no `M2` or `M30`.
     NoEnd,
 }
@@ -121,6 +133,46 @@ fn template(kind: Kind, lang: &str) -> &'static str {
             "{n} 个主轴转速超过上限 {limit} rpm（第一个在第 {line} 行）",
             "{n} velocidades do fuso ultrapassam o limite de {limit} rpm (a primeira na linha {line})",
         ],
+        Kind::FeedBelowMaterial => [
+            "{n} cutting moves run below the {limit} mm/min suggested for the material in use (first at line {line})",
+            "{n} movimientos de corte van por debajo de los {limit} mm/min sugeridos para el material en uso (el primero en la línea {line})",
+            "{n} Schnittbewegungen laufen unter den für das gewählte Material empfohlenen {limit} mm/min (die erste in Zeile {line})",
+            "{n} déplacements de coupe vont sous les {limit} mm/min conseillés pour le matériau choisi (le premier à la ligne {line})",
+            "{n} movimenti di taglio vanno sotto i {limit} mm/min suggeriti per il materiale in uso (il primo alla riga {line})",
+            "{n} 件の切削移動が、使用中の材料の推奨値 {limit} mm/min を下回っています（最初は {line} 行目）",
+            "{n} 个切削移动低于所选材料建议的 {limit} mm/min（第一个在第 {line} 行）",
+            "{n} movimentos de corte ficam abaixo dos {limit} mm/min sugeridos para o material em uso (o primeiro na linha {line})",
+        ],
+        Kind::FeedAboveMaterial => [
+            "{n} cutting moves run above the {limit} mm/min suggested for the material in use (first at line {line})",
+            "{n} movimientos de corte van por encima de los {limit} mm/min sugeridos para el material en uso (el primero en la línea {line})",
+            "{n} Schnittbewegungen laufen über den für das gewählte Material empfohlenen {limit} mm/min (die erste in Zeile {line})",
+            "{n} déplacements de coupe vont au-dessus des {limit} mm/min conseillés pour le matériau choisi (le premier à la ligne {line})",
+            "{n} movimenti di taglio vanno sopra i {limit} mm/min suggeriti per il materiale in uso (il primo alla riga {line})",
+            "{n} 件の切削移動が、使用中の材料の推奨値 {limit} mm/min を上回っています（最初は {line} 行目）",
+            "{n} 个切削移动高于所选材料建议的 {limit} mm/min（第一个在第 {line} 行）",
+            "{n} movimentos de corte ficam acima dos {limit} mm/min sugeridos para o material em uso (o primeiro na linha {line})",
+        ],
+        Kind::SpeedBelowMaterial => [
+            "{n} spindle speeds are below the {limit} rpm suggested for the material in use (first at line {line})",
+            "{n} velocidades del husillo están por debajo de las {limit} rpm sugeridas para el material en uso (la primera en la línea {line})",
+            "{n} Spindeldrehzahlen liegen unter den für das gewählte Material empfohlenen {limit} U/min (die erste in Zeile {line})",
+            "{n} vitesses de broche sont sous les {limit} tr/min conseillés pour le matériau choisi (la première à la ligne {line})",
+            "{n} velocità del mandrino sono sotto i {limit} giri/min suggeriti per il materiale in uso (la prima alla riga {line})",
+            "{n} 件の主軸回転数が、使用中の材料の推奨値 {limit} rpm を下回っています（最初は {line} 行目）",
+            "{n} 个主轴转速低于所选材料建议的 {limit} rpm（第一个在第 {line} 行）",
+            "{n} velocidades do fuso ficam abaixo das {limit} rpm sugeridas para o material em uso (a primeira na linha {line})",
+        ],
+        Kind::SpeedAboveMaterial => [
+            "{n} spindle speeds are above the {limit} rpm suggested for the material in use (first at line {line})",
+            "{n} velocidades del husillo están por encima de las {limit} rpm sugeridas para el material en uso (la primera en la línea {line})",
+            "{n} Spindeldrehzahlen liegen über den für das gewählte Material empfohlenen {limit} U/min (die erste in Zeile {line})",
+            "{n} vitesses de broche sont au-dessus des {limit} tr/min conseillés pour le matériau choisi (la première à la ligne {line})",
+            "{n} velocità del mandrino sono sopra i {limit} giri/min suggeriti per il materiale in uso (la prima alla riga {line})",
+            "{n} 件の主軸回転数が、使用中の材料の推奨値 {limit} rpm を上回っています（最初は {line} 行目）",
+            "{n} 个主轴转速高于所选材料建议的 {limit} rpm（第一个在第 {line} 行）",
+            "{n} velocidades do fuso ficam acima das {limit} rpm sugeridas para o material em uso (a primeira na linha {line})",
+        ],
         Kind::NoEnd => [
             "The program has no end (M2 or M30): the spindle may stay on",
             "El programa no tiene final (M2 o M30): el husillo puede quedar encendido",
@@ -168,6 +220,10 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
     let mut change: Option<Finding> = None;
     let mut fast: Option<Finding> = None;
     let mut spinning: Option<Finding> = None;
+    let (mut feed_low, mut feed_high): (Option<Finding>, Option<Finding>) = (None, None);
+    let (mut speed_low, mut speed_high): (Option<Finding>, Option<Finding>) = (None, None);
+    // the feed in force, in mm/min
+    let mut feed_now: Option<f64> = None;
     let mut scale = 1.0;
     let bump = |slot: &mut Option<Finding>, kind: Kind, line: usize| match slot {
         Some(f) => f.count += 1,
@@ -183,6 +239,7 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
     for (n, raw) in lines.iter().enumerate() {
         let ws = words(raw);
         let mut axis = false;
+        let mut xy = false;
         let mut new_z = None;
         // the speed of the line itself counts for the start of the same line
         if ws.iter().any(|&(l, _)| l == 'S') {
@@ -190,6 +247,17 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
         }
         for &(l, v) in &ws {
             let tenths = (v * 10.0).round() as i32;
+            // the material in use: the feed in force is kept for the moves, and a spindle speed outside the range is said at once
+            if l == 'F' {
+                feed_now = Some(v * scale);
+            }
+            if let ('S', Some((lo, hi))) = (l, cfg.material_rpm) {
+                if v > 0.0 && v < lo {
+                    bump(&mut speed_low, Kind::SpeedBelowMaterial, n + 1);
+                } else if v > hi {
+                    bump(&mut speed_high, Kind::SpeedAboveMaterial, n + 1);
+                }
+            }
             match l {
                 'G' => match tenths {
                     0 => motion = 0,
@@ -207,7 +275,10 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
                 'S' if cfg.max_rpm > 0.0 && v > cfg.max_rpm => {
                     bump(&mut spinning, Kind::SpeedTooHigh, n + 1)
                 }
-                'X' | 'Y' => axis = true,
+                'X' | 'Y' => {
+                    axis = true;
+                    xy = true;
+                }
                 'Z' => {
                     axis = true;
                     new_z = Some(v);
@@ -241,22 +312,38 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
             if new_z.is_some() && z < cfg.rapid_floor_mm {
                 bump(&mut rapid, Kind::RapidDown, n + 1);
             }
-        } else if !spindle_on {
-            bump(&mut dry, Kind::CutWithoutSpindle, n + 1);
+        } else {
+            if !spindle_on {
+                bump(&mut dry, Kind::CutWithoutSpindle, n + 1);
+            }
+            // a plunge (Z alone) has a feed of its own: only the moves in X or Y are held to the range of the material
+            if let (true, Some((lo, hi)), Some(f)) = (xy, cfg.material_feed, feed_now) {
+                if f < lo {
+                    bump(&mut feed_low, Kind::FeedBelowMaterial, n + 1);
+                } else if f > hi {
+                    bump(&mut feed_high, Kind::FeedAboveMaterial, n + 1);
+                }
+            }
         }
     }
     for (slot, limit) in [
         (&mut fast, cfg.max_feed_mm_min),
         (&mut spinning, cfg.max_rpm),
+        (&mut feed_low, cfg.material_feed.map_or(0.0, |r| r.0)),
+        (&mut feed_high, cfg.material_feed.map_or(0.0, |r| r.1)),
+        (&mut speed_low, cfg.material_rpm.map_or(0.0, |r| r.0)),
+        (&mut speed_high, cfg.material_rpm.map_or(0.0, |r| r.1)),
     ] {
         if let Some(f) = slot {
             f.limit = limit;
         }
     }
-    let mut out: Vec<Finding> = [rapid, dry, nospeed, change, fast, spinning]
-        .into_iter()
-        .flatten()
-        .collect();
+    let mut out: Vec<Finding> = [
+        rapid, dry, nospeed, change, fast, spinning, feed_low, feed_high, speed_low, speed_high,
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     if moves && !ended {
         out.push(Finding {
             kind: Kind::NoEnd,
@@ -290,6 +377,59 @@ mod tests {
                 .is_empty()
         );
         assert!(kinds("; nothing here").is_empty());
+    }
+
+    #[test]
+    fn the_feed_and_the_speed_are_held_to_the_range_of_the_material_in_use() {
+        let cfg = LintCfg {
+            material_feed: Some((100.0, 600.0)),
+            material_rpm: Some((10_000.0, 24_000.0)),
+            max_feed_mm_min: 0.0,
+            max_rpm: 0.0,
+            ..LintCfg::default()
+        };
+        let p = lines(
+            "M3 S5000\nG1 X5 F50\nG1 X9 F700\nG1 Z-1 F20\nG1 X1 F300\nG2 X2 Y2 I1 J0 F650\nS30000\nM30",
+        );
+        let got: Vec<(Kind, usize, usize, f64)> = lint(&p, &cfg)
+            .iter()
+            .map(|f| (f.kind, f.line, f.count, f.limit))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (Kind::FeedBelowMaterial, 2, 1, 100.0),
+                (Kind::FeedAboveMaterial, 3, 2, 600.0),
+                (Kind::SpeedBelowMaterial, 1, 1, 10_000.0),
+                (Kind::SpeedAboveMaterial, 7, 1, 24_000.0),
+            ]
+        );
+        // a plunge in Z alone and a rapid are never held to the feed, and S0 is not a speed below the range
+        let q = lines("M3 S12000\nG0 X1 F10\nG1 Z-2 F20\nS0\nM30");
+        assert!(lint(&q, &cfg).is_empty());
+        // without a material nothing is said, and a material with only one range checks only that one
+        assert!(lint(&p, &LintCfg::default()).iter().all(|f| !matches!(
+            f.kind,
+            Kind::FeedBelowMaterial
+                | Kind::FeedAboveMaterial
+                | Kind::SpeedBelowMaterial
+                | Kind::SpeedAboveMaterial
+        )));
+        let only = LintCfg {
+            material_rpm: Some((10_000.0, 24_000.0)),
+            ..LintCfg::default()
+        };
+        assert!(lint(&p, &only)
+            .iter()
+            .all(|f| !matches!(f.kind, Kind::FeedBelowMaterial | Kind::FeedAboveMaterial)));
+        // inches: F2 is 50.8 mm/min, under the range
+        let inch = lines("G20\nM3 S12000\nG1 X1 F2\nM30");
+        assert_eq!(lint(&inch, &cfg)[0].kind, Kind::FeedBelowMaterial);
+        // the sentence has the number in it, in each language
+        let f = lint(&p, &cfg)[0];
+        assert!(f.message("en").contains("100 mm/min"));
+        assert!(f.message("de").contains("100 mm/min"));
+        assert!(f.message("zh").contains("100"));
     }
 
     #[test]

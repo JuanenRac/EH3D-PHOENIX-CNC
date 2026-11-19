@@ -1,0 +1,18 @@
+# The library of materials: the range of cutting feed (mm per minute) and of spindle speed (rpm) that is a good place to start with each
+# material, for small machines and small cutters. The program checks a G-code program against the material chosen in the settings (General
+# checks section) and says when a cutting move runs below or above the feed range, or the spindle runs below or above the speed range.
+# These are starting points, not rules: tune them to your cutter and your machine.
+#
+# To use your own library, copy this file next to the settings file with the name phoenix-cnc-materials.txt and edit it. While that file
+# does not exist, this one is used.
+#
+# material = NAME | feed=LOW,HIGH | rpm=LOW,HIGH      (either range may be left out; a line that is not valid is left out)
+material = FR4 circuit board | feed=100,600 | rpm=10000,24000
+material = Copper-clad engraving | feed=150,600 | rpm=12000,24000
+material = Aluminium | feed=150,800 | rpm=8000,18000
+material = Brass | feed=100,500 | rpm=6000,14000
+material = Acrylic | feed=300,1200 | rpm=10000,20000
+material = Hardwood | feed=400,1500 | rpm=10000,20000
+material = Softwood and MDF | feed=600,2000 | rpm=10000,20000
+material = Plywood | feed=400,1500 | rpm=10000,20000
+material = Foam | feed=800,3000 | rpm=8000,18000

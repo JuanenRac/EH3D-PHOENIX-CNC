@@ -248,10 +248,12 @@ pub enum Msg {
     ViewFront,
     ViewSide,
     ViewIso,
+    SetMaterial,
+    MatNone,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 240] = [
+pub const ALL: [Msg; 242] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -492,6 +494,8 @@ pub const ALL: [Msg; 240] = [
     Msg::ViewFront,
     Msg::ViewSide,
     Msg::ViewIso,
+    Msg::SetMaterial,
+    Msg::MatNone,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2897,6 +2901,26 @@ fn table(m: Msg) -> [&'static str; 8] {
             "等轴测图",
             "Vista isométrica",
         ],
+        Msg::SetMaterial => [
+            "Material (feeds and speeds suggested)",
+            "Material (avances y velocidades sugeridos)",
+            "Material (empfohlene Vorschübe und Drehzahlen)",
+            "Matériau (avances et vitesses conseillés)",
+            "Materiale (avanzamenti e velocità suggeriti)",
+            "材料（推奨の送りと回転数）",
+            "材料（建议的进给和转速）",
+            "Material (avanços e velocidades sugeridos)",
+        ],
+        Msg::MatNone => [
+            "None",
+            "Ninguno",
+            "Keines",
+            "Aucun",
+            "Nessuno",
+            "なし",
+            "无",
+            "Nenhum",
+        ],
     }
 }
 
@@ -2960,7 +2984,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 240);
+        assert_eq!(seen.len(), 242);
     }
 
     #[test]

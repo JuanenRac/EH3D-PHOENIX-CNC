@@ -20,6 +20,7 @@ pub mod link;
 pub mod lint;
 pub mod logbook;
 pub mod macros;
+pub mod materials;
 pub mod plan;
 pub mod probe;
 pub mod profiles;

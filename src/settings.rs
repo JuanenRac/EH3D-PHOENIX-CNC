@@ -93,6 +93,8 @@ pub struct Settings {
     /// values were set by hand).
     pub profiles: Vec<Profile>,
     pub profile: String,
+    /// The name of the material in use, from the library of materials ("" for none): its ranges of feed and speed are held in `lint`.
+    pub material: String,
 }
 
 impl Default for Settings {
@@ -140,6 +142,7 @@ impl Default for Settings {
             tuning: Tuning::default(),
             profiles: Vec::new(),
             profile: String::new(),
+            material: String::new(),
         }
     }
 }
@@ -180,6 +183,7 @@ impl Settings {
             let num = |v: &str| v.parse::<f64>().ok().filter(|x| x.is_finite());
             match k.as_str() {
                 "lang" => s.lang = Lang::from_code(v).unwrap_or(s.lang),
+                "material" => s.material = crate::profiles::clean_name(v).unwrap_or_default(),
                 "theme" => s.theme = ThemeId::from_key(v).unwrap_or(s.theme),
                 "units" => {
                     s.inches = v.eq_ignore_ascii_case("in") || v.eq_ignore_ascii_case("inch")
@@ -407,14 +411,26 @@ impl Settings {
             self.heightmap_segment_mm
         ));
         out.push_str(&self.profiles_text());
+        out.push_str(&format!("material = {}\n", one_line(&self.material)));
         out.push_str(&self.tuning.to_text());
         out
+    }
+
+    /// Gives the checker the ranges of the material in use (the name in `material`, looked for in the library), or none when there is no
+    /// such material.
+    pub fn resolve_material(&mut self, library: &[crate::materials::Material]) {
+        self.lint.material_feed = None;
+        self.lint.material_rpm = None;
+        if let Some(m) = crate::materials::find(library, &self.material) {
+            m.apply(&mut self.lint);
+        }
     }
 
     /// The checks of the program go back to their defaults (the keep-out boxes stay).
     pub fn reset_checks(&mut self) {
         let d = Settings::default();
         self.lint = d.lint;
+        self.material.clear();
         self.tuning.progcheck = d.tuning.progcheck;
         self.tuning.keepout_margin = d.tuning.keepout_margin;
         self.tuning.keepout_reject = d.tuning.keepout_reject;
@@ -536,6 +552,7 @@ mod tests {
                 rapid_floor_mm: -1.5,
                 max_feed_mm_min: 2400.0,
                 max_rpm: 24_000.0,
+                ..LintCfg::default()
             },
             probe: ProbeCfg {
                 feed_mm_min: 15.0,
@@ -558,6 +575,7 @@ mod tests {
             },
             profiles: Vec::new(),
             profile: String::new(),
+            material: String::new(),
         };
         s.save_profile("Small mill");
         s.spindle_rpm = 21_000.0;
@@ -769,6 +787,41 @@ mod tests {
         );
         s.recent = vec!["a.nc".into()];
         s
+    }
+
+    #[test]
+    fn the_material_in_use_is_kept_in_the_file_and_gives_the_checker_its_ranges() {
+        use crate::materials::parse_library;
+        let lib = parse_library(
+            "material = Oak | feed=300,900 | rpm=9000,18000\nmaterial = Foam | feed=800,3000\n",
+        );
+        let mut s = Settings::parse("material = oak\n");
+        assert_eq!(s.material, "oak");
+        // parsing alone does not look in the library
+        assert_eq!(s.lint.material_feed, None);
+        s.resolve_material(&lib);
+        assert_eq!(s.lint.material_feed, Some((300.0, 900.0)));
+        assert_eq!(s.lint.material_rpm, Some((9000.0, 18000.0)));
+        // the name is what the file keeps, and the ranges are not written
+        assert!(s.to_text().contains("material = oak\n"));
+        assert!(!s.to_text().contains("9000"));
+        assert_eq!(Settings::parse(&s.to_text()).material, "oak");
+        // a material with one range clears the other; a name that is not in the library clears both
+        s.material = "Foam".to_string();
+        s.resolve_material(&lib);
+        assert_eq!(
+            (s.lint.material_feed.is_some(), s.lint.material_rpm),
+            (true, None)
+        );
+        s.material = "Nothing".to_string();
+        s.resolve_material(&lib);
+        assert_eq!((s.lint.material_feed, s.lint.material_rpm), (None, None));
+        // none is the default, a name with line breaks is cleaned, and the section of the checks puts it back
+        assert_eq!(Settings::default().material, "");
+        assert_eq!(Settings::parse("material = a|b\n").material, "a b");
+        s.material = "Oak".to_string();
+        s.reset_checks();
+        assert_eq!(s.material, "");
     }
 
     #[test]

@@ -187,6 +187,9 @@ impl App {
     /// The effect of a change of the settings on the window and on the machine.
     pub(super) fn apply_settings(&mut self) {
         self.lang = self.settings.lang;
+        // the library may have been edited: the material in use is looked for again
+        self.materials = crate::materials::load(&self.settings_path);
+        self.settings.resolve_material(&self.materials);
         if self.theme.id != self.settings.theme {
             self.theme = Theme::for_id(self.settings.theme);
         }
@@ -1461,6 +1464,28 @@ mod tests {
             a.open_window(name);
             assert_eq!(a.win.is_some(), ok, "{name}");
         }
+    }
+
+    #[test]
+    fn the_material_chosen_in_the_settings_reaches_the_checks_of_the_program() {
+        let mut a = App::isolated();
+        a.session.load("M3 S12000\nG1 X5 F20\nM30");
+        let found = |a: &App| {
+            a.program_notes()
+                .iter()
+                .any(|n| n.text.contains("suggested"))
+        };
+        assert!(!found(&a));
+        // the library shipped has aluminium, which holds the feed above 150 mm/min
+        a.settings.material = "Aluminium".to_string();
+        a.apply_settings();
+        assert!(!a.materials.is_empty());
+        assert!(a.settings.lint.material_feed.is_some());
+        assert!(found(&a));
+        // none puts the ranges away again
+        a.settings.material.clear();
+        a.apply_settings();
+        assert!(a.settings.lint.material_feed.is_none() && !found(&a));
     }
 
     #[test]
