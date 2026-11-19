@@ -78,6 +78,24 @@ pub fn notes(lines: &[String], tuning: &Tuning, lint_cfg: &LintCfg, cfg: &Cfg) -
             ),
         });
     }
+    for c in crate::atc::collisions(
+        lines,
+        &tuning.atc,
+        cfg.offset,
+        &tuning.keepouts,
+        tuning.keepout_margin,
+    ) {
+        out.push(Note {
+            line: Some(c.line),
+            level: Level::Danger,
+            problem: true,
+            text: say(
+                lang,
+                Msg::AtcBoxHit,
+                &[(c.line + 1).to_string(), c.tool.to_string(), c.name],
+            ),
+        });
+    }
     let chords = if tuning.keepouts.is_empty() {
         0
     } else {
@@ -279,5 +297,41 @@ mod tests {
             (n[0].line, n[0].level, n[0].problem),
             (None, Level::Info, false)
         );
+    }
+
+    #[test]
+    fn a_tool_change_that_goes_through_a_keep_out_box_is_a_problem_of_the_report() {
+        let atc = crate::atc::AtcCfg {
+            enabled: true,
+            safe_z: 10.0,
+            rack: [100.0, 50.0, -5.0],
+            pitch: [30.0, 0.0],
+            ..Default::default()
+        };
+        let p = prog("G21\nM3 S1000\nG0 X0 Y0 Z10\nT1 M6\nG0 X0 Y0 Z10\nT2 M6\nM30");
+        let mut t = Tuning {
+            atc,
+            keepouts: vec![crate::boxes::KeepOut::parse("post 125 45 -8 135 55 5").unwrap()],
+            ..Tuning::default()
+        };
+        let n = notes(&p, &t, &LintCfg::default(), &cfg("en"));
+        let change = n
+            .iter()
+            .find(|x| x.text.contains("the change to T2"))
+            .unwrap_or_else(|| panic!("{n:?}"));
+        assert_eq!(
+            (change.line, change.level, change.problem),
+            (Some(5), Level::Danger, true)
+        );
+        assert!(change.text.contains("post") && change.text.contains("Line 6"));
+        assert!(build(&p, &t, &LintCfg::default(), &cfg("en")).problems >= 1);
+        // in the other languages too
+        let es = notes(&p, &t, &LintCfg::default(), &cfg("es"));
+        assert!(es.iter().any(|x| x.text.contains("el cambio a T2")));
+        // with the changer off the program is clean: the program itself never enters the box
+        t.atc.enabled = false;
+        assert!(notes(&p, &t, &LintCfg::default(), &cfg("en"))
+            .iter()
+            .all(|x| !x.text.contains("change to")));
     }
 }

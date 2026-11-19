@@ -62,17 +62,31 @@ impl App {
         if !t.keepout_reject || t.keepouts.is_empty() {
             return None;
         }
-        let first = hits(
-            &self.path_toolpath,
-            self.work_offset(),
+        let offset = self.work_offset();
+        let path = hits(&self.path_toolpath, offset, &t.keepouts, t.keepout_margin);
+        if let Some(first) = path.into_iter().next() {
+            return Some(self.ws(
+                Msg::KeepRefused,
+                &[(first.line + 1).to_string(), first.name],
+            ));
+        }
+        // then the moves of the tool changes, when the changer is on
+        let change = crate::atc::collisions(
+            &self.session.program,
+            &t.atc,
+            offset,
             &t.keepouts,
             t.keepout_margin,
         )
         .into_iter()
         .next()?;
         Some(self.ws(
-            Msg::KeepRefused,
-            &[(first.line + 1).to_string(), first.name],
+            Msg::AtcBoxRefused,
+            &[
+                (change.line + 1).to_string(),
+                change.tool.to_string(),
+                change.name,
+            ],
         ))
     }
 
@@ -266,5 +280,33 @@ mod tests {
         let mut a = app();
         a.open_window("keepout");
         assert!(matches!(a.win, Some(Win::KeepOut(_))));
+    }
+
+    #[test]
+    fn a_tool_change_that_goes_through_a_box_refuses_the_start_while_the_changer_is_on() {
+        let mut a = app();
+        a.settings.tuning.atc = crate::atc::AtcCfg {
+            enabled: true,
+            safe_z: 10.0,
+            rack: [100.0, 50.0, -5.0],
+            pitch: [30.0, 0.0],
+            ..Default::default()
+        };
+        a.add_keepout("post", &nums(["125", "45", "-8", "135", "55", "5"]));
+        a.session
+            .load("G21 G90\nM3 S10000\nG0 X0 Y0 Z10\nT1 M6\nG0 X0 Y0 Z10\nT2 M6\nM30");
+        a.path_toolpath = gcode::toolpath(&a.session.program);
+        let why = a.keepout_refusal().unwrap();
+        assert!(why.contains("T2") && why.contains("post"), "{why}");
+        assert!(a.start_refused());
+        // with the changer off the program itself is clear of the box and starts
+        a.settings.tuning.atc.enabled = false;
+        assert_eq!(a.keepout_refusal(), None);
+        assert!(!a.start_refused());
+        // with the refusal turned off the changer is only said, not refused
+        a.settings.tuning.atc.enabled = true;
+        a.settings.tuning.keepout_reject = false;
+        assert_eq!(a.keepout_refusal(), None);
+        let _ = std::fs::remove_file(&a.settings_path);
     }
 }

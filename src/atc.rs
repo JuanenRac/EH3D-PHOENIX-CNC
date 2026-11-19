@@ -13,8 +13,13 @@
 //! The slot of each tool can come from a table instead of the pitch: `phoenix-cnc-atc.txt` next to the settings file, one
 //! `tool = NUMBER | pos=X,Y` line for each tool of the rack (`examples/atc.txt` is a model). A line that cannot be used is left out and named with
 //! its number; a tool that is not in the table keeps the rack and the pitch.
+//!
+//! The moves of a change are also tested against the keep-out boxes of the settings (`collisions`): the rack is in machine coordinates, a
+//! change starts where the program has the tool at that line (its work position plus the zero of the work), and every straight move of the
+//! steps is tried against the boxes, so a clamp next to the rack, or on the way between two slots, is named before anything moves.
 
-use crate::gcode::words;
+use crate::boxes::KeepOut;
+use crate::gcode::{toolpath, words};
 use crate::heightmap::num;
 use crate::words::{say, Msg};
 
@@ -409,6 +414,76 @@ pub fn g_code(steps: &[Step]) -> Vec<String> {
                 out.push(format!("M64 P{pin}"));
                 out.push(format!("G4 P{}", num(seconds)));
                 out.push(format!("M65 P{pin}"));
+            }
+        }
+    }
+    out
+}
+
+/// The straight moves the steps make, each as the point it starts from and the point it ends at (X, Y, Z in mm), from `start`.
+pub fn moves(steps: &[Step], start: [f64; 3]) -> Vec<([f64; 3], [f64; 3])> {
+    let mut at = start;
+    let mut out = Vec::new();
+    for s in steps {
+        let to = match *s {
+            Step::ToZ(z) => [at[0], at[1], z],
+            Step::ToXy(x, y) => [x, y, at[2]],
+            _ => continue,
+        };
+        out.push((at, to));
+        at = to;
+    }
+    out
+}
+
+/// A tool change whose moves go through a keep-out box.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Collision {
+    /// The line of the program (from 0) that asks for the change.
+    pub line: usize,
+    /// The tool that is taken.
+    pub tool: u32,
+    /// The box that is entered.
+    pub name: String,
+}
+
+/// The changes of a program whose moves enter a keep-out box (grown by `margin`), one entry for each change and box. Nothing when the
+/// changer is off, there are no boxes or the program changes no tool. The rack and the boxes are in machine coordinates; `offset` is where
+/// the zero of the work is in the machine, and a change starts where the program has the tool at its line (the origin before its first move).
+/// The move that follows the change is not tested here: it is a move of the program, which the boxes check already.
+pub fn collisions(
+    lines: &[String],
+    cfg: &AtcCfg,
+    offset: [f64; 3],
+    boxes: &[KeepOut],
+    margin: f64,
+) -> Vec<Collision> {
+    if !cfg.enabled || boxes.is_empty() {
+        return Vec::new();
+    }
+    let changes = changes_of(lines);
+    if changes.is_empty() {
+        return Vec::new();
+    }
+    let path = toolpath(lines);
+    let grown: Vec<KeepOut> = boxes.iter().map(|b| b.grown(margin)).collect();
+    let mut out: Vec<Collision> = Vec::new();
+    for (line, from, to) in changes {
+        let (x, y, z) = path
+            .iter()
+            .rev()
+            .find(|s| s.line < line)
+            .map_or((0.0, 0.0, 0.0), |s| s.to);
+        let start = [x + offset[0], y + offset[1], z + offset[2]];
+        for (a, b) in moves(&plan(cfg, from, to), start) {
+            for g in &grown {
+                if g.crossed_by(a, b) && !out.iter().any(|c| c.line == line && c.name == g.name) {
+                    out.push(Collision {
+                        line,
+                        tool: to,
+                        name: g.name.clone(),
+                    });
+                }
             }
         }
     }
@@ -971,5 +1046,112 @@ mod tests {
         assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
         assert_eq!(load_table(&settings).slots.len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn boxed(text: &str) -> KeepOut {
+        KeepOut::parse(text).expect(text)
+    }
+
+    #[test]
+    fn the_moves_of_a_change_are_the_straight_pieces_of_its_steps() {
+        let c = on();
+        let m = moves(&plan(&c, Some(1), 2), [0.0, 0.0, 10.0]);
+        // up (none: already at the safe height), over slot 1, down, up, over slot 2, down, up
+        assert_eq!(
+            m,
+            vec![
+                ([0.0, 0.0, 10.0], [0.0, 0.0, 10.0]),
+                ([0.0, 0.0, 10.0], [100.0, 50.0, 10.0]),
+                ([100.0, 50.0, 10.0], [100.0, 50.0, -5.0]),
+                ([100.0, 50.0, -5.0], [100.0, 50.0, 10.0]),
+                ([100.0, 50.0, 10.0], [130.0, 50.0, 10.0]),
+                ([130.0, 50.0, 10.0], [130.0, 50.0, -5.0]),
+                ([130.0, 50.0, -5.0], [130.0, 50.0, 10.0]),
+            ]
+        );
+        // the lock, the blow and the spindle do not move anything
+        assert_eq!(
+            moves(
+                &[
+                    Step::SpindleOff,
+                    Step::Blow {
+                        pin: 4,
+                        seconds: 1.0
+                    }
+                ],
+                [1.0, 2.0, 3.0]
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_change_that_goes_through_a_box_is_named_with_its_line_and_tool() {
+        let p = lines("G0 X100 Y50 Z10\nT1 M6\nG0 X0 Y0 Z10\nT2 M6\nM30");
+        let c = on();
+        // a clamp around the slot of tool 2, below the safe height: the descent to take the tool goes through it
+        let post = vec![boxed("post 125 45 -8 135 55 5")];
+        assert_eq!(
+            collisions(&p, &c, [0.0; 3], &post, 0.0),
+            vec![Collision {
+                line: 3,
+                tool: 2,
+                name: "post".to_string()
+            }]
+        );
+        // a box on the way from the origin to slot 1, at the safe height
+        let mid = vec![boxed("mid 60 28 5 70 40 15")];
+        let found = collisions(&p, &c, [0.0; 3], &mid, 0.0);
+        assert_eq!(found.len(), 1);
+        assert_eq!((found[0].line, found[0].tool), (3, 2));
+        // a box above the safe height is never touched
+        assert!(collisions(&p, &c, [0.0; 3], &[boxed("roof 0 0 12 300 100 30")], 0.0).is_empty());
+        // a box clear of every move is not touched, but the margin of the boxes grows it into the moves
+        let side = vec![boxed("side 95 60 -10 135 70 5")];
+        assert!(collisions(&p, &c, [0.0; 3], &side, 0.0).is_empty());
+        assert!(!collisions(&p, &c, [0.0; 3], &side, 15.0).is_empty());
+    }
+
+    #[test]
+    fn a_change_is_named_once_for_each_box_and_each_change_has_its_own_line() {
+        // the first change takes tool 1 at slot 1; the second puts it back and takes tool 2
+        let p = lines("G0 X100 Y50 Z10\nT1 M6\nG0 X100 Y50 Z10\nT2 M6\nM30");
+        let c = on();
+        let everything = vec![boxed("all -500 -500 -500 500 500 500")];
+        let found = collisions(&p, &c, [0.0; 3], &everything, 0.0);
+        assert_eq!(
+            found.iter().map(|f| (f.line, f.tool)).collect::<Vec<_>>(),
+            [(1, 1), (3, 2)]
+        );
+        // two boxes on one change are two entries
+        let two = vec![
+            boxed("a -500 -500 -500 500 500 500"),
+            boxed("b 0 0 -50 300 300 50"),
+        ];
+        assert_eq!(collisions(&p, &c, [0.0; 3], &two, 0.0).len(), 4);
+    }
+
+    #[test]
+    fn the_change_starts_where_the_program_has_the_tool_and_the_zero_of_the_work_counts() {
+        // the tool is at the work origin when the change is asked for
+        let p = lines("G0 X0 Y0 Z10\nT1 M6\nM30");
+        let c = on();
+        let own = vec![boxed("own -5 -5 5 5 5 15")];
+        // with the zero of the work at the machine origin the tool starts inside the box
+        assert_eq!(collisions(&p, &c, [0.0; 3], &own, 0.0).len(), 1);
+        // with the zero of the work 200 mm along X the tool starts well clear of it, and the way to slot 1 does not cross it
+        assert!(collisions(&p, &c, [200.0, 0.0, 0.0], &own, 0.0).is_empty());
+        // before its first move the tool is taken to be at the origin
+        let first = lines("T1 M6\nG0 X300 Y300 Z10\nM30");
+        assert_eq!(collisions(&first, &c, [0.0; 3], &own, 0.0).len(), 1);
+    }
+
+    #[test]
+    fn with_the_changer_off_or_nothing_to_test_nothing_is_found() {
+        let p = lines("T1 M6\nT2 M6\nM30");
+        let everything = vec![boxed("all -500 -500 -500 500 500 500")];
+        assert!(collisions(&p, &AtcCfg::default(), [0.0; 3], &everything, 0.0).is_empty());
+        assert!(collisions(&p, &on(), [0.0; 3], &[], 0.0).is_empty());
+        assert!(collisions(&lines("G1 X1 F10"), &on(), [0.0; 3], &everything, 0.0).is_empty());
     }
 }

@@ -317,10 +317,12 @@ pub enum Msg {
     BmReplaceAsk,
     SetBmLoad,
     SetBmConfirm,
+    AtcBoxHit,
+    AtcBoxRefused,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 309] = [
+pub const ALL: [Msg; 311] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -630,6 +632,8 @@ pub const ALL: [Msg; 309] = [
     Msg::BmReplaceAsk,
     Msg::SetBmLoad,
     Msg::SetBmConfirm,
+    Msg::AtcBoxHit,
+    Msg::AtcBoxRefused,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -3725,6 +3729,26 @@ fn table(m: Msg) -> [&'static str; 8] {
             "替换书签文件前先询问",
             "Perguntar antes de substituir um ficheiro de marcadores",
         ],
+        Msg::AtcBoxHit => [
+            "Line {0}: the change to T{1} would take the tool through the keep-out box {2}",
+            "Línea {0}: el cambio a T{1} llevaría la herramienta por la caja prohibida {2}",
+            "Zeile {0}: der Wechsel auf T{1} würde das Werkzeug durch die Sperrbox {2} führen",
+            "Ligne {0} : le changement vers T{1} ferait passer l'outil par la boîte interdite {2}",
+            "Riga {0}: il cambio a T{1} porterebbe l'utensile attraverso il riquadro vietato {2}",
+            "{0} 行目：T{1} への交換では、工具が進入禁止ボックス {2} を通ります",
+            "第 {0} 行：换成 T{1} 时刀具会穿过禁区盒 {2}",
+            "Linha {0}: a troca para T{1} levaria a ferramenta através da caixa proibida {2}",
+        ],
+        Msg::AtcBoxRefused => [
+            "The start is refused: the change to T{1} at line {0} goes through the box {2}",
+            "Se rechaza el inicio: el cambio a T{1} de la línea {0} pasa por la caja {2}",
+            "Der Start wird abgelehnt: der Wechsel auf T{1} in Zeile {0} führt durch die Sperrbox {2}",
+            "Le démarrage est refusé : le changement vers T{1} à la ligne {0} passe par la boîte {2}",
+            "L'avvio è rifiutato: il cambio a T{1} alla riga {0} passa attraverso il riquadro {2}",
+            "開始を拒否しました。{0} 行目の T{1} への交換がボックス {2} を通ります",
+            "已拒绝启动：第 {0} 行换成 T{1} 时会穿过禁区盒 {2}",
+            "O arranque é recusado: a troca para T{1} na linha {0} passa pela caixa {2}",
+        ],
     }
 }
 
@@ -3788,7 +3812,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 309);
+        assert_eq!(seen.len(), 311);
     }
 
     #[test]
