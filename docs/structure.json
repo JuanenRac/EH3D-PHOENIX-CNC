@@ -489,6 +489,97 @@
           }
         },
         {
+          "name": "cycles.rs",
+          "desc": {
+            "en": "the canned cycles (G73, G81 to G89) worked out into their moves and checked",
+            "es": "los ciclos fijos (G73, G81 a G89) calculados en sus movimientos, y lo que falla en ellos",
+            "de": "die Bearbeitungszyklen (G73, G81 bis G89) in ihre Bewegungen aufgelöst, und was nicht stimmt",
+            "fr": "les cycles fixes (G73, G81 à G89) développés en mouvements, et ce qui cloche",
+            "it": "i cicli fissi (G73, G81-G89) espansi nei loro movimenti, e cosa non va",
+            "ja": "固定サイクル（G73、G81〜G89）を移動に展開し、問題点を示す",
+            "zh": "把固定循环（G73、G81 至 G89）展开为移动，并指出其中的问题",
+            "pt": "os ciclos fixos (G73, G81 a G89) calculados nos seus movimentos, e o que está mal"
+          }
+        },
+        {
+          "name": "cutcomp.rs",
+          "desc": {
+            "en": "cutter compensation (G41, G42, G40) worked out in simulation and checked",
+            "es": "compensación de herramienta (G41, G42, G40) en simulación, y lo que un controlador rechazaría",
+            "de": "Fräserradiuskorrektur (G41, G42, G40) in der Simulation, mit dem, was eine Steuerung ablehnt",
+            "fr": "compensation d'outil (G41, G42, G40) en simulation, avec ce qu'un contrôleur refuserait",
+            "it": "compensazione utensile (G41, G42, G40) in simulazione, con ciò che un controller rifiuterebbe",
+            "ja": "シミュレーションで求める工具径補正（G41、G42、G40）と、拒否される内容",
+            "zh": "在模拟中计算的刀具半径补偿（G41、G42、G40），以及会被拒绝的情况",
+            "pt": "compensação da ferramenta (G41, G42, G40) em simulação, com o que um controlador recusaria"
+          }
+        },
+        {
+          "name": "wcs.rs",
+          "desc": {
+            "en": "the work coordinate systems (G54 to G59) and the offsets a program writes into them",
+            "es": "los sistemas de coordenadas de trabajo (G54 a G59) y los desplazamientos que se escriben en ellos",
+            "de": "die Arbeitskoordinatensysteme (G54 bis G59) und die Verschiebungen, die ein Programm schreibt",
+            "fr": "les systèmes de coordonnées de travail (G54 à G59) et les décalages qu'un programme y écrit",
+            "it": "i sistemi di coordinate di lavoro (G54-G59) e gli offset che un programma vi scrive",
+            "ja": "ワーク座標系（G54〜G59）とプログラムが書き込むオフセット",
+            "zh": "工件坐标系（G54 至 G59）及程序写入其中的偏移",
+            "pt": "os sistemas de coordenadas de trabalho (G54 a G59) e os desvios que um programa escreve"
+          }
+        },
+        {
+          "name": "consumption.rs",
+          "desc": {
+            "en": "what a program uses up of each tool, by the material that is cut",
+            "es": "lo que un programa gasta de cada herramienta, según el material que se corta",
+            "de": "was ein Programm von jedem Werkzeug verbraucht, je nach geschnittenem Material",
+            "fr": "ce qu'un programme use de chaque outil, selon la matière coupée",
+            "it": "quanto un programma consuma di ogni utensile, secondo il materiale tagliato",
+            "ja": "加工する材料に応じて、プログラムが各工具をどれだけ消耗するか",
+            "zh": "按所切材料估算程序消耗每把刀具的多少",
+            "pt": "quanto um programa gasta de cada ferramenta, conforme o material cortado"
+          }
+        },
+        {
+          "name": "macrocheck.rs",
+          "desc": {
+            "en": "the validator of the macros: what each one leaves on when it ends",
+            "es": "el validador de macros: qué deja activo cada una al terminar",
+            "de": "der Prüfer der Makros: was jedes am Ende eingeschaltet lässt",
+            "fr": "le validateur des macros : ce que chacune laisse actif à sa fin",
+            "it": "il validatore delle macro: cosa lascia attivo ciascuna alla fine",
+            "ja": "マクロの検証：終了時に各マクロが有効なまま残すもの",
+            "zh": "宏的验证：每个宏结束时遗留的有效状态",
+            "pt": "o validador das macros: o que cada uma deixa ativo ao terminar"
+          }
+        },
+        {
+          "name": "gcodehelp.rs",
+          "desc": {
+            "en": "the help of the G-code words in eight languages: how a code is written, what it does",
+            "es": "la ayuda de las palabras de G-code en ocho idiomas: cómo se escribe y qué hace",
+            "de": "die Hilfe zu den G-Code-Wörtern in acht Sprachen: wie ein Code lautet und was er tut",
+            "fr": "l'aide des mots du G-code en huit langues : comment s'écrit un code, ce qu'il fait",
+            "it": "l'aiuto delle parole del G-code in otto lingue: come si scrive e cosa fa",
+            "ja": "Gコードのワードのヘルプ（8言語）：書き方と動作",
+            "zh": "G 代码字的帮助（八种语言）：怎么写、起什么作用",
+            "pt": "a ajuda das palavras de G-code em oito idiomas: como se escreve e o que faz"
+          }
+        },
+        {
+          "name": "fuzz.rs",
+          "desc": {
+            "en": "tests from a fixed seed: made-up programs through every analysis",
+            "es": "pruebas con semilla fija: programas inventados por cada análisis, cada mensaje nuevo provocado",
+            "de": "Tests mit festem Startwert: erfundene Programme durch jede Analyse, jede neue Meldung ausgelöst",
+            "fr": "tests à graine fixe : des programmes inventés dans chaque analyse, chaque message provoqué",
+            "it": "test con seme fisso: programmi inventati in ogni analisi, ogni nuovo messaggio provocato",
+            "ja": "固定シードのテスト：作った多数のプログラムを全解析に通し、新しいメッセージを全て発生させる",
+            "zh": "固定种子的测试：把编造的程序送入每项分析，并触发每条新消息",
+            "pt": "testes de semente fixa: programas inventados em cada análise, cada mensagem nova provocada"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
