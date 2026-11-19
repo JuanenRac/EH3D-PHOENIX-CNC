@@ -92,6 +92,35 @@ pub const ORBIT_HOME: Orbit = Orbit {
     focus: None,
 };
 
+/// The views the 3D view can be put in with one click or key: from above (the plan), from the front, from the side, and the usual isometric.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Preset {
+    Top,
+    Front,
+    Side,
+    Iso,
+}
+
+impl Preset {
+    pub const ALL: [Preset; 4] = [Preset::Top, Preset::Front, Preset::Side, Preset::Iso];
+
+    /// The word of the command line (`--view`).
+    pub fn key(self) -> &'static str {
+        match self {
+            Preset::Top => "top",
+            Preset::Front => "front",
+            Preset::Side => "side",
+            Preset::Iso => "iso",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Preset> {
+        Preset::ALL
+            .into_iter()
+            .find(|p| p.key().eq_ignore_ascii_case(key.trim()))
+    }
+}
+
 /// Degrees of turn per pixel dragged.
 const TURN_DEG_PER_PX: f64 = 0.4;
 
@@ -140,6 +169,24 @@ impl Orbit {
 
     pub fn is_home(&self) -> bool {
         *self == ORBIT_HOME
+    }
+
+    /// Puts the view in a preset one, at zoom 1 and with the middle of the table in the middle. The view from above is the plan of the window
+    /// (the 3D projection is not a true view from above), so `Top` changes nothing here. The front looks along Y with X to the right and the side looks along X
+    /// with Y to the right, both level with the table; the isometric one is the view the window starts in.
+    pub fn preset(&mut self, preset: Preset) {
+        let (yaw_deg, pitch_deg) = match preset {
+            Preset::Top => return,
+            Preset::Front => (315.0, 0.0),
+            Preset::Side => (225.0, 0.0),
+            Preset::Iso => (ORBIT_HOME.yaw_deg, ORBIT_HOME.pitch_deg),
+        };
+        *self = Orbit {
+            yaw_deg,
+            pitch_deg,
+            zoom: 1.0,
+            focus: None,
+        };
     }
 
     /// The projection of the table and the machine volume (`height_mm` over the table) in an area of `width` x `height` pixels: the whole
@@ -236,6 +283,81 @@ mod tests {
         v.drag(10.0, -5.0);
         v.drag(5.0, 5.0);
         assert_eq!(v.apply((100.0, 100.0), (50.0, 50.0)), (115.0, 100.0));
+    }
+
+    #[test]
+    fn the_presets_look_along_an_axis_and_the_isometric_one_is_home() {
+        let table = Table::new(300.0, 200.0);
+        let screen = |o: &Orbit, p: (f64, f64, f64)| {
+            let iso = o.iso(&table, 100.0, 800.0, 600.0);
+            iso.project(p.0, p.1, p.2)
+        };
+        // front: X goes across the screen, Y does not move anything, Z goes up
+        let mut front = Orbit::default();
+        front.preset(Preset::Front);
+        let (a, b) = (
+            screen(&front, (50.0, 0.0, 0.0)),
+            screen(&front, (50.0, 90.0, 0.0)),
+        );
+        assert!(
+            (a.0 - b.0).abs() < 1e-6 && (a.1 - b.1).abs() < 1e-6,
+            "{a:?} {b:?}"
+        );
+        let (c, d) = (
+            screen(&front, (0.0, 0.0, 0.0)),
+            screen(&front, (80.0, 0.0, 0.0)),
+        );
+        assert!(d.0 > c.0 + 50.0 && (d.1 - c.1).abs() < 1e-6, "{c:?} {d:?}");
+        let up = screen(&front, (0.0, 0.0, 40.0));
+        assert!(
+            up.1 < c.1 - 30.0 && (up.0 - c.0).abs() < 1e-6,
+            "{c:?} {up:?}"
+        );
+        // side: Y goes across the screen to the right, X does not move anything
+        let mut side = Orbit::default();
+        side.preset(Preset::Side);
+        let (a, b) = (
+            screen(&side, (0.0, 30.0, 0.0)),
+            screen(&side, (200.0, 30.0, 0.0)),
+        );
+        assert!(
+            (a.0 - b.0).abs() < 1e-6 && (a.1 - b.1).abs() < 1e-6,
+            "{a:?} {b:?}"
+        );
+        let (c, d) = (
+            screen(&side, (0.0, 0.0, 0.0)),
+            screen(&side, (0.0, 80.0, 0.0)),
+        );
+        assert!(d.0 > c.0 + 50.0 && (d.1 - c.1).abs() < 1e-6, "{c:?} {d:?}");
+        // the middle of the table stays in the middle of the area
+        let m = screen(&front, (150.0, 100.0, 50.0));
+        assert!(
+            (m.0 - 400.0).abs() < 1e-6 && (m.1 - 300.0).abs() < 1e-6,
+            "{m:?}"
+        );
+        // a preset starts again from zoom 1 and no focus; the isometric one is home; the one from above is the plan, so it leaves the orbit alone
+        let mut o = Orbit::default();
+        o.wheel(500.0);
+        o.focus = Some((1.0, 2.0, 3.0));
+        o.preset(Preset::Top);
+        assert!(o.zoom > 1.0 && o.focus.is_some());
+        o.preset(Preset::Side);
+        assert_eq!((o.zoom, o.focus), (1.0, None));
+        o.preset(Preset::Iso);
+        assert!(o.is_home());
+        // dragging from a level view tilts it within the limits
+        front.drag(0.0, -1.0e6);
+        assert_eq!(front.pitch_deg, 5.0);
+    }
+
+    #[test]
+    fn the_presets_have_words_for_the_command_line() {
+        for p in Preset::ALL {
+            assert_eq!(Preset::from_key(p.key()), Some(p));
+        }
+        assert_eq!(Preset::from_key(" Front "), Some(Preset::Front));
+        assert_eq!(Preset::from_key("back"), None);
+        assert_eq!(Preset::from_key(""), None);
     }
 
     #[test]

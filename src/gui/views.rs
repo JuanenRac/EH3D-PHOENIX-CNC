@@ -25,6 +25,18 @@ impl App {
         }
     }
 
+    /// Puts the view in a fixed one: the plan for the view from above, or the 3D view turned to the front, the side or the isometric one.
+    pub(super) fn set_preset(&mut self, preset: crate::view::Preset) {
+        if preset == crate::view::Preset::Top {
+            self.settings.view_3d = false;
+            self.plan2d.reset();
+        } else {
+            self.settings.view_3d = true;
+            self.orbit.preset(preset);
+        }
+        self.save_settings();
+    }
+
     /// Changes between the plan and the 3D view.
     pub(super) fn toggle_view(&mut self) {
         self.settings.view_3d = !self.settings.view_3d;
@@ -409,6 +421,35 @@ mod tests {
         a.session.status.machine_mm = machine;
         a.session.status.work_mm = work;
         assert_eq!(a.work_offset(), [100.0, 50.0, 0.0]);
+    }
+
+    #[test]
+    fn the_fixed_views_put_the_plan_or_the_3d_view_where_they_say() {
+        use crate::view::Preset;
+        let mut a = App::isolated();
+        a.plan2d.drag(40.0, 10.0);
+        a.set_preset(Preset::Front);
+        assert!(a.settings.view_3d);
+        assert_eq!((a.orbit.yaw_deg, a.orbit.pitch_deg), (315.0, 0.0));
+        a.set_preset(Preset::Side);
+        assert_eq!((a.orbit.yaw_deg, a.orbit.pitch_deg), (225.0, 0.0));
+        a.set_preset(Preset::Iso);
+        assert!(a.settings.view_3d && a.orbit.is_home());
+        // from above is the plan, with its drag undone
+        a.set_preset(Preset::Top);
+        assert!(!a.settings.view_3d && a.plan2d.is_default());
+    }
+
+    #[test]
+    fn a_fixed_view_asked_for_on_the_command_line_is_the_one_the_window_starts_in() {
+        let o = Options {
+            view_3d: Some(true),
+            view_preset: Some(crate::view::Preset::Side),
+            ..Options::default()
+        };
+        let a = App::new(&o);
+        assert!(a.settings.view_3d);
+        assert_eq!((a.orbit.yaw_deg, a.orbit.pitch_deg), (225.0, 0.0));
     }
 
     #[test]

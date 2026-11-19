@@ -164,7 +164,7 @@ impl App {
                                 .monospace()
                                 .color(col(self.theme.accent)),
                         );
-                        ui.label(self.t(b.text));
+                        ui.label(b.msg.map_or_else(|| self.t(b.text), |m| self.w(m)));
                         ui.end_row();
                         if b.shortcut == keys::Shortcut::Stop {
                             // the same key closes a window that is open

@@ -244,10 +244,14 @@ pub enum Msg {
     SlBack,
     SlWait,
     SetStartConfirm,
+    ViewTop,
+    ViewFront,
+    ViewSide,
+    ViewIso,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 236] = [
+pub const ALL: [Msg; 240] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -484,6 +488,10 @@ pub const ALL: [Msg; 236] = [
     Msg::SlBack,
     Msg::SlWait,
     Msg::SetStartConfirm,
+    Msg::ViewTop,
+    Msg::ViewFront,
+    Msg::ViewSide,
+    Msg::ViewIso,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -2849,6 +2857,46 @@ fn table(m: Msg) -> [&'static str; 8] {
             "从某行开始前要求勾选确认（已检查刀具、主轴和零点）",
             "Pedir uma marca antes de começar a partir de uma linha (ferramenta, fuso e zero verificados)",
         ],
+        Msg::ViewTop => [
+            "Top view",
+            "Vista superior",
+            "Ansicht von oben",
+            "Vue de dessus",
+            "Vista dall'alto",
+            "上面図",
+            "俯视图",
+            "Vista de cima",
+        ],
+        Msg::ViewFront => [
+            "Front view",
+            "Vista frontal",
+            "Vorderansicht",
+            "Vue de face",
+            "Vista frontale",
+            "正面図",
+            "前视图",
+            "Vista de frente",
+        ],
+        Msg::ViewSide => [
+            "Side view",
+            "Vista lateral",
+            "Seitenansicht",
+            "Vue de côté",
+            "Vista laterale",
+            "側面図",
+            "侧视图",
+            "Vista lateral",
+        ],
+        Msg::ViewIso => [
+            "Isometric view",
+            "Vista isométrica",
+            "Isometrische Ansicht",
+            "Vue isométrique",
+            "Vista isometrica",
+            "等角図",
+            "等轴测图",
+            "Vista isométrica",
+        ],
     }
 }
 
@@ -2912,7 +2960,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 236);
+        assert_eq!(seen.len(), 240);
     }
 
     #[test]

@@ -4,6 +4,7 @@
 //! off in the settings (only the mouse then).
 
 use super::*;
+use crate::words::Msg;
 use dialogs::Draft;
 
 /// What a key asks for.
@@ -20,6 +21,10 @@ pub(super) enum Shortcut {
     Help,
     ResetView,
     ToggleView,
+    ViewTop,
+    ViewFront,
+    ViewSide,
+    ViewIso,
 }
 
 /// A key, the words it is shown with and the text of what it does.
@@ -29,18 +34,21 @@ pub(super) struct Binding {
     pub key: egui::Key,
     pub label: &'static str,
     pub text: Text,
+    /// The words of a key that has none in the shared list of texts (they are shown instead of `text`).
+    pub msg: Option<Msg>,
 }
 
 const CMD: egui::Modifiers = egui::Modifiers::COMMAND;
 const NONE: egui::Modifiers = egui::Modifiers::NONE;
 
-pub(super) const BINDINGS: [Binding; 11] = [
+pub(super) const BINDINGS: [Binding; 15] = [
     Binding {
         shortcut: Shortcut::Open,
         modifiers: CMD,
         key: egui::Key::O,
         label: "Ctrl+O",
         text: Text::McOpenGcode,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Save,
@@ -48,6 +56,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::S,
         label: "Ctrl+S",
         text: Text::McSaveGcode,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Edit,
@@ -55,6 +64,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::E,
         label: "Ctrl+E",
         text: Text::McEditProgram,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Settings,
@@ -62,6 +72,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::Comma,
         label: "Ctrl+,",
         text: Text::SettingsTitle,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Start,
@@ -69,6 +80,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::F5,
         label: "F5",
         text: Text::Start,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Pause,
@@ -76,6 +88,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::Space,
         label: "Space",
         text: Text::Pause,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Stop,
@@ -83,6 +96,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::Escape,
         label: "Esc",
         text: Text::Stop,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Quit,
@@ -90,6 +104,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::Q,
         label: "Ctrl+Q",
         text: Text::MenuExit,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::Help,
@@ -97,6 +112,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::F1,
         label: "F1",
         text: Text::McShortcuts,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::ResetView,
@@ -104,6 +120,7 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::Num0,
         label: "Ctrl+0",
         text: Text::ResetView,
+        msg: None,
     },
     Binding {
         shortcut: Shortcut::ToggleView,
@@ -111,6 +128,39 @@ pub(super) const BINDINGS: [Binding; 11] = [
         key: egui::Key::F3,
         label: "F3",
         text: Text::ViewMachine,
+        msg: None,
+    },
+    Binding {
+        shortcut: Shortcut::ViewTop,
+        modifiers: CMD,
+        key: egui::Key::Num1,
+        label: "Ctrl+1",
+        text: Text::ViewPlan,
+        msg: Some(Msg::ViewTop),
+    },
+    Binding {
+        shortcut: Shortcut::ViewFront,
+        modifiers: CMD,
+        key: egui::Key::Num2,
+        label: "Ctrl+2",
+        text: Text::ViewMachine,
+        msg: Some(Msg::ViewFront),
+    },
+    Binding {
+        shortcut: Shortcut::ViewSide,
+        modifiers: CMD,
+        key: egui::Key::Num3,
+        label: "Ctrl+3",
+        text: Text::ViewMachine,
+        msg: Some(Msg::ViewSide),
+    },
+    Binding {
+        shortcut: Shortcut::ViewIso,
+        modifiers: CMD,
+        key: egui::Key::Num4,
+        label: "Ctrl+4",
+        text: Text::ViewMachine,
+        msg: Some(Msg::ViewIso),
     },
 ];
 
@@ -232,6 +282,10 @@ impl App {
             Shortcut::Help => self.win = Some(Win::Shortcuts),
             Shortcut::ResetView => self.reset_view(),
             Shortcut::ToggleView => self.toggle_view(),
+            Shortcut::ViewTop => self.set_preset(crate::view::Preset::Top),
+            Shortcut::ViewFront => self.set_preset(crate::view::Preset::Front),
+            Shortcut::ViewSide => self.set_preset(crate::view::Preset::Side),
+            Shortcut::ViewIso => self.set_preset(crate::view::Preset::Iso),
         }
     }
 }
@@ -268,6 +322,15 @@ mod tests {
         );
         assert_eq!(shortcut_of(egui::Key::O, egui::Modifiers::NONE), None);
         assert_eq!(label_of(Shortcut::Stop), "Esc");
+        assert_eq!(
+            shortcut_of(egui::Key::Num2, egui::Modifiers::COMMAND),
+            Some(Shortcut::ViewFront)
+        );
+        assert_eq!(label_of(Shortcut::ViewIso), "Ctrl+4");
+        // the keys that have words of their own show them
+        for b in BINDINGS.iter().filter(|b| b.msg.is_some()) {
+            assert!(!b.label.is_empty());
+        }
         assert_eq!(label_of(Shortcut::Pause), "Space");
         assert_eq!(label_of(Shortcut::Start), "F5");
         assert_eq!(

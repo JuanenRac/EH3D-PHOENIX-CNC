@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use eh3d_view::texts::Lang;
 use eh3d_view::theme::ThemeId;
 
+use crate::view::Preset;
 use crate::viewer::ColorBy;
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -29,6 +30,8 @@ pub struct Options {
     pub window: Option<String>,
     /// How the path is seen at the start (`--view plan|3d`); without it the view the settings remember.
     pub view_3d: Option<bool>,
+    /// A fixed view the 3D view starts in (`--view top|front|side|iso`): `top` is the plan.
+    pub view_preset: Option<Preset>,
     /// How the path is coloured at the start (`--color state|kind|progress|tool|feed`): for the pictures of the viewer.
     pub color: Option<ColorBy>,
     /// The line of the program (from 1, as the program panel counts) whose move is selected at the start (`--select LINE`): for the pictures.
@@ -83,7 +86,7 @@ pub fn help_text() -> String {
          \x20 --html FILE        with --report, also write the work report as one page of HTML (a file that is there is not written over)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
-         \x20 --view plan|3d     how the path is seen at the start\n\
+         \x20 --view VIEW        how the path is seen at the start (plan, 3d, top, front, side or iso)\n\
          \x20 --color MODE       how the path is coloured at the start ({})\n\
          \x20 --select LINE      select the move of that line of the program (from 1) at the start\n\
          \x20 --profile NAME     start with the values of a machine profile saved in the settings (travel, spindle, feeds, probe)\n\
@@ -142,7 +145,17 @@ impl Options {
                     o.view_3d = Some(match v.as_str() {
                         "plan" | "2d" => false,
                         "3d" => true,
-                        _ => return Err(format!("unknown view '{v}' (plan or 3d)")),
+                        other => match Preset::from_key(other) {
+                            Some(p) => {
+                                o.view_preset = Some(p);
+                                p != Preset::Top
+                            }
+                            None => {
+                                return Err(format!(
+                                    "unknown view '{v}' (plan, 3d, top, front, side or iso)"
+                                ))
+                            }
+                        },
                     });
                 }
                 "--color" => {
@@ -228,7 +241,18 @@ mod tests {
         assert_eq!(parse("--view 3d").unwrap().view_3d, Some(true));
         assert_eq!(parse("--view plan").unwrap().view_3d, Some(false));
         assert_eq!(parse("").unwrap().view_3d, None);
-        assert!(parse("--view side").is_err());
+        assert!(parse("--view sideways").is_err());
+        // the fixed views: the one from above is the plan, the others are 3D
+        let f = parse("--view front").unwrap();
+        assert_eq!(
+            (f.view_3d, f.view_preset),
+            (Some(true), Some(Preset::Front))
+        );
+        let t = parse("--view Top").unwrap();
+        assert_eq!((t.view_3d, t.view_preset), (Some(false), Some(Preset::Top)));
+        assert_eq!(parse("--view iso").unwrap().view_preset, Some(Preset::Iso));
+        assert_eq!(parse("--view 3d").unwrap().view_preset, None);
+        assert!(help_text().contains("front"));
     }
 
     #[test]

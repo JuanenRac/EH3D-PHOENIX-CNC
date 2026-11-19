@@ -347,6 +347,9 @@ impl App {
             }
         }
         // the pictures: the way the path is coloured and the move that is selected
+        if let Some(p) = o.view_preset {
+            app.orbit.preset(p);
+        }
         if let Some(c) = o.color {
             app.viewer.color_by = c;
         }

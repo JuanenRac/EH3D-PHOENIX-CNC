@@ -7,6 +7,7 @@ use eh3d_filedialog::{
 
 use super::*;
 use crate::settings::Settings;
+use crate::view::Preset;
 use crate::words::Msg;
 
 /// The extensions a G-code program usually has.
@@ -311,6 +312,17 @@ impl App {
             if self.menu_item(ui, self.t(Text::ResetView), Shortcut::ResetView, true) {
                 self.reset_view();
                 ui.close();
+            }
+            for (preset, key, name) in [
+                (Preset::Top, Shortcut::ViewTop, Msg::ViewTop),
+                (Preset::Front, Shortcut::ViewFront, Msg::ViewFront),
+                (Preset::Side, Shortcut::ViewSide, Msg::ViewSide),
+                (Preset::Iso, Shortcut::ViewIso, Msg::ViewIso),
+            ] {
+                if self.menu_item(ui, self.w(name), key, true) {
+                    self.set_preset(preset);
+                    ui.close();
+                }
             }
             ui.separator();
             if ui
