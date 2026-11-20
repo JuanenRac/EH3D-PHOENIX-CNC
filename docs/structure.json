@@ -749,6 +749,71 @@
           }
         },
         {
+          "name": "dialtext.rs",
+          "desc": {
+            "en": "the errors and alarms that belong to grblHAL and to Marlin, in eight languages",
+            "es": "los errores y alarmas propios de grblHAL y de Marlin, en ocho idiomas",
+            "de": "die Fehler und Alarme von grblHAL und Marlin in acht Sprachen",
+            "fr": "les erreurs et alarmes propres à grblHAL et à Marlin, en huit langues",
+            "it": "gli errori e gli allarmi propri di grblHAL e di Marlin, in otto lingue",
+            "ja": "grblHAL と Marlin 固有のエラーとアラームを 8 言語で",
+            "zh": "grblHAL 和 Marlin 特有的错误与报警，八种语言",
+            "pt": "os erros e alarmes próprios do grblHAL e do Marlin, em oito idiomas"
+          }
+        },
+        {
+          "name": "wire.rs",
+          "desc": {
+            "en": "a simulated cable: pieces, noise, flipped bits and silence, from a fixed seed",
+            "es": "un cable simulado: trozos, ruido, bits cambiados y silencio, con semilla fija",
+            "de": "ein simuliertes Kabel: Stücke, Rauschen, gekippte Bits und Stille, mit festem Seed",
+            "fr": "un câble simulé : morceaux, bruit, bits inversés et silence, à graine fixe",
+            "it": "un cavo simulato: pezzi, rumore, bit invertiti e silenzio, con seme fisso",
+            "ja": "模拟线缆：分段、噪声、位翻转和无应答，固定种子",
+            "zh": "模拟线缆：分段、噪声、位翻转和静默，使用固定种子",
+            "pt": "um cabo simulado: pedaços, ruído, bits trocados e silêncio, com semente fixa"
+          }
+        },
+        {
+          "name": "grblsim.rs",
+          "desc": {
+            "en": "GRBL and grblHAL as simulated devices: lines, reports, alarms, errors by number",
+            "es": "GRBL y grblHAL como dispositivos simulados: líneas, informes, alarmas, errores por número",
+            "de": "GRBL und grblHAL als simulierte Geräte: Zeilen, Berichte, Alarme, Fehler nach Nummer",
+            "fr": "GRBL et grblHAL en appareils simulés : lignes, rapports, alarmes, erreurs par numéro",
+            "it": "GRBL e grblHAL come dispositivi simulati: righe, rapporti, allarmi, errori per numero",
+            "ja": "模擬デバイスとしての GRBL と grblHAL：行、レポート、アラーム、番号別エラー",
+            "zh": "模拟设备形式的 GRBL 和 grblHAL：行、状态报告、报警、按编号的错误",
+            "pt": "GRBL e grblHAL como dispositivos simulados: linhas, relatórios, alarmes, erros por número"
+          }
+        },
+        {
+          "name": "marlin.rs",
+          "desc": {
+            "en": "Marlin: the controller of its dialect and the simulated Marlin it is tried on",
+            "es": "Marlin: el controlador de su dialecto y el Marlin simulado con el que se prueba",
+            "de": "Marlin: die Steuerung seines Dialekts und das simulierte Marlin, an dem sie geprüft wird",
+            "fr": "Marlin : le contrôleur de son dialecte et le Marlin simulé sur lequel il est essayé",
+            "it": "Marlin: il controllore del suo dialetto e il Marlin simulato su cui si prova",
+            "ja": "Marlin：その方言のコントローラーと、試験に使う模擬 Marlin",
+            "zh": "Marlin：其方言的控制器，以及用于测试的模拟 Marlin",
+            "pt": "Marlin: o controlador do seu dialeto e o Marlin simulado em que é testado"
+          }
+        },
+        {
+          "name": "dialcheck.rs",
+          "desc": {
+            "en": "the check of a dialect against its simulator: steps, noise, silence and the guard",
+            "es": "la prueba de un dialecto contra su simulador: pasos, ruido, silencio y la guarda",
+            "de": "die Prüfung eines Dialekts am Simulator: Schritte, Rauschen, Stille und die Wache",
+            "fr": "la vérification d'un dialecte sur son simulateur : étapes, bruit, silence et garde",
+            "it": "la verifica di un dialetto sul suo simulatore: passi, rumore, silenzio e la guardia",
+            "ja": "方言をシミュレーターで検査：手順、ノイズ、無応答、ガード",
+            "zh": "对照模拟器检查一种方言：步骤、噪声、静默和防护",
+            "pt": "a verificação de um dialeto contra o seu simulador: passos, ruído, silêncio e a guarda"
+          }
+        },
+        {
           "name": "faulty.rs",
           "desc": {
             "en": "a controller that goes wrong on purpose: silence, busy, error at a line, false position",
@@ -798,6 +863,19 @@
             "ja": "HPGL・DXF・SVG の上限付きリーダーと、それに沿って切削する G コード",
             "zh": "有上限的 HPGL、DXF、SVG 读取器，以及沿路径切割的 G 代码",
             "pt": "leitores limitados de HPGL, DXF e SVG, e o G-code que corta ao longo deles"
+          }
+        },
+        {
+          "name": "pcb.rs",
+          "desc": {
+            "en": "boards: Gerber and Excellon files to isolation, profile and drill programs",
+            "es": "placas: archivos Gerber y Excellon a programas de aislamiento, contorno y taladrado",
+            "de": "Platinen: Gerber- und Excellon-Dateien zu Isolations-, Kontur- und Bohrprogrammen",
+            "fr": "cartes : fichiers Gerber et Excellon en programmes d'isolation, de contour et de perçage",
+            "it": "schede: file Gerber ed Excellon in programmi di isolamento, contorno e foratura",
+            "ja": "基板：Gerber と Excellon をアイソレーション・外形・穴あけのプログラムに変換",
+            "zh": "电路板：将 Gerber 和 Excellon 文件转为隔离、外形和钻孔程序",
+            "pt": "placas: ficheiros Gerber e Excellon em programas de isolamento, contorno e furação"
           }
         },
         {
@@ -1300,14 +1378,14 @@
         {
           "name": "docs/",
           "desc": {
-            "en": "the sources of the Architecture and Repository Structure pictures",
-            "es": "las fuentes de las imágenes de Arquitectura y Estructura del repositorio",
-            "de": "die Quellen der Bilder von Architektur und Repository-Struktur",
-            "fr": "les sources des images d'Architecture et de Structure du dépôt",
-            "it": "le sorgenti delle immagini di Architettura e Struttura del repository",
-            "ja": "アーキテクチャ図とリポジトリ構成図の元データ",
-            "zh": "架构图和仓库结构图的源文件",
-            "pt": "as fontes das imagens de Arquitetura e Estrutura do repositório"
+            "en": "the sources of the two pictures and the decision on the script engine",
+            "es": "las fuentes de las dos imágenes y la decisión sobre el motor de scripts",
+            "de": "die Quellen der beiden Bilder und die Entscheidung zur Skript-Engine",
+            "fr": "les sources des deux images et la décision sur le moteur de scripts",
+            "it": "le fonti delle due immagini e la decisione sul motore di script",
+            "ja": "2 枚の図のソースと、スクリプトエンジンについての決定",
+            "zh": "两张图的源文件和脚本引擎的决定",
+            "pt": "as fontes das duas imagens e a decisão sobre o motor de scripts"
           }
         },
         {

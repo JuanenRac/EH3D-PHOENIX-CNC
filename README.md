@@ -13,16 +13,16 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-916-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-986-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 916 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 986 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
-> **Safety and security status:** by default this program drives a simulated machine. With `--grbl` (a build with `--features serial`) it opens a serial port and drives a real GRBL controller, never tried on a real machine; with a server address in the settings it opens a network connection to that server and sends the token in clear text over HTTP. When a real controller is connected it will have to prove itself on a simulator and then on a real machine before it is called working, and the limit switches and an emergency stop stay the job of the machine's own control unit; the emergency stop of the window is not a safety circuit.
+> **Safety and security status:** by default this program drives a simulated machine. With `--grbl`, `--grblhal` or `--marlin` (a build with `--features serial`) it opens a serial port and drives a real GRBL, grblHAL or Marlin controller, never tried on a real machine; with a server address in the settings it opens a network connection to that server and sends the token in clear text over HTTP. When a real controller is connected it will have to prove itself on a simulator and then on a real machine before it is called working, and the limit switches and an emergency stop stay the job of the machine's own control unit; the emergency stop of the window is not a safety circuit.
 
 ## 📋 At a glance
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.2.2` |
 | Maturity | Functional |
-| Tests | 916 |
+| Tests | 986 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 916 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 986 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -62,6 +62,8 @@ Each line is one part of this repository and the light says how far it is today.
 * The **themes and the words** of `eh3d-view`: Forge (the default), Neon Arcade, Glass Pro, the classic Windows grey and one that follows Windows, and the interface in English, Spanish, Italian, German, French, Portuguese, Chinese and Japanese. What it will be: one program to drill, to route and to do 2D and 3D CNC work on the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO; that part does not exist yet.
 * The **menus, the settings and the files**: the menus File, Edit, View, Program, Machine, Window and Help with the usual entries (open, recent files, save, edit, the zeros, the stored positions, the spindle and the coolant); a settings window (units, language, eleven themes, travel limits, jog) that is kept between runs; and the Open and Save windows of the suite (`eh3d-filedialog`: places, sorting, filters, the extension of a saved file and the question before a file is replaced).
 * **GRBL on a serial port:** built with `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` drives a GRBL controller (115200 baud by default) instead of the simulator and `phoenix-cnc --ports` lists the serial ports; a build without the feature, or a port that does not open, says so and leaves. It has been tried only against a scripted controller, never against a real one. With a real controller, `--start` (open the file and start it as the window opens) is refused unless `--start-real` is also given, and `--start-real` alone is an error; `busy_wait` in the settings file (4 hours by default) is the most a line waits for its answer while the machine says it is working, and the stop is heard meanwhile.
+* **GRBL, grblHAL and Marlin, against simulators:** `--grblhal PORT[@BAUD]` and `--marlin PORT[@BAUD]` (a build with `--features serial`; Marlin is at 250000 baud when none is given) drive those controllers behind the same guard as GRBL, and `--sim grbl|grblhal|marlin` drives the dialect of one of them on a simulated cable with nothing real (`src/grblsim.rs`, `src/marlin.rs`, `src/wire.rs`): the cable cuts the answers in pieces, adds noise, flips bits and falls silent, from a fixed seed (the `wire_` keys of the motion file), and Marlin can number its lines with a checksum so that a spoiled line is asked for again (`marlin_numbering`, off by default). The errors that only grblHAL has and the kinds of error of Marlin are told in the eight languages (`src/dialtext.rs`). `phoenix-cnc --dialect-check grbl|grblhal|marlin` puts a dialect through a battery of steps (status, move, jog, homing, a refusal by number, a silent controller under the guard, noisy cables) and ends with exit code 2 when one does not pass. All of it is simulation; none of it has met a real controller.
+* **Boards from their Gerber and Excellon files:** `phoenix-cnc --import FILE` also reads a Gerber layer or an Excellon drill file with the readers of EH3D-CORE-LIBS (the ones the other programs of the suite use) and prints the G-code for it (`src/pcb.rs`): the isolation of a copper layer (the paths a radius of the tool away from the copper, in as many passes as asked), the profile of an outline layer (outside the board and inside the cut-outs, in passes of depth) and the holes and slots of a drill file (the smaller drill first, a pause to change it, pecks). The layer is what the file says (`--layer isolation|profile|drill` says it otherwise), the layers of the bottom are mirrored (`--mirror` asks for it), and the Import panel of the window has the same choices. The tool, the passes, the depths, the feeds, the pecks, the grid and the limits are the `pcb_` keys of the motion file (`examples/motion.txt`); none is in the code. Nothing has been cut on a machine.
 * **A window that follows the screen:** it opens maximized, and from 720p to 1080p and on to larger and wider screens everything grows or shrinks with it.
 * **Going on after a failure:** while a program runs, the line it has reached is saved to a small file; if the window, the computer or the link goes down, the next start asks whether to go on from that line or to leave it. Nothing is sent to the controller until the operator answers.
 * **Sent to the EH3D server:** with the address of the server, the token of this program and the id of the machine in the settings (section Server of the settings window, or `server_address`, `server_token` and `server_machine` in the settings file), **Program > Send to the server** sends the text of the program as a G-code job; the server runs it on its machine (a GRBL controller on its serial port, or its simulator) and the window follows it: the state, the percentage and the line it has reached in the top bar, the panel and the log. Start, Pause and Stop of the window reach the job on the server, closing the window does not stop it, and a job that stopped is taken up again from the line the server reached (the next start of the window offers it, as it does for a program of the controller): the server gives the codes in force back and waits for the operator before the first move. The spindle and the coolant are started again only with `server_restore_outputs = yes`. Tested against a stand-in server; the server's own tests send the same requests to its simulator. Never run on a machine. The link is the shared client of the suite (`eh3d-serverclient` of EH3D-COMMON): four more settings, `server_timeout_s` (the seconds one try may take, 1 to 120, 15 by default), `server_retries` (more tries after a failure on the network, 0 to 5, 2), `server_mdns` (look for the server on the network, `on` or `off`, off by default; the program has no resolver of its own yet, so on finds nothing) and `server_max_answer_mib` (the most MiB read from one answer, 1 to 256, 8); a failed connection is tried again with growing pauses and a request that makes something is never sent twice; the refusals of the server are told by their code in the language of the window; a login that is gone ends the following at once instead of after forty failed answers; and the log says when the link goes up, down or logged out.
@@ -96,7 +98,7 @@ Each line is one part of this repository and the light says how far it is today.
 
 ## 🧩 Role in EH3D
 
-EH3D-PHOENIX-CNC is the machine-control program of EH3D, today working on a simulated machine. It depends by path on EH3D-COMMON (the folder `EH3D-COMMON` must sit next to this one: the view, the themes, the words and the controllers) and on no other EH3D repository yet.
+EH3D-PHOENIX-CNC is the machine-control program of EH3D, today working on a simulated machine. It depends by path on EH3D-COMMON (the folder `EH3D-COMMON` must sit next to this one: the view, the themes, the words and the controllers) and on EH3D-CORE-LIBS (the folder `EH3D-CORE-LIBS` must sit next to it too: the readers of Gerber and Excellon, the geometry and the CAM of the boards), and on no other EH3D repository yet.
 
 ## 🏛️ Architecture
 
@@ -171,7 +173,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 916 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 986 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -244,10 +246,16 @@ EH3D-PHOENIX-CNC/
 │   ├── units.rs                                 converts a program between millimetres and inches and says what it left
 │   ├── dialect.rs                               the reports of GRBL and grblHAL as data: build, $$ settings and the parser state
 │   ├── ctltext.rs                               alarms, errors and guard messages by number in eight languages
+│   ├── dialtext.rs                              the errors and alarms that belong to grblHAL and to Marlin, in eight languages
+│   ├── wire.rs                                  a simulated cable: pieces, noise, flipped bits and silence, from a fixed seed
+│   ├── grblsim.rs                               GRBL and grblHAL as simulated devices: lines, reports, alarms, errors by number
+│   ├── marlin.rs                                Marlin: the controller of its dialect and the simulated Marlin it is tried on
+│   ├── dialcheck.rs                             the check of a dialect against its simulator: steps, noise, silence and the guard
 │   ├── faulty.rs                                a controller that goes wrong on purpose: silence, busy, error at a line, false position
 │   ├── guard.rs                                 the guard that fails closed, and the handle the window feeds with the time
 │   ├── lookahead.rs                             the planner on paper: corner speeds, acceleration per axis, profiles and the time
 │   ├── import.rs                                bounded readers of HPGL, DXF and SVG, and the G-code that cuts along them
+│   ├── pcb.rs                                   boards: Gerber and Excellon files to isolation, profile and drill programs
 │   ├── post.rs                                  post-processors as rules in a text file: header, footer, words, numbers, decimals
 │   ├── toolsetter.rs                            the tool setter: tool length measured by touch, written to the table of tools
 │   ├── motioncfg.rs                             the motion file: planner, guard, importers and tool setter values
@@ -285,7 +293,7 @@ EH3D-PHOENIX-CNC/
 ├── examples/                                    three sample G-code programs, from a square to a long spiral
 ├── tests/                                       more tests of the G-code and the settings
 ├── tools/                                       CI check, README check and the picture tools
-├── docs/                                        the sources of the Architecture and Repository Structure pictures
+├── docs/                                        the sources of the two pictures and the decision on the script engine
 ├── .github/                                     CI workflow, issue and pull-request templates
 ├── images/                                      banner, the two pictures and the screenshots
 ├── build.sh build.bat                           build the library
