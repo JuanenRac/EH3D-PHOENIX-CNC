@@ -567,6 +567,45 @@
           }
         },
         {
+          "name": "holder.rs",
+          "desc": {
+            "en": "the tool holder against the material, with the reach of each tool in the table",
+            "es": "el portaherramientas frente al material, con el alcance de cada herramienta de la tabla",
+            "de": "der Werkzeughalter gegen das Material, mit der Reichweite jedes Werkzeugs der Tabelle",
+            "fr": "le porte-outil face à la matière, avec la portée de chaque outil de la table",
+            "it": "il portautensili rispetto al materiale, con la sporgenza di ogni utensile della tabella",
+            "ja": "工具ホルダーと材料の干渉：表の各工具の突き出し量を使用",
+            "zh": "刀柄与材料的干涉检查，使用刀具表中每把刀的伸出长度",
+            "pt": "o porta-ferramentas face ao material, com o alcance de cada ferramenta da tabela"
+          }
+        },
+        {
+          "name": "life.rs",
+          "desc": {
+            "en": "the wear of the tools pass by pass against their life, and the pass where one runs out",
+            "es": "el desgaste de las herramientas pasada a pasada frente a su vida, y la pasada en que una se agota",
+            "de": "der Verschleiß der Werkzeuge Durchgang für Durchgang gegen ihre Standzeit und der Durchgang, in dem eines verbraucht ist",
+            "fr": "l'usure des outils passe après passe face à leur durée de vie, et la passe où l'un s'épuise",
+            "it": "l'usura degli utensili passata per passata rispetto alla loro vita, e la passata in cui uno si esaurisce",
+            "ja": "パスごとの工具摩耗と寿命の照合、寿命が尽きるパスの特定",
+            "zh": "按道次对照寿命统计刀具磨损，并指出寿命用尽的那一道",
+            "pt": "o desgaste das ferramentas passagem a passagem face à sua vida, e a passagem em que uma se esgota"
+          }
+        },
+        {
+          "name": "restart.rs",
+          "desc": {
+            "en": "a program restarted from a line, with the state before it rebuilt",
+            "es": "un programa reiniciado desde una línea, con el estado anterior reconstruido",
+            "de": "ein ab einer Zeile neu gestartetes Programm, mit rekonstruiertem Zustand davor",
+            "fr": "un programme repris à partir d'une ligne, avec l'état antérieur reconstruit",
+            "it": "un programma ripartito da una riga, con lo stato precedente ricostruito",
+            "ja": "指定行から再開するプログラム：それ以前の状態を再構築",
+            "zh": "从某一行重新开始的程序：重建之前的状态",
+            "pt": "um programa reiniciado a partir de uma linha, com o estado anterior reconstruído"
+          }
+        },
+        {
           "name": "fuzz.rs",
           "desc": {
             "en": "tests from a fixed seed: made-up programs through every analysis",
@@ -582,14 +621,27 @@
         {
           "name": "cli_tools.rs",
           "desc": {
-            "en": "command-line tools that print a text: convert, compare, times, offsets, format",
-            "es": "las herramientas de la línea de órdenes que imprimen un texto: convertir, comparar, tiempos, correcciones y formato",
-            "de": "die Werkzeuge der Befehlszeile, die einen Text ausgeben: umrechnen, vergleichen, Zeiten, Korrekturen und Format",
-            "fr": "les outils de la ligne de commande qui impriment un texte : conversion, comparaison, temps, décalages et format",
-            "it": "gli strumenti della riga di comando che stampano un testo: conversione, confronto, tempi, correttori e formato",
-            "ja": "テキストを出力するコマンドラインの機能：変換、比較、時間、補正、書式",
-            "zh": "输出文本的命令行工具：换算、比较、时间、补偿和格式",
-            "pt": "as ferramentas da linha de comandos que imprimem um texto: converter, comparar, tempos, correções e formato"
+            "en": "the command-line tools that print a text (--convert, --times, --holder...)",
+            "es": "las herramientas de línea de órdenes que imprimen un texto (--convert, --times, --holder...)",
+            "de": "die Befehlszeilenwerkzeuge, die einen Text ausgeben (--convert, --times, --holder...)",
+            "fr": "les outils en ligne de commande qui affichent un texte (--convert, --times, --holder...)",
+            "it": "gli strumenti da riga di comando che stampano un testo (--convert, --times, --holder...)",
+            "ja": "テキストを出力するコマンドラインツール（--convert、--times、--holder など）",
+            "zh": "输出文本的命令行工具（--convert、--times、--holder 等）",
+            "pt": "as ferramentas de linha de comandos que imprimem um texto (--convert, --times, --holder...)"
+          }
+        },
+        {
+          "name": "cncroutes.rs",
+          "desc": {
+            "en": "the routes of the machine on the server: position, jog, emergency stop, release",
+            "es": "las rutas de la máquina en el servidor: posición, desplazamiento, parada de emergencia, liberación",
+            "de": "die Routen der Maschine auf dem Server: Position, Verfahren, Not-Halt, Freigabe",
+            "fr": "les routes de la machine sur le serveur : position, déplacement, arrêt d'urgence, libération",
+            "it": "le rotte della macchina sul server: posizione, movimento, arresto di emergenza, rilascio",
+            "ja": "サーバー上の機械のルート：位置、移動、非常停止、解除",
+            "zh": "服务器上机器的路由：位置、移动、紧急停止、解除",
+            "pt": "as rotas da máquina no servidor: posição, movimento, paragem de emergência, libertação"
           }
         },
         {
@@ -621,14 +673,27 @@
         {
           "name": "postcheck.rs",
           "desc": {
-            "en": "the format a controller takes: line length, decimals, codes it lists, groups and the end",
-            "es": "el formato que admite un controlador: longitud de línea, decimales, códigos que lista, grupos y el final",
-            "de": "das Format, das eine Steuerung annimmt: Zeilenlänge, Dezimalstellen, gelistete Codes, Gruppen und das Ende",
-            "fr": "le format qu'accepte un contrôleur : longueur de ligne, décimales, codes listés, groupes et fin",
-            "it": "il formato che accetta un controller: lunghezza riga, decimali, codici elencati, gruppi e fine",
-            "ja": "コントローラが受け付ける書式：行の長さ、小数桁、一覧のコード、グループ、終了",
-            "zh": "控制器接受的格式：行长度、小数位、列出的代码、分组和结尾",
-            "pt": "o formato que um controlador aceita: comprimento da linha, decimais, códigos listados, grupos e o fim"
+            "en": "the format a controller takes (or one of yours): line length, decimals, codes, groups",
+            "es": "el formato que admite un controlador (o uno propio): longitud de línea, decimales, códigos, grupos",
+            "de": "das Format, das eine Steuerung annimmt (oder ein eigenes): Zeilenlänge, Dezimalstellen, Codes, Gruppen",
+            "fr": "le format qu'accepte un contrôleur (ou le vôtre) : longueur de ligne, décimales, codes, groupes",
+            "it": "il formato che accetta un controller (o uno proprio): lunghezza riga, decimali, codici, gruppi",
+            "ja": "コントローラが受け付ける書式（独自のものも可）：行の長さ、小数桁、コード、グループ",
+            "zh": "控制器接受的格式（也可自定义）：行长度、小数位、代码、分组",
+            "pt": "o formato que um controlador aceita (ou um seu): comprimento da linha, decimais, códigos, grupos"
+          }
+        },
+        {
+          "name": "templates.rs",
+          "desc": {
+            "en": "templates of a machine: the travel, speeds and limits of four kinds of machine",
+            "es": "plantillas de máquina: recorridos, velocidades y límites de cuatro tipos de máquina",
+            "de": "Maschinenvorlagen: Verfahrwege, Geschwindigkeiten und Grenzen von vier Maschinenarten",
+            "fr": "modèles de machine : courses, vitesses et limites de quatre types de machine",
+            "it": "modelli di macchina: corse, velocità e limiti di quattro tipi di macchina",
+            "ja": "機械のテンプレート：4 種類の機械の移動範囲・速度・上限",
+            "zh": "机器模板：四类机器的行程、速度与限值",
+            "pt": "modelos de máquina: cursos, velocidades e limites de quatro tipos de máquina"
           }
         },
         {
@@ -684,6 +749,19 @@
           }
         },
         {
+          "name": "serverlink.rs",
+          "desc": {
+            "en": "the settings of the server link over the panel of the suite, and the login the job uses",
+            "es": "los ajustes del enlace con el servidor sobre el panel de la suite, y la sesión que usa el trabajo",
+            "de": "die Einstellungen der Serververbindung über dem Panel der Suite und die Anmeldung, die der Auftrag nutzt",
+            "fr": "les réglages du lien avec le serveur sur le panneau de la suite, et la connexion que le travail utilise",
+            "it": "le impostazioni del collegamento al server sul pannello della suite, e l'accesso che il lavoro usa",
+            "ja": "スイート共通パネル上のサーバー接続設定と、ジョブが使うログイン",
+            "zh": "基于套件通用面板的服务器连接设置，以及作业所用的登录",
+            "pt": "as definições da ligação ao servidor sobre o painel da suite, e o início de sessão que o trabalho usa"
+          }
+        },
+        {
           "name": "settings.rs",
           "desc": {
             "en": "what is kept between runs",
@@ -733,6 +811,19 @@
             "ja": "サーバー上のプログラム：開始、一時停止、停止、再開",
             "zh": "服务器上的程序：开始、暂停、停止与继续",
             "pt": "o programa no servidor: Iniciar, Pausa, Parar e retomar"
+          }
+        },
+        {
+          "name": "gui/machine.rs",
+          "desc": {
+            "en": "the machine on the server: position, jog, emergency stop and release",
+            "es": "la máquina en el servidor: posición, desplazamiento, parada de emergencia y liberación",
+            "de": "die Maschine auf dem Server: Position, Verfahren, Not-Halt und Freigabe",
+            "fr": "la machine sur le serveur : position, déplacement, arrêt d'urgence et libération",
+            "it": "la macchina sul server: posizione, movimento, arresto di emergenza e rilascio",
+            "ja": "サーバー上の機械：位置、移動、非常停止、解除",
+            "zh": "服务器上的机器：位置、移动、紧急停止和解除",
+            "pt": "a máquina no servidor: posição, movimento, paragem de emergência e libertação"
           }
         },
         {
