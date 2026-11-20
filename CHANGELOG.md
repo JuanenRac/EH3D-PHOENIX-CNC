@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The pictures of the window are taken again with the newest build:** every picture of `images/screens/` comes from the Windows 64 bits program of the latest release, and the README files show two new ones, the machine window and the tool changer section of the settings.
+
 ## [0.2.2] - Shared server panel, machine window with emergency stop, holder and tool life checks, restart from a line and machine templates
 
 - **The settings of the server are the panel of the suite:** the Server section of the settings window is the panel of `eh3d-view` of EH3D-COMMON (the address, the token of the program, the machine, the limits of the link, the state of the link, a test of the connection, and the login and logout of a person) with its words in the eight languages, in place of the three boxes it had. `src/serverlink.rs` turns the settings of this program into the settings of the link and back (the seven keys; nothing else is touched), keeps the login of the person in memory in a store that the panel and the job share (`Client::with_login`), so a job is sent with the login the person made, never writes it anywhere and never shows it in a `Debug`, and gives the panel its connection again when the window opens, closes or the settings are applied. The CI builds against EH3D-COMMON 0.2.5, and the `gui` feature turns on the `gui` feature of `eh3d-view`. Tested against the server in memory of the crate (the settings both ways, a token the link cannot send left out, a login in the panel used by the job and ended by the logout, a wrong password kept out of the window, an applied address and token, the removal of a token only when asked, the boxes put back, the test of the connection).

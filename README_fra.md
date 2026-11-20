@@ -136,6 +136,18 @@ Comment les parties s'assemblent : qui l'utilisera, ce que contient ce dépôt e
 
 <p align="center"><em>La fenêtre Ouvrir de la suite : lieux, récents, la liste du dossier avec ses dates et tailles, le nom et le type.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-06-machine.png" alt="Fenetre de la machine avec l'arret d'urgence et la boite de la machine sur le serveur" width="100%">
+</p>
+
+<p align="center"><em>La fenêtre de la machine : la position, le déplacement manuel, l'arrêt d'urgence et, au-dessus du trajet, la boîte de la machine sur le serveur.</em></p>
+
+<p align="center">
+  <img src="images/screens/phoenix-cnc-07-settings-atc.png" alt="Fenetre des reglages avec la section du changeur d'outils" width="100%">
+</p>
+
+<p align="center"><em>La section du changeur d'outils dans la fenêtre des réglages.</em></p>
+
 ## 🔒 Sécurité et protection
 
 Ce programme n'ouvre un port série que s'il est lancé pour GRBL (`--grbl`, une compilation avec `--features serial`) et une connexion réseau que vers le serveur EH3D dont l'adresse est dans les réglages, quand l'opérateur lui envoie un programme ; le jeton est gardé comme texte dans le fichier de réglages. Il n'ouvre aucun fichier d'autres personnes, sauf le fichier G-code et la carte des hauteurs que choisit l'opérateur (lus comme du texte, jamais exécutés d'eux-mêmes) et ses propres fichiers à côté des réglages (les macros, la file gardée entre deux exécutions, la ligne qu'un programme avait atteinte) ; il n'écrit un fichier que là où l'opérateur le dit (le programme, la carte des hauteurs, le journal exporté) et n'écrit jamais le journal par-dessus un fichier. La table des emplacements du changeur d'outils, la table d'outils, la bibliothèque de matériaux et les signets sont lus là où sont les réglages (ou le programme) et ne sont écrits que par leurs propres boutons : la table d'exemple et la bibliothèque d'exemple jamais sur un fichier existant, la bibliothèque et les signets après une question quand le fichier existe déjà (la question des signets peut être désactivée dans les réglages), et chacun de ces fichiers a une limite de taille. Les macros qu'il exécute sont des lignes de G-code sur lesquelles il demande d'abord, et la file qui revient ne démarre jamais seule. Ce n'est pas un système de sécurité. Voir [SECURITY.md](SECURITY.md).

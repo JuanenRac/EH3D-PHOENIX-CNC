@@ -136,6 +136,18 @@ Como as partes se encaixam: quem o vai usar, o que este repositório contém e e
 
 <p align="center"><em>A janela Abrir da suite: locais, recentes, a lista da pasta com datas e tamanhos, o nome e o tipo.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-06-machine.png" alt="Janela da máquina com a paragem de emergência e a caixa da máquina no servidor" width="100%">
+</p>
+
+<p align="center"><em>A janela da máquina: a posição, o avanço manual, a paragem de emergência e, sobre a trajetória, a caixa da máquina no servidor.</em></p>
+
+<p align="center">
+  <img src="images/screens/phoenix-cnc-07-settings-atc.png" alt="Janela de definições com a secção do trocador de ferramentas" width="100%">
+</p>
+
+<p align="center"><em>A secção do trocador de ferramentas na janela de definições.</em></p>
+
 ## 🔒 Segurança e proteção
 
 Este programa só abre uma porta série quando é arrancado para GRBL (`--grbl`, uma compilação com `--features serial`) e só abre uma ligação de rede ao servidor EH3D cujo endereço está nas definições, quando o operador lhe envia um programa; o token fica guardado como texto no ficheiro de definições. Não abre ficheiros de outras pessoas, exceto o ficheiro G-code e o mapa de alturas que o operador escolhe (lidos como texto, nunca executados por si) e os seus próprios ficheiros junto às definições (as macros, a fila guardada entre execuções, a linha que um programa tinha alcançado); só escreve um ficheiro onde o operador o diz (o programa, o mapa de alturas, o registo exportado) e nunca escreve o registo por cima de um ficheiro. A tabela de posições do trocador de ferramentas, a tabela de ferramentas, a biblioteca de materiais e os marcadores são lidos de onde estão as definições (ou o programa) e só são escritos pelos seus próprios botões: a tabela de exemplo e a biblioteca de exemplo nunca por cima de um ficheiro existente, e a biblioteca e os marcadores depois de uma pergunta quando o ficheiro já existe (a pergunta dos marcadores pode ser desativada nas definições), e cada um destes ficheiros tem um limite de tamanho. As macros que executa são linhas de G-code sobre as quais pergunta antes, e a fila que volta nunca arranca sozinha. Não é um sistema de segurança. Ver [SECURITY.md](SECURITY.md).

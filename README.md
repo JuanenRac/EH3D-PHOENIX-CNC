@@ -136,6 +136,18 @@ How the parts fit together: who will use it, what this repository holds and what
 
 <p align="center"><em>The Open window of the suite: places, recent files, the list of the folder with its dates and sizes, the file name and the type.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-06-machine.png" alt="The machine window with the emergency stop and the dialog of the machine on the server" width="100%">
+</p>
+
+<p align="center"><em>The machine window: the position, the jog, the emergency stop and, over the path, the dialog of the machine on the server.</em></p>
+
+<p align="center">
+  <img src="images/screens/phoenix-cnc-07-settings-atc.png" alt="Settings window with the section of the tool changer" width="100%">
+</p>
+
+<p align="center"><em>The section of the tool changer in the settings window.</em></p>
+
 ## 🔒 Security & Safety
 
 This program opens a serial port only when it is started for GRBL (`--grbl`, a build with `--features serial`) and a network connection only to the EH3D server whose address is in its settings, when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file and the height map the operator chooses (read as text, never run by itself) and its own files next to the settings (the macros, the queue kept between runs, the line a program had reached); it writes a file only where the operator says (the program, the height map, the exported log) and never writes the log over a file. The table of slots of the tool changer, the table of tools, the library of materials and the bookmarks are read from where the settings (or the program) are and written only by their own buttons: the example table and the example library never over a file that is there, the library and the bookmarks after a question when the file is there already (the question about the bookmarks can be turned off in the settings), and every one of these files has a size limit. The macros it runs are lines of G-code that it asks about first, and the queue that comes back never starts by itself. It is not a safety system. See [SECURITY.md](SECURITY.md).

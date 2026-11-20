@@ -136,6 +136,18 @@ Cómo encajan las partes: quién lo usará, qué contiene este repositorio y en 
 
 <p align="center"><em>La ventana Abrir de la suite: lugares, recientes, la lista de la carpeta con sus fechas y tamaños, el nombre y el tipo.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-06-machine.png" alt="Ventana de la maquina con la parada de emergencia y el dialogo de la maquina en el servidor" width="100%">
+</p>
+
+<p align="center"><em>La ventana de la máquina: la posición, el desplazamiento manual, la parada de emergencia y, sobre la trayectoria, el diálogo de la máquina en el servidor.</em></p>
+
+<p align="center">
+  <img src="images/screens/phoenix-cnc-07-settings-atc.png" alt="Ventana de ajustes con la seccion del cambiador de herramientas" width="100%">
+</p>
+
+<p align="center"><em>La sección del cambiador de herramientas en la ventana de ajustes.</em></p>
+
 ## 🔒 Seguridad y protección
 
 Este programa abre un puerto serie solo si se arranca para GRBL (`--grbl`, una compilación con `--features serial`) y una conexión de red solo con el servidor EH3D cuya dirección está en los ajustes, cuando el operador le envía un programa; el token se guarda como texto en el fichero de ajustes. No abre ficheiros de otras personas salvo el fichero G-code y el mapa de alturas que elige el operador (se leen como texto y nunca se ejecutan solos) y sus propios ficheros junto a los ajustes (las macros, la cola guardada entre ejecuciones, la línea que había alcanzado un programa); solo escribe un fichero donde el operador lo dice (el programa, el mapa de alturas, el registro exportado) y nunca escribe el registro sobre un fichero. La tabla de huecos del cambiador de herramientas, la tabla de herramientas, la biblioteca de materiales y los marcadores se leen de donde están los ajustes (o el programa) y solo los escriben sus propios botones: la tabla de ejemplo y la biblioteca de ejemplo nunca sobre un fichero que exista, y la biblioteca y los marcadores tras una pregunta cuando el fichero ya existe (la pregunta de los marcadores se puede desactivar en los ajustes), y cada uno de estos ficheros tiene un límite de tamaño. Las macros que ejecuta son líneas de G-code por las que pregunta antes, y la cola que vuelve nunca empieza sola. No es un sistema de seguridad. Véase [SECURITY.md](SECURITY.md).

@@ -136,6 +136,18 @@ Wie die Teile zusammenpassen: wer es nutzen wird, was dieses Repository enthält
 
 <p align="center"><em>Das Fenster Öffnen der Suite: Orte, zuletzt geöffnet, die Liste des Ordners mit Datum und Größe, der Name und der Typ.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-06-machine.png" alt="Maschinenfenster mit Not-Halt und dem Dialog der Maschine am Server" width="100%">
+</p>
+
+<p align="center"><em>Das Maschinenfenster: die Position, das Handfahren, der Not-Halt und über dem Pfad der Dialog der Maschine am Server.</em></p>
+
+<p align="center">
+  <img src="images/screens/phoenix-cnc-07-settings-atc.png" alt="Einstellungsfenster mit dem Abschnitt des Werkzeugwechslers" width="100%">
+</p>
+
+<p align="center"><em>Der Abschnitt des Werkzeugwechslers im Einstellungsfenster.</em></p>
+
 ## 🔒 Sicherheit und Schutz
 
 Dieses Programm öffnet eine serielle Schnittstelle nur, wenn es für GRBL gestartet wird (`--grbl`, ein Build mit `--features serial`), und eine Netzverbindung nur zum EH3D-Server, dessen Adresse in den Einstellungen steht, wenn der Bediener ihm ein Programm sendet; das Token liegt als Text in der Einstellungsdatei. Es öffnet keine Dateien anderer Personen außer der G-Code-Datei und der Höhenkarte, die der Bediener wählt (als Text gelesen, nie von selbst ausgeführt), und seinen eigenen Dateien neben den Einstellungen (die Makros, die zwischen den Läufen gehaltene Warteschlange, die Zeile, die ein Programm erreicht hatte); es schreibt eine Datei nur dort, wo der Bediener es sagt (das Programm, die Höhenkarte, das exportierte Protokoll), und schreibt das Protokoll nie über eine Datei. Die Platztabelle des Werkzeugwechslers, die Werkzeugtabelle, die Materialbibliothek und die Lesezeichen werden dort gelesen, wo die Einstellungen (oder das Programm) liegen, und nur von ihren eigenen Schaltflächen geschrieben: die Beispieltabelle und die Beispielbibliothek nie über eine vorhandene Datei, die Bibliothek und die Lesezeichen nach einer Rückfrage, wenn die Datei schon da ist (die Rückfrage zu den Lesezeichen lässt sich in den Einstellungen abschalten), und jede dieser Dateien hat eine Größenbegrenzung. Die Makros, die es ausführt, sind G-Code-Zeilen, nach denen es vorher fragt, und die zurückkehrende Warteschlange startet nie von selbst. Es ist kein Sicherheitssystem. Siehe [SECURITY.md](SECURITY.md).
