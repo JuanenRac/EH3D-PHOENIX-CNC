@@ -84,6 +84,11 @@ pub fn measure(io: &mut dyn ProbeIo, cfg: &SetterCfg, confirmed: bool) -> Result
         }
     }
     let z = touched.ok_or_else(|| "no reading".to_string())?;
+    length_from_touch(z, cfg)
+}
+
+/// The length of the tool from the machine Z where it touched the setter. A touch from outside the travel asked for is not believed.
+pub fn length_from_touch(z: f64, cfg: &SetterCfg) -> Result<f64, String> {
     let lowest = cfg.start_z_mm - cfg.max_travel_mm;
     if !z.is_finite() || z > cfg.start_z_mm + 0.05 || z < lowest - 0.05 {
         return Err(format!(

@@ -8,11 +8,15 @@
 //! caller tells it the time in milliseconds with [`Guarded::at`], so that every rule is tested without waiting. Every option is a switch of
 //! [`GuardCfg`] (`phoenix-cnc-motion.txt`) and the safe way is the default.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
+
 use eh3d_controller::urgent::UrgentChannel;
 use eh3d_controller::{Capabilities, Command, Controller, Error, Family, State, Status, AXES};
 
 use crate::ctltext::Guard;
 use crate::motioncfg::GuardCfg;
+use crate::session::BoxedController;
 
 /// Why the guard stopped the machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,11 +31,34 @@ pub enum Trip {
     TwoMoves,
 }
 
+/// The text for the reason the guard stopped the machine, in the language.
+pub fn trip_text(trip: Trip, lang: &str) -> &'static str {
+    match trip {
+        Trip::Silent | Trip::Deaf => Guard::Silent,
+        Trip::Implausible => Guard::Implausible,
+        Trip::TwoMoves => Guard::TwoMoves,
+    }
+    .text(lang)
+}
+
+/// The text for something the guard did (an event of [`Guarded::events`]), in the language; `None` for the ones that need no words.
+pub fn event_text(event: &str, lang: &str) -> Option<&'static str> {
+    Some(match event {
+        "trip Silent" | "trip Deaf" => Guard::Silent.text(lang),
+        "trip Implausible" => Guard::Implausible.text(lang),
+        "trip TwoMoves" => Guard::TwoMoves.text(lang),
+        "stale jog" => Guard::StaleJog.text(lang),
+        _ => return None,
+    })
+}
+
 /// The guard.
 pub struct Guarded<C: Controller> {
     inner: C,
     cfg: GuardCfg,
     now_ms: u64,
+    /// A clock another thread sets (the window), read instead of `now_ms` when there is one.
+    clock: Option<Arc<AtomicU64>>,
     tripped: Option<Trip>,
     last_position: Option<[f64; AXES]>,
     /// The jog that is active: its axis, its direction (+1 or -1) and the moment its target was last renewed.
@@ -104,6 +131,7 @@ impl<C: Controller> Guarded<C> {
             inner,
             cfg,
             now_ms: 0,
+            clock: None,
             tripped: None,
             last_position: None,
             jog: None,
@@ -126,6 +154,25 @@ impl<C: Controller> Guarded<C> {
         self
     }
 
+    /// Makes the guard read the time from a clock that another thread sets, so the window can keep it without waiting for the lock of the
+    /// controller (an order that waits for its answer holds that lock).
+    pub fn with_clock(mut self, clock: Arc<AtomicU64>) -> Self {
+        self.clock = Some(clock);
+        self
+    }
+
+    /// The time the guard goes by: the shared clock when there is one, else the last time it was told.
+    fn now(&self) -> u64 {
+        self.clock
+            .as_ref()
+            .map_or(self.now_ms, |c| c.load(Ordering::Relaxed))
+    }
+
+    /// Takes what the guard did since the last time, in order.
+    pub fn take_events(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.events)
+    }
+
     /// Why the machine is stopped, when it is.
     pub fn tripped(&self) -> Option<Trip> {
         self.tripped
@@ -142,14 +189,7 @@ impl<C: Controller> Guarded<C> {
 
     /// The message to show for the state of the guard, in the language.
     pub fn message(&self, lang: &str) -> Option<&'static str> {
-        Some(
-            match self.tripped? {
-                Trip::Silent | Trip::Deaf => Guard::Silent,
-                Trip::Implausible => Guard::Implausible,
-                Trip::TwoMoves => Guard::TwoMoves,
-            }
-            .text(lang),
-        )
+        self.tripped.map(|t| trip_text(t, lang))
     }
 
     /// The safe stop: the jog is cancelled and the job stopped; if the controller will not take that, the emergency stop is given.
@@ -175,7 +215,7 @@ impl<C: Controller> Guarded<C> {
     /// Returns whether it stopped one.
     pub fn tick(&mut self) -> bool {
         if let Some((_, _, renewed)) = self.jog {
-            if self.now_ms.saturating_sub(renewed) > self.cfg.jog_stale_ms {
+            if self.now().saturating_sub(renewed) > self.cfg.jog_stale_ms {
                 self.events.push("stale jog".into());
                 let _ = self.inner.command(Command::JogStop);
                 self.jog = None;
@@ -261,7 +301,7 @@ impl<C: Controller> Controller for Guarded<C> {
                     }
                 }
             }
-            self.jog = Some((*axis, dir, self.now_ms));
+            self.jog = Some((*axis, dir, self.now()));
         }
         if matches!(command, Command::Home(_) | Command::Resume)
             && self.jog.is_some()
@@ -319,6 +359,150 @@ impl<C: Controller> Controller for Guarded<C> {
 
     fn urgent_channel(&self) -> Option<UrgentChannel> {
         self.inner.urgent_channel()
+    }
+}
+
+/// The controller that the session holds, as a controller the guard can wrap (a box of a trait object is not one).
+struct Boxed(BoxedController);
+
+impl Controller for Boxed {
+    fn family(&self) -> Family {
+        self.0.family()
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.0.capabilities()
+    }
+
+    fn status(&mut self) -> Result<Status, Error> {
+        self.0.status()
+    }
+
+    fn command(&mut self, command: Command) -> Result<(), Error> {
+        self.0.command(command)
+    }
+
+    fn send_line(&mut self, line: &str) -> Result<(), Error> {
+        self.0.send_line(line)
+    }
+
+    fn set_travel(&mut self, travel: [(f64, f64); AXES]) -> bool {
+        self.0.set_travel(travel)
+    }
+
+    fn max_travel(&mut self) -> Result<Option<[f64; 3]>, Error> {
+        self.0.max_travel()
+    }
+
+    fn urgent_channel(&self) -> Option<UrgentChannel> {
+        self.0.urgent_channel()
+    }
+}
+
+/// A guard that the session and the window share: the session holds one copy as its controller, the window keeps the other to tell the guard
+/// the time every frame, to renew the jog, to read why it stopped the machine and to give the all clear. The time goes in through an atomic
+/// clock and the reads that could wait for the controller use `try_lock`, so the window never waits for a line that is waiting for its answer.
+#[derive(Clone)]
+pub struct GuardHandle {
+    guard: Arc<Mutex<Guarded<Boxed>>>,
+    clock: Arc<AtomicU64>,
+}
+
+impl GuardHandle {
+    /// Wraps the controller of the session in a guard.
+    pub fn new(inner: BoxedController, cfg: GuardCfg) -> GuardHandle {
+        let clock = Arc::new(AtomicU64::new(0));
+        let guard = Guarded::new(Boxed(inner), cfg).with_clock(Arc::clone(&clock));
+        GuardHandle {
+            guard: Arc::new(Mutex::new(guard)),
+            clock,
+        }
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Guarded<Boxed>> {
+        self.guard.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn try_lock(&self) -> Option<MutexGuard<'_, Guarded<Boxed>>> {
+        match self.guard.try_lock() {
+            Ok(g) => Some(g),
+            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Err(TryLockError::WouldBlock) => None,
+        }
+    }
+
+    /// Tells the guard what time it is (milliseconds since the start of the window) and renews the clock of the jog: a jog whose target
+    /// was not renewed in time is stopped. Returns whether it stopped one; when the controller is busy with an order it does nothing and
+    /// returns `false`, to be tried again at the next frame.
+    pub fn tick_at(&self, now_ms: u64) -> bool {
+        self.clock.store(now_ms, Ordering::Relaxed);
+        self.try_lock().is_some_and(|mut g| g.tick())
+    }
+
+    /// Why the machine is stopped, when it is (`None` also when the guard could not be asked this time: see [`GuardHandle::try_tripped`]).
+    pub fn tripped(&self) -> Option<Trip> {
+        self.try_tripped().flatten()
+    }
+
+    /// Why the machine is stopped: `Some(None)` when it is not, and `None` when an order holds the guard and it could not be asked.
+    pub fn try_tripped(&self) -> Option<Option<Trip>> {
+        self.try_lock().map(|g| g.tripped())
+    }
+
+    /// The text for the state of the guard in the language, when it stopped the machine.
+    pub fn message(&self, lang: &str) -> Option<&'static str> {
+        self.try_lock().and_then(|g| g.message(lang))
+    }
+
+    /// The operator's all clear.
+    pub fn reset(&self) {
+        self.lock().reset();
+    }
+
+    /// What the guard did since the last call, for the log.
+    pub fn take_events(&self) -> Vec<String> {
+        self.try_lock()
+            .map(|mut g| g.take_events())
+            .unwrap_or_default()
+    }
+
+    /// How many reads were tried again.
+    pub fn retried_reads(&self) -> u32 {
+        self.try_lock().map_or(0, |g| g.retried_reads)
+    }
+}
+
+impl Controller for GuardHandle {
+    fn family(&self) -> Family {
+        self.lock().family()
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.lock().capabilities()
+    }
+
+    fn status(&mut self) -> Result<Status, Error> {
+        self.lock().status()
+    }
+
+    fn command(&mut self, command: Command) -> Result<(), Error> {
+        self.lock().command(command)
+    }
+
+    fn send_line(&mut self, line: &str) -> Result<(), Error> {
+        self.lock().send_line(line)
+    }
+
+    fn set_travel(&mut self, travel: [(f64, f64); AXES]) -> bool {
+        self.lock().set_travel(travel)
+    }
+
+    fn max_travel(&mut self) -> Result<Option<[f64; 3]>, Error> {
+        self.lock().max_travel()
+    }
+
+    fn urgent_channel(&self) -> Option<UrgentChannel> {
+        self.lock().urgent_channel()
     }
 }
 
@@ -630,5 +814,95 @@ mod tests {
                 assert!(n <= 1, "{l} went {n} times");
             }
         }
+    }
+
+    fn handle(faults: Vec<Fault>) -> GuardHandle {
+        GuardHandle::new(
+            Box::new(FaultyController::new(SimController::new(), faults)),
+            GuardCfg::default(),
+        )
+    }
+
+    #[test]
+    fn the_handle_keeps_the_clock_stops_a_stale_jog_and_gives_the_all_clear() {
+        let h = handle(vec![]);
+        let mut session_side = h.clone();
+        assert!(!h.tick_at(0));
+        assert!(session_side.command(jog(0, 1.0)).is_ok());
+        // renewed in time: nothing is stopped
+        assert!(!h.tick_at(100));
+        // the window stopped feeding the target: the jog is stopped and the guard says so
+        assert!(h.tick_at(1000));
+        assert!(h.take_events().iter().any(|e| e == "stale jog"));
+        assert!(h.take_events().is_empty(), "the events are taken once");
+        // a jog on another axis is let in now that the first is over
+        assert!(session_side.command(jog(1, 1.0)).is_ok());
+        assert_eq!(h.tripped(), None);
+    }
+
+    #[test]
+    fn the_handle_shows_why_the_machine_was_stopped_and_the_operator_clears_it() {
+        let h = handle(vec![Fault::Silence {
+            from: 0,
+            calls: None,
+        }]);
+        let mut session_side = h.clone();
+        assert_eq!(session_side.send_line("G1 X5 F100"), Err(Error::Timeout));
+        assert_eq!(h.tripped(), Some(Trip::Silent));
+        assert_eq!(h.message("es"), Some(Guard::Silent.text("es")));
+        assert!(matches!(
+            session_side.command(jog(0, 1.0)),
+            Err(Error::Alarm(_))
+        ));
+        h.reset();
+        assert_eq!(h.tripped(), None);
+        assert_eq!(h.message("en"), None);
+    }
+
+    #[test]
+    fn a_handle_that_is_busy_is_not_waited_for() {
+        let h = handle(vec![]);
+        let held = h.guard.lock().unwrap();
+        // the reads of the window give up at once while an order holds the guard
+        assert_eq!(h.tripped(), None);
+        assert!(!h.tick_at(5));
+        assert!(h.take_events().is_empty());
+        assert_eq!(h.retried_reads(), 0);
+        drop(held);
+        assert!(!h.tick_at(6));
+    }
+
+    #[test]
+    fn what_the_guard_did_is_told_in_the_eight_languages() {
+        for lang in ["en", "es", "it", "de", "fr", "pt", "zh", "ja"] {
+            for trip in [Trip::Silent, Trip::Deaf, Trip::Implausible, Trip::TwoMoves] {
+                assert!(!trip_text(trip, lang).is_empty(), "{lang} {trip:?}");
+            }
+            for event in [
+                "trip Silent",
+                "trip Deaf",
+                "trip Implausible",
+                "trip TwoMoves",
+                "stale jog",
+            ] {
+                assert!(
+                    event_text(event, lang).is_some_and(|t| !t.is_empty()),
+                    "{lang} {event}"
+                );
+            }
+        }
+        // the words of a stop in Spanish are not the English ones, and what needs no words has none
+        assert_ne!(trip_text(Trip::Silent, "es"), trip_text(Trip::Silent, "en"));
+        assert_eq!(event_text("reset", "en"), None);
+        assert_eq!(event_text("nothing", "es"), None);
+        // the handle and the guard say the same thing
+        let h = handle(vec![Fault::Silence {
+            from: 0,
+            calls: None,
+        }]);
+        let mut s = h.clone();
+        let _ = s.send_line("G1 X1 F100");
+        assert_eq!(h.message("de"), Some(trip_text(Trip::Silent, "de")));
+        assert_eq!(h.try_tripped(), Some(Some(Trip::Silent)));
     }
 }

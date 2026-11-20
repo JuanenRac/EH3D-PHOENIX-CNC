@@ -19,6 +19,7 @@ use eh3d_controller::{Command, Controller, Error, State, Status, AXES};
 use crate::gcode::{toolpath, words, Modal};
 use crate::heightmap::HeightMap;
 use crate::jog::{limit_step, Step as JogStep};
+use crate::motioncfg::SetterCfg;
 use crate::probe::{grid_script, z_touch_off_lines, Act, ProbeCfg};
 
 /// The jog steps offered, in mm.
@@ -68,6 +69,8 @@ enum Then {
         nx: usize,
         ny: usize,
     },
+    /// The touch on the tool setter: when it ends well the length of the tool is worked out from the height read.
+    Setter { cfg: SetterCfg },
 }
 
 /// A batch the emitter is working on.
@@ -138,6 +141,12 @@ pub struct Session {
     uncorrected: Option<Vec<String>>,
     /// The heights the emitter read during a grid.
     samples: Arc<Mutex<Vec<f64>>>,
+    /// The axis and the direction (+1 or -1) of the jog that may still be moving: a jog in another direction cancels it first.
+    last_jog: Option<(usize, i8)>,
+    /// A jog that crosses the last one (another axis, or the other way) cancels the move in progress first; off, the order goes as it is.
+    pub cancel_crossing_jog: bool,
+    /// The length of the tool the last measure on the tool setter gave (mm), until the operator writes it into the table or drops it.
+    pub setter_length: Option<f64>,
 }
 
 /// The travel the summary and the refusal use: where the settings put it, shortened to the longest travel the controller reports when that is
@@ -259,6 +268,9 @@ impl Session {
             height_map: None,
             uncorrected: None,
             samples: Arc::new(Mutex::new(Vec::new())),
+            last_jog: None,
+            cancel_crossing_jog: true,
+            setter_length: None,
         };
         s.refresh();
         s
@@ -314,10 +326,19 @@ impl Session {
                 if s.state == State::Alarm {
                     self.homed = false;
                 }
+                if !matches!(s.state, State::Jog | State::Run) {
+                    self.last_jog = None;
+                }
                 self.status = s;
             }
             Err(e) => self.failed("status", e),
         }
+    }
+
+    /// The controller has an input for a probe (the probe, the height map and the tool setter need one). A controller that is busy sending
+    /// answers no, to be asked again.
+    pub fn has_probe(&self) -> bool {
+        self.inflight.is_none() && self.ctl().capabilities().probe
     }
 
     pub fn alarm(&self) -> bool {
@@ -350,6 +371,21 @@ impl Session {
                 }
             }
         }
+        // two jogs that cross (X+ and then Y+ while the first still moves) are normal for a person; the guard takes a second, different move
+        // order while one is active for a fault, so the move in progress is cancelled before the new one is given
+        let way = (axis, if distance_mm < 0.0 { -1i8 } else { 1 });
+        if self.cancel_crossing_jog
+            && matches!(self.status.state, State::Jog | State::Run)
+            && self.last_jog.is_some_and(|prev| prev != way)
+        {
+            let stop = self.ctl().command(Command::JogStop);
+            if let Err(e) = stop {
+                self.failed("jog", e);
+                self.refresh();
+                return;
+            }
+        }
+        self.last_jog = Some(way);
         let command = Command::Jog {
             axis,
             distance_mm,
@@ -798,7 +834,7 @@ impl Session {
                             };
                             format!("resume ({line})")
                         }
-                        Then::Probed | Then::Grid { .. } => {
+                        Then::Probed | Then::Grid { .. } | Then::Setter { .. } => {
                             let line = match f.steps.get(f.applied) {
                                 Some(Step::Line(l)) => l.clone(),
                                 _ => String::new(),
@@ -832,6 +868,7 @@ impl Session {
                             self.say("probe: touched, the zero of Z is set and the head is up")
                         }
                         Then::Grid { area, nx, ny } => self.finish_grid(area, nx, ny),
+                        Then::Setter { cfg } => self.finish_setter(&cfg),
                     }
                 }
             }
@@ -919,6 +956,55 @@ impl Session {
                 self.say(format!("probe: {e}"));
                 false
             }
+        }
+    }
+
+    /// Measures the tool in the spindle by touching the tool setter (see `toolsetter`): the head goes to the setter, touches it and lifts, and
+    /// when it ends well the length is in `setter_length`. It moves the machine: nothing happens unless `confirmed`, and with `setter_confirm`
+    /// on in the motion file the caller must have asked the operator whether the setter is there and clear.
+    pub fn measure_tool(&mut self, cfg: &SetterCfg, confirmed: bool) -> bool {
+        if self.probe_refused("tool setter", confirmed) {
+            return false;
+        }
+        self.setter_length = None;
+        match crate::toolsetter::script(cfg) {
+            Ok(script) => {
+                let steps: Vec<Step> = script
+                    .into_iter()
+                    .map(|a| match a {
+                        Act::Mark(_) => Step::Skip,
+                        Act::Line(l) => Step::Line(l),
+                        Act::Sample => Step::Sample,
+                    })
+                    .collect();
+                self.say("tool setter: the head goes to the setter and touches it");
+                self.post(steps, false, Then::Setter { cfg: *cfg });
+                true
+            }
+            Err(e) => {
+                self.say(format!("tool setter: {e}"));
+                false
+            }
+        }
+    }
+
+    /// The touch ended well: the length of the tool is worked out from the height read.
+    fn finish_setter(&mut self, cfg: &SetterCfg) {
+        let z = self
+            .samples
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .first()
+            .copied();
+        match z
+            .ok_or_else(|| "no reading".to_string())
+            .and_then(|z| crate::toolsetter::length_from_touch(z, cfg))
+        {
+            Ok(length) => {
+                self.say(format!("tool setter: the tool measures {length:.3} mm"));
+                self.setter_length = Some(length);
+            }
+            Err(e) => self.say(format!("tool setter: {e}")),
         }
     }
 
@@ -1786,6 +1872,201 @@ G0 X2",
     fn touchy_session(surface: fn(f64, f64) -> f64) -> (Session, Arc<Mutex<Vec<String>>>) {
         let (c, sent) = Touchy::new(surface);
         (Session::new(Box::new(c)), sent)
+    }
+
+    /// A controller whose jog goes on after the order: it says `Jog` until it is told to stop.
+    struct Sticky {
+        sent: Arc<Mutex<Vec<String>>>,
+        jogging: bool,
+    }
+
+    impl Controller for Sticky {
+        fn family(&self) -> eh3d_controller::Family {
+            eh3d_controller::Family::Grbl
+        }
+        fn capabilities(&self) -> eh3d_controller::Capabilities {
+            SimController::new().capabilities()
+        }
+        fn status(&mut self) -> Result<Status, Error> {
+            Ok(Status {
+                state: if self.jogging {
+                    State::Jog
+                } else {
+                    State::Idle
+                },
+                ..Status::default()
+            })
+        }
+        fn command(&mut self, command: Command) -> Result<(), Error> {
+            match command {
+                Command::Jog { .. } => {
+                    self.jogging = true;
+                    self.sent.lock().unwrap().push("jog".into());
+                }
+                Command::JogStop => {
+                    self.jogging = false;
+                    self.sent.lock().unwrap().push("stop".into());
+                }
+                _ => {}
+            }
+            Ok(())
+        }
+        fn send_line(&mut self, _line: &str) -> Result<(), Error> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn jogs_that_cross_are_normal_and_do_not_trip_the_guard_because_the_move_in_progress_is_cancelled_first(
+    ) {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let inner = Sticky {
+            sent: Arc::clone(&sent),
+            jogging: false,
+        };
+        let guard =
+            crate::guard::GuardHandle::new(Box::new(inner), crate::motioncfg::GuardCfg::default());
+        let mut s = Session::new(Box::new(guard.clone()));
+        s.step_mm = 1.0;
+        s.jog(0, 1.0);
+        // the first jog still moves: another axis, then the other way
+        s.jog(1, 1.0);
+        s.jog(1, -1.0);
+        assert_eq!(guard.tripped(), None, "{:?}", s.log);
+        assert!(s.log.iter().all(|l| !l.contains("jog:")), "{:?}", s.log);
+        assert_eq!(
+            sent.lock().unwrap().join(","),
+            "jog,stop,jog,stop,jog",
+            "a stop goes before each jog that changes the axis or the way"
+        );
+        // the same axis and way again renews the target: no stop between
+        s.jog(1, -1.0);
+        assert_eq!(sent.lock().unwrap().join(","), "jog,stop,jog,stop,jog,jog");
+        assert_eq!(guard.tripped(), None);
+    }
+
+    #[test]
+    fn with_the_cancel_turned_off_a_crossing_jog_is_a_second_move_order_and_the_guard_stops_the_machine(
+    ) {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let inner = Sticky {
+            sent: Arc::clone(&sent),
+            jogging: false,
+        };
+        let guard =
+            crate::guard::GuardHandle::new(Box::new(inner), crate::motioncfg::GuardCfg::default());
+        let mut s = Session::new(Box::new(guard.clone()));
+        s.cancel_crossing_jog = false;
+        s.step_mm = 1.0;
+        s.jog(0, 1.0);
+        s.jog(1, 1.0);
+        assert_eq!(guard.tripped(), Some(crate::guard::Trip::TwoMoves));
+        // the second order was not sent, and the machine was told to stop
+        assert_eq!(sent.lock().unwrap().join(","), "jog,stop");
+        assert!(s.log.iter().any(|l| l.contains("jog:")), "{:?}", s.log);
+    }
+
+    #[test]
+    fn jogs_in_any_order_from_a_fixed_seed_never_trip_the_guard_and_never_send_two_moves_in_a_row()
+    {
+        let mut seed: u64 = 0x1065_EED0_0000_0005;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let inner = Sticky {
+            sent: Arc::clone(&sent),
+            jogging: false,
+        };
+        let guard =
+            crate::guard::GuardHandle::new(Box::new(inner), crate::motioncfg::GuardCfg::default());
+        let mut s = Session::new(Box::new(guard.clone()));
+        s.step_mm = 1.0;
+        for _ in 0..300 {
+            let axis = (next() % 3) as usize;
+            let dir = if next() % 2 == 0 { 1.0 } else { -1.0 };
+            s.jog(axis, dir);
+            assert_eq!(guard.tripped(), None, "{:?}", s.log);
+        }
+        // two different jog orders never follow each other without a stop between them
+        let sent = sent.lock().unwrap();
+        let mut last_jog_since_stop = false;
+        let mut jogs = 0;
+        for c in sent.iter() {
+            match c.as_str() {
+                "jog" => {
+                    jogs += 1;
+                    last_jog_since_stop = true;
+                }
+                "stop" => assert!(last_jog_since_stop, "a stop with nothing to stop"),
+                other => panic!("{other}"),
+            }
+            if c == "stop" {
+                last_jog_since_stop = false;
+            }
+        }
+        assert_eq!(jogs, 300);
+    }
+
+    #[test]
+    fn a_jog_after_the_last_one_ended_needs_no_stop_and_without_the_cancel_the_guard_would_have_tripped(
+    ) {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let inner = Sticky {
+            sent: Arc::clone(&sent),
+            jogging: false,
+        };
+        // the guard alone, as the session used to meet it: a crossing jog is a second move order
+        let mut bare = crate::guard::Guarded::new(inner, crate::motioncfg::GuardCfg::default());
+        let jog = |axis| Command::Jog {
+            axis,
+            distance_mm: 1.0,
+            feed_mm_min: 300.0,
+        };
+        assert!(bare.command(jog(0)).is_ok());
+        assert!(bare.command(jog(1)).is_err());
+        assert_eq!(bare.tripped(), Some(crate::guard::Trip::TwoMoves));
+        // the session over a controller that is idle when the next jog comes: nothing is cancelled and nothing is said
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        s.step_mm = 1.0;
+        s.jog(0, 1.0);
+        s.jog(1, 1.0);
+        assert!(sent.lock().unwrap().is_empty());
+        assert!(s.log.is_empty(), "{:?}", s.log);
+    }
+
+    #[test]
+    fn the_tool_setter_moves_nothing_unconfirmed_and_gives_the_length_of_a_believable_touch() {
+        let cfg = SetterCfg::default();
+        let (mut s, sent) = touchy_session(|_, _| -23.5);
+        assert!(!s.measure_tool(&cfg, false));
+        assert!(sent.lock().unwrap().is_empty());
+        assert_eq!(s.setter_length, None);
+        assert!(s.measure_tool(&cfg, true));
+        s.wait_idle();
+        assert_eq!(s.setter_length, Some(-23.5), "{:?}", s.log);
+        assert!(sent.lock().unwrap().iter().any(|l| l == "G38.2 Z-60 F60"));
+        // a touch outside the travel of the cycle is not believed and gives no length
+        let (mut s, _) = touchy_session(|_, _| -90.0);
+        assert!(s.measure_tool(&cfg, true));
+        s.wait_idle();
+        assert_eq!(s.setter_length, None);
+        assert!(
+            s.log.iter().any(|l| l.contains("outside the travel")),
+            "{:?}",
+            s.log
+        );
+        // the simulator has no probe: refused, with the reason
+        let mut sim = session();
+        assert!(!sim.measure_tool(&cfg, true));
+        assert!(
+            sim.log.iter().any(|l| l.contains("no probe")),
+            "{:?}",
+            sim.log
+        );
     }
 
     #[test]

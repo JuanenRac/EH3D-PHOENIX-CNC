@@ -5,6 +5,8 @@ use std::time::Duration;
 use eh3d_controller::sim::SimController;
 
 use crate::cli::Options;
+use crate::guard::GuardHandle;
+use crate::motioncfg::GuardCfg;
 use crate::session::BoxedController;
 
 /// The baud rate of GRBL 1.1 when the option names only the port.
@@ -41,6 +43,40 @@ pub fn controller_for_with(o: &Options, busy: Duration) -> Result<BoxedControlle
     };
     let (port, baud) = parse_port(text)?;
     open_grbl(&port, baud, busy)
+}
+
+/// The controller of the window and, when the guard is on, the handle the window keeps to feed it the time and to read why it stopped.
+pub struct Linked {
+    /// What the session holds: the guard when it is on, the controller as it is when not.
+    pub controller: BoxedController,
+    /// The guard, when the motion file has it on.
+    pub guard: Option<GuardHandle>,
+}
+
+/// The controller the options ask for, wrapped in the guard that fails closed unless the motion file turns it off (`guard = off`). The
+/// simulator is wrapped too, but it jumps to its target in one step, so the check of the position that jumps is off for it.
+pub fn guarded_for_with(o: &Options, busy: Duration, cfg: &GuardCfg) -> Result<Linked, String> {
+    let controller = controller_for_with(o, busy)?;
+    Ok(wrap(controller, o.grbl.is_none(), cfg))
+}
+
+/// Puts a controller in the guard (or leaves it as it is when the guard is off).
+pub fn wrap(controller: BoxedController, simulated: bool, cfg: &GuardCfg) -> Linked {
+    if !cfg.enabled {
+        return Linked {
+            controller,
+            guard: None,
+        };
+    }
+    let mut cfg = cfg.clone();
+    if simulated {
+        cfg.check_position = false;
+    }
+    let handle = GuardHandle::new(controller, cfg);
+    Linked {
+        controller: Box::new(handle.clone()),
+        guard: Some(handle),
+    }
 }
 
 #[cfg(feature = "serial")]
@@ -108,5 +144,54 @@ mod tests {
             Err(e) => assert!(e.contains("serial")),
             Ok(_) => panic!("a build without serial opened a port"),
         }
+    }
+
+    fn after_a_jump() -> BoxedController {
+        use crate::faulty::{Fault, FaultyController};
+        let mut offset_mm = [0.0; eh3d_controller::AXES];
+        offset_mm[0] = 900.0;
+        Box::new(FaultyController::new(
+            SimController::new(),
+            vec![Fault::FalsePosition { from: 1, offset_mm }],
+        ))
+    }
+
+    #[test]
+    fn the_guard_is_on_by_default_and_the_switch_takes_it_away() {
+        let cfg = GuardCfg::default();
+        let l = wrap(Box::new(SimController::new()), true, &cfg);
+        assert!(l.guard.is_some());
+        let off = GuardCfg {
+            enabled: false,
+            ..GuardCfg::default()
+        };
+        let l = wrap(Box::new(SimController::new()), true, &off);
+        assert!(l.guard.is_none());
+    }
+
+    #[test]
+    fn a_real_controller_that_jumps_is_stopped_but_the_simulator_may_jump() {
+        let cfg = GuardCfg::default();
+        // a real one: the second status is 900 mm from the first
+        let mut real = wrap(after_a_jump(), false, &cfg);
+        assert!(real.controller.status().is_ok());
+        assert!(real.controller.status().is_err());
+        assert!(real.guard.as_ref().unwrap().tripped().is_some());
+        // the simulator reaches its target in one step: the check of the jump is left off for it
+        let mut sim = wrap(after_a_jump(), true, &cfg);
+        assert!(sim.controller.status().is_ok());
+        assert!(sim.controller.status().is_ok());
+        assert_eq!(sim.guard.as_ref().unwrap().tripped(), None);
+    }
+
+    #[test]
+    fn the_options_without_a_port_give_the_simulator_in_the_guard() {
+        let l = guarded_for_with(
+            &Options::default(),
+            Duration::from_millis(10),
+            &GuardCfg::default(),
+        )
+        .unwrap();
+        assert!(l.guard.is_some());
     }
 }

@@ -13,7 +13,7 @@
 #
 # life is the minutes of work a tool is good for and used the minutes it has worked already (both from 0 to 100000). With a life, the
 # report says a tool that is worn out, one that the program would wear out and one with a fifth of its life left or less. Add the time
-# of every job to used by hand: the program never writes this file.
+# of every job to used by hand: the program writes only the length of a tool, when you press the button of the tool setter panel.
 tool = 1 | name=Engraving V bit | diameter=0.2 | flutes=1
 tool = 2 | name=End mill 1 mm | diameter=1 | flutes=2 | reach=6 | life=240 | used=0
 tool = 3 | name=End mill 2 mm | diameter=2 | flutes=2

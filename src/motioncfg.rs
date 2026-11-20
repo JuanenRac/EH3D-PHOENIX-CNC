@@ -47,6 +47,8 @@ impl Default for PlannerCfg {
 /// How the guard of the controller behaves.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GuardCfg {
+    /// The controller of the window is wrapped in the guard (off: the window talks to the controller directly, as it did before).
+    pub enabled: bool,
     /// More tries of a read (the status) that got no answer; an order that moves is never tried again whatever this says.
     pub status_retries: u32,
     /// A controller that falls silent while it may be moving is stopped and the machine is refused until the operator resets.
@@ -57,17 +59,22 @@ pub struct GuardCfg {
     /// The jog: one move order at a time (a second one is a stop), and a target not renewed in this many ms leaves the machine still.
     pub jog_one_order: bool,
     pub jog_stale_ms: u64,
+    /// A jog in another axis or the other way while the last one still moves cancels the move in progress first (off: the order goes as it is,
+    /// and with `jog_one_order` on the guard takes it for a second move order and stops the machine).
+    pub jog_cancel_crossing: bool,
 }
 
 impl Default for GuardCfg {
     fn default() -> Self {
         GuardCfg {
+            enabled: true,
             status_retries: 2,
             stop_on_silence: true,
             check_position: true,
             max_jump_mm: 250.0,
             jog_one_order: true,
             jog_stale_ms: 300,
+            jog_cancel_crossing: true,
         }
     }
 }
@@ -106,7 +113,7 @@ impl Default for ImportCfg {
 }
 
 /// Where the tool setter is and how it is touched.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SetterCfg {
     /// The machine position of the setter (X, Y) and the height it is touched from (Z), in mm.
     pub x_mm: f64,
@@ -243,12 +250,14 @@ impl MotionCfg {
             "arcs" => p.arcs = flag(v)?,
             "arc_tolerance" => p.arc_tolerance_mm = ranged(v, 0.0001, 5.0)?,
             "lookahead" => p.lookahead = ranged(v, 1.0, 4096.0)? as usize,
+            "guard" => g.enabled = flag(v)?,
             "guard_status_retries" => g.status_retries = ranged(v, 0.0, 10.0)? as u32,
             "guard_stop_on_silence" => g.stop_on_silence = flag(v)?,
             "guard_check_position" => g.check_position = flag(v)?,
             "guard_max_jump" => g.max_jump_mm = ranged(v, 0.1, 100_000.0)?,
             "jog_one_order" => g.jog_one_order = flag(v)?,
             "jog_stale_ms" => g.jog_stale_ms = ranged(v, 20.0, 60_000.0)? as u64,
+            "jog_cancel_crossing" => g.jog_cancel_crossing = flag(v)?,
             "import_max_bytes" => i.max_bytes = ranged(v, 1024.0, 268_435_456.0)? as u64,
             "import_max_points" => i.max_points = ranged(v, 16.0, 10_000_000.0)? as usize,
             "import_depth" => i.depth_mm = ranged(v, 0.001, 1000.0)?,
@@ -294,6 +303,7 @@ impl MotionCfg {
         t.push_str(&format!("arcs = {}\n", f(p.arcs)));
         t.push_str(&format!("arc_tolerance = {}\n", p.arc_tolerance_mm));
         t.push_str(&format!("lookahead = {}\n", p.lookahead));
+        t.push_str(&format!("guard = {}\n", f(g.enabled)));
         t.push_str(&format!("guard_status_retries = {}\n", g.status_retries));
         t.push_str(&format!(
             "guard_stop_on_silence = {}\n",
@@ -303,6 +313,10 @@ impl MotionCfg {
         t.push_str(&format!("guard_max_jump = {}\n", g.max_jump_mm));
         t.push_str(&format!("jog_one_order = {}\n", f(g.jog_one_order)));
         t.push_str(&format!("jog_stale_ms = {}\n", g.jog_stale_ms));
+        t.push_str(&format!(
+            "jog_cancel_crossing = {}\n",
+            f(g.jog_cancel_crossing)
+        ));
         t.push_str(&format!("import_max_bytes = {}\n", i.max_bytes));
         t.push_str(&format!("import_max_points = {}\n", i.max_points));
         t.push_str(&format!("post_scripts = {}\n", f(i.post_scripts)));
@@ -339,6 +353,11 @@ mod tests {
         assert_eq!(c, MotionCfg::default());
         // the safe options start on and the unsafe one (rebuilding arcs) starts off
         assert!(c.guard.stop_on_silence && c.guard.check_position && c.guard.jog_one_order);
+        assert!(c.guard.enabled, "the guard starts on");
+        assert!(
+            c.guard.jog_cancel_crossing,
+            "crossing jogs are cancelled by default"
+        );
         assert!(!c.planner.arcs && c.setter.confirm);
         let (back, problems) = MotionCfg::parse(&c.to_text());
         assert!(problems.is_empty(), "{problems:?}");
@@ -368,6 +387,31 @@ mod tests {
         let lines: Vec<usize> = p.iter().map(|p| p.line).collect();
         assert_eq!(lines, vec![5, 6, 7, 8, 9]);
         assert_eq!(p[4].why, Why::Repeated);
+    }
+
+    #[test]
+    fn the_guard_has_a_switch_that_starts_on_and_a_wrong_value_is_named() {
+        let (c, p) = MotionCfg::parse("guard = off\n");
+        assert!(p.is_empty() && !c.guard.enabled);
+        // the other options of the guard stay as they were
+        assert!(c.guard.stop_on_silence && c.guard.jog_one_order);
+        for on in ["on", "yes", "true", "1"] {
+            assert!(MotionCfg::parse(&format!("guard = {on}\n")).0.guard.enabled);
+        }
+        let (c, p) = MotionCfg::parse("jog_cancel_crossing = off\n");
+        assert!(p.is_empty() && !c.guard.jog_cancel_crossing && c.guard.jog_one_order);
+        let (c, p) = MotionCfg::parse("guard = maybe\n");
+        assert!(
+            c.guard.enabled,
+            "a value that cannot be used keeps the default, which is on"
+        );
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].why, Why::OnOff);
+        // written and read back
+        let mut off = MotionCfg::default();
+        off.guard.enabled = false;
+        assert!(off.to_text().contains("guard = off\n"));
+        assert_eq!(MotionCfg::parse(&off.to_text()).0, off);
     }
 
     #[test]
