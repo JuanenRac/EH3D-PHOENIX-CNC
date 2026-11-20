@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - **The pictures of the window are taken again with the newest build:** every picture of `images/screens/` comes from the Windows 64 bits program of the latest release, and the README files show two new ones, the machine window and the tool changer section of the settings.
+- **The controller layer reads GRBL and grblHAL and fails closed:** `src/dialect.rs` reads the build (`$I`), the settings (`$$`) and the state of the parser (`$G`) and tells GRBL from grblHAL; `src/guard.rs` wraps a controller and fails closed (a move is never sent twice, a controller that falls silent while it may be moving is stopped and the machine is refused until the operator resets, a second move order while one is active is a stop, a jog target that is not renewed in time leaves the machine still, and a position that is not a number or that jumps is not believed), each rule with a switch that starts on; `src/faulty.rs` is a controller that goes wrong on purpose (silence, busy, an error at a line, a false position) to test it; the alarms 1 to 9 and fifteen errors of GRBL have their texts in the eight languages (`src/ctltext.rs`, `src/problem.rs`); the values are in `phoenix-cnc-motion.txt` next to the settings file (`examples/motion.txt` is the model). Only simulated controllers: nothing was tried on a machine.
 
 ## [0.2.2] - Shared server panel, machine window with emergency stop, holder and tool life checks, restart from a line and machine templates
 
