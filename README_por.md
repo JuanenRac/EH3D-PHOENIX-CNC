@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-869-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-916-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 869 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
+**Verificação de honestidade - o que funciona hoje:** um programa em Rust com uma janela (`phoenix-cnc`) que comanda uma máquina **simulada**: mostra a posição da máquina (peça e máquina), move-a à mão com um teclado de jog, põe o zero, faz a referência, aceita os comandos escritos pelo operador, executa um programa G-code linha a linha (com pausa, paragem e paragem de emergência), desenha a trajetória do programa na mesa com as linhas feitas marcadas e pára no que o controlador recusa. A janela fala 37 idiomas e tem onze temas. A interface de controladores (`eh3d-controller`, no EH3D-COMMON) tem o GRBL escrito contra uma linha simulada e lista as outras famílias como ainda sem controlador. 916 testes correm num computador. **Nada aqui foi executado numa máquina real**, só se abre uma porta série para GRBL e uma ligação de rede só ao enviar um programa ao servidor, e os arcos e os outros códigos o simulador nem os desenha nem os executa.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versão | `0.2.2` |
 | Maturidade | Funcional |
-| Testes | 869 |
+| Testes | 916 |
 | Tecnologias | Rust |
 | Em hardware real | Não: por defeito comanda uma máquina simulada; um controlador GRBL real (`--grbl`) nunca foi experimentado |
 
@@ -47,7 +47,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 | Biblioteca base | 🟡 | Um crate de Rust que reexporta `scene`, `texts` e `theme` do `eh3d-view` com o nome deste programa; precisa da pasta do EH3D-COMMON ao lado. |
 | Cena e vistas | 🟡 | Escrita e testada no EH3D-COMMON; a janela deste programa desenha a trajetória de um programa na mesa e a posição da ferramenta (vista num computador). |
 | Temas e textos | 🟡 | Onze temas e as palavras da interface em 37 idiomas, vistos na janela deste programa. |
-| Testes | 🟡 | Passam 869 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
+| Testes | 🟡 | Passam 916 testes num computador (`cargo test --features gui`): a sessão (jog, zero, referência, um programa, pausa, alarme, paragem de emergência), a trajetória de um programa e a linha de comandos; o controlador simulado é testado no EH3D-COMMON. |
 | Janela e jog | 🟡 | Funciona num computador com o controlador simulado: posição, teclado de jog, passos, avanço, referência, zero, desbloqueio, uma linha de comandos e um registo; sem máquina real. |
 | Controlo de máquina | 🟠 | Só o simulador: um programa corre linha a linha com pausa, paragem e paragem de emergência; ainda não se liga nenhum controlador real a partir daqui. |
 | Documentação | 🟡 | README em oito idiomas, as duas imagens, três programas de exemplo e o changelog. |
@@ -55,11 +55,12 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. Esc
 ## 🎯 Visão geral
 
 * A **janela** (`src/gui.rs`, `phoenix-cnc`): a posição da máquina (peça e máquina), um teclado de jog com os seus passos e avanço, referência, zero e desbloqueio, a paragem de emergência, uma linha de comandos com o seu registo e o programa com a sua trajetória na mesa.
+* A **janela acoplável** (`src/gui/shell.rs`, `src/panels.rs` e a moldura `eh3d-dock` do EH3D-COMMON): doze painéis que se podem tirar, repor, mover, agrupar em separadores, flutuar e recolher contra uma margem (a trajetória, o controlo manual, o estado da máquina, o programa, os ficheiros, a tabela de ferramentas, o sensor de ferramenta, a sonda e o mapa de alturas, a importação, o planeamento e o tempo, o relatório e a consola), quatro espaços de trabalho conforme a tarefa (Preparar, Executar, Rever e Compacto), a barra de menus e uma disposição que fica guardada no ficheiro de definições (linhas `dock.*`), com os textos em oito idiomas. O controlador vai dentro do guarda (`guard = off` no ficheiro de movimento tira-o): a janela dá-lhe a hora em cada fotograma, mostra porque parou a máquina e oferece a luz verde, e um jog que cruza outro cancela primeiro o movimento em curso, de modo que a regra de uma ordem de movimento de cada vez não dispara com um par normal de jogs. O painel de planeamento mostra o tempo com e sem antecipação, o painel de importação lê HPGL, DXF ou SVG com um pós-processador à escolha, e o painel do sensor de ferramenta só leva a máquina ao sensor depois de o operador confirmar que está no sítio e livre, e só escreve o comprimento na tabela de ferramentas quando lhe é pedido. Desenhada e testada sem janela (fotogramas do egui nos testes); ainda não vista num ecrã real nem numa máquina real.
 * A **sessão** (`src/session.rs`): o que o programa faz com qualquer controlador de `eh3d-controller`: jog, zero, referência, enviar uma linha, executar um programa linha a linha, pausa, paragem e os alarmes; é testada com o controlador simulado.
 * A **trajetória de um programa** (`src/gcode.rs`): os movimentos retos (`G0`, `G1`, absolutos ou relativos, em mm ou polegadas) desenhados antes de executar o programa; os arcos não se desenham.
 * O **controlador simulado** (`eh3d_controller::sim`, no EH3D-COMMON): uma máquina em memória com limites de curso que dão alarme; as famílias de controladores do mercado estão listadas em `eh3d-controller`, o GRBL é a primeira escrita e as outras aparecem como ainda sem controlador.
 * Os **temas e as palavras** de `eh3d-view`: Forge (o predefinido), Neon Arcade, Glass Pro, o cinzento clássico do Windows e um que segue o Windows, e a interface em inglês, espanhol, italiano, alemão, francês, português, chinês e japonês. O que será: um programa para furar, fresar e fazer CNC 2D e 3D sobre os motores do EH3D-DRILLPRO e do EH3D-ROUTEPRO; essa parte ainda não existe.
-* Os **menus, as definições e os ficheiros**: os menus Ficheiro, Ver, Programa, Máquina e Ajuda com as entradas habituais (abrir, recentes, guardar, editar, os zeros, as posições guardadas, o fuso e o refrigerante); uma janela de definições (unidades, idioma, onze temas, limites de curso, jog) que se recorda entre execuções; e as janelas Abrir e Guardar da suite (`eh3d-filedialog`: locais, ordenação, filtros, a extensão de um ficheiro guardado e a pergunta antes de substituir).
+* Os **menus, as definições e os ficheiros**: os menus Ficheiro, Editar, Ver, Programa, Máquina, Janela e Ajuda com as entradas habituais (abrir, recentes, guardar, editar, os zeros, as posições guardadas, o fuso e o refrigerante); uma janela de definições (unidades, idioma, onze temas, limites de curso, jog) que se recorda entre execuções; e as janelas Abrir e Guardar da suite (`eh3d-filedialog`: locais, ordenação, filtros, a extensão de um ficheiro guardado e a pergunta antes de substituir).
 * **GRBL numa porta série:** compilado com `--features serial`, `phoenix-cnc --grbl PORTA[@BAUD]` comanda um controlador GRBL (115200 baud por omissão) em vez do simulador e `phoenix-cnc --ports` lista as portas série; uma compilação sem a funcionalidade, ou uma porta que não abre, di-lo e termina. Experimentado apenas contra um controlador guionizado, nunca contra um real. Com um controlador real, `--start` (abrir o ficheiro e iniciá-lo quando a janela abre) é recusado a menos que `--start-real` também seja dado, e `--start-real` sozinho é um erro; `busy_wait` no ficheiro de definições (4 horas por omissão) é o máximo que uma linha espera pela resposta enquanto a máquina diz que está a trabalhar, e a paragem é ouvida entretanto.
 * **Uma janela que segue o ecrã:** abre maximizada e, de 720p a 1080p e até ecrãs maiores e mais largos, tudo cresce ou encolhe com ela.
 * **Continuar após uma falha:** enquanto um programa corre, a linha alcançada é guardada num ficheiro pequeno; se a janela, o computador ou a ligação cair, o arranque seguinte pergunta se continua a partir dessa linha ou se deixa. Nada é enviado ao controlador até o operador responder.
@@ -170,7 +171,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testes
 
-`cargo test --features gui` executa 869 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
+`cargo test --features gui` executa 916 testes: a sessão (jog e zero, um programa linha a linha, pausa e continuar, uma linha recusada, a paragem de emergência e o alarme, o registo dos comandos, a referência), a trajetória de um programa e a linha de comandos; a vista e o controlador simulado são testados no EH3D-COMMON. A CI também executa `cargo fmt --check` e `cargo clippy` com avisos como erros, e `python -I tools/ci_validate.py` verifica o manifesto, as versões, o changelog e os oito README.
 
 ## 🏗️ Compilação e publicação
 
@@ -189,7 +190,7 @@ A versão está em `Cargo.toml` e em `eh3d.project.json`, e cada versão tem a s
 EH3D-PHOENIX-CNC/
 ├── src/
 │   ├── lib.rs                                   os módulos e a vista do eh3d-view reexportada com o nome deste programa
-│   ├── gui.rs                                   a janela: posição, jog, programa, trajetória, comandos e registo
+│   ├── gui.rs                                   a janela: estado, barras, blocos de posição e jog, início e fim de cada fotograma
 │   ├── session.rs                               o que se faz com um controlador: jog, zero, referência, um programa linha a linha, pausa, paragem, alarmes
 │   ├── queue.rs                                 a fila: ordem, estado, passagens, saltar, remover, parar ao falhar, ficheiro de estado
 │   ├── progcheck.rs                             segunda verificação de um programa: unidades, desvios, apalpação, planos
@@ -244,36 +245,41 @@ EH3D-PHOENIX-CNC/
 │   ├── dialect.rs                               os relatórios do GRBL e do grblHAL como dados: versão, definições $$ e estado do parser
 │   ├── ctltext.rs                               alarmes, erros e mensagens do guarda por número, em oito idiomas
 │   ├── faulty.rs                                um controlador que falha de propósito: silêncio, ocupado, erro numa linha, posição falsa
-│   ├── guard.rs                                 o guarda seguro: sem reenvio de movimentos, paragem no silêncio, um jog de cada vez
+│   ├── guard.rs                                 o guarda seguro e o acesso a que a janela dá a hora
 │   ├── lookahead.rs                             o planeador em papel: velocidades nos cantos, aceleração por eixo, perfis e tempo
 │   ├── import.rs                                leitores limitados de HPGL, DXF e SVG, e o G-code que corta ao longo deles
 │   ├── post.rs                                  pós-processadores como regras num ficheiro de texto: cabeçalho, rodapé, palavras, números
 │   ├── toolsetter.rs                            o sensor de ferramenta: comprimento medido por toque e escrito na tabela de ferramentas
 │   ├── motioncfg.rs                             o ficheiro de movimento: valores do planeador, do guarda, dos importadores e do sensor
+│   ├── panels.rs                                os painéis, espaços de trabalho e menus da janela como dados
+│   ├── paneltext.rs                             as palavras dos novos painéis e entradas de menu em oito idiomas
+│   ├── workflow.rs                              o que os painéis decidem: tempo com/sem antecipação, importação, regras do sensor
 │   ├── notes.rs                                 textos dos importadores e da ferramenta do planeador em oito idiomas
 │   ├── problem.rs                               o que está errado numa linha de um ficheiro de movimento ou de pós-processador
 │   ├── bin/phoenix-cnc.rs                       o programa que abre a janela
 │   ├── server.rs                                a ligação ao servidor EH3D: enviar, acompanhar, pausar, parar
 │   ├── serverlink.rs                            as definições da ligação ao servidor sobre o painel da suite, e o início de sessão que o trabalho usa
 │   ├── settings.rs                              o que se recorda entre execuções
-│   ├── gui/dialogs.rs                           menus, definições, Abrir, Guardar, editor
+│   ├── gui/dialogs.rs                           definições, Abrir, Guardar, editor, Acerca de
 │   ├── gui/prefs.rs                             as secções de definições das ferramentas: verificações, sonda, fila, trocador, materiais
 │   ├── gui/remote.rs                            o programa no servidor: Iniciar, Pausa, Parar e retomar
 │   ├── gui/machine.rs                           a máquina no servidor: posição, movimento, paragem de emergência e libertação
-│   ├── gui/views.rs                             o centro da janela: a trajetória vista de cima ou em 3D, com a ferramenta
+│   ├── gui/views.rs                             o painel visualizador: a trajetória vista de cima ou em 3D, com a ferramenta
+│   ├── gui/shell.rs                             a janela: os painéis na moldura da suite, os menus e os comandos
+│   ├── gui/dockpanels.rs                        os painéis: estado, jog, ficheiros, programa, consola, ferramentas, sonda, importar, tempo, relatório
 │   ├── gui/pathview.rs                          a linha do visualizador: cores, camadas, ampliar, linha clicada
 │   ├── gui/editwin.rs                           a janela do editor: números de linha, procurar, notas, guardar
 │   ├── gui/xform.rs                             a janela Transformar e Anular do menu Programa
 │   ├── gui/lines.rs                             a janela de marcadores e o arranque a partir de uma linha, com a sua pergunta
 │   ├── gui/summary.rs                           a janela de resumo antes do arranque e a lista de teclas
-│   ├── gui/probe.rs                             a sonda na janela: perguntas e entradas do mapa de alturas
+│   ├── gui/probe.rs                             a sonda na janela: perguntas antes de mover e palavras do mapa de alturas
 │   ├── gui/numfield.rs                          um número definido com os botões menos e mais ou escrevendo-o
-│   ├── gui/keys.rs                              as teclas do teclado e a tabela que os menus e a lista de teclas leem
+│   ├── gui/keys.rs                              as teclas do teclado e a tabela que a lista de teclas lê
 │   ├── gui/queue.rs                             a fila na janela: passagens, repetições, uma pergunta ou uma espera entre passagens
 │   ├── gui/check.rs                             a janela de verificação: o que as verificações encontram, linha a linha
 │   ├── gui/keepout.rs                           o editor das caixas proibidas e a recusa de um programa que entre numa delas
 │   ├── gui/sim.rs                               estatísticas e simulação: a ferramenta na trajetória, a linha, o tempo que falta
-│   ├── gui/macros.rs                            o menu de macros e a pergunta antes de executar uma macro
+│   ├── gui/macros.rs                            a lista de macros e a pergunta antes de executar uma macro
 │   ├── gui/files.rs                             o mapa de alturas e o registo da sessão como ficheiros, pelas janelas de ficheiros
 │   └── gui/icons.rs                             os desenhos dos botões, traçados com linhas, e o botão da barra de ferramentas
 ├── examples/                                    três programas G-code de exemplo, de um quadrado a uma espiral longa

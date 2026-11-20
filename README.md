@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-869-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-916-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 869 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 916 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.2.2` |
 | Maturity | Functional |
-| Tests | 869 |
+| Tests | 916 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
-| Tests | 🟡 | 869 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 916 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -55,11 +55,12 @@ Each line is one part of this repository and the light says how far it is today.
 ## 🎯 Overview
 
 * The **window** (`src/gui.rs`, `phoenix-cnc`): the position of the machine (work and machine), a jog pad with its steps and feed, home, zero and unlock, the emergency stop, a line of commands with its log, and the program with its path on the table.
+* The **docking window** (`src/gui/shell.rs`, `src/panels.rs` and the frame `eh3d-dock` of EH3D-COMMON): twelve panels that can be taken away, put back, moved, put in tabs, floated and folded into an edge (the path, the hand control, the state of the machine, the program, the files, the table of tools, the tool setter, the probe and the height map, the import, the planning and time, the report and the console), four workspaces for the task (Prepare, Run, Review and Compact), the menu bar and an arrangement that is kept in the settings file (`dock.*` lines), with its words in eight languages. The controller is wrapped in the guard (`guard = off` in the motion file takes it away): the window gives it the time at every frame, shows why it stopped the machine and offers the all clear, and a jog that crosses another one cancels the move in progress first, so the rule of one move order at a time does not fire on a normal pair of jogs. The planning panel shows the time with and without the look-ahead, the import panel reads HPGL, DXF or SVG through a post-processor of your choice, and the tool setter panel sends the machine to the setter only after the operator confirms that it is there and clear, and writes the length into the table of tools only when asked. Drawn and tested without a window (frames of egui in the tests); not yet seen on a real screen or on a real machine.
 * The **session** (`src/session.rs`): what the program does with any controller of `eh3d-controller`: jog, zero, home, send a line, run a program line by line, pause, stop and the alarms; it is tested on the simulated controller.
 * The **path of a program** (`src/gcode.rs`): the straight moves (`G0`, `G1`, absolute or relative, in mm or inches) drawn before the program runs; arcs are not drawn.
 * The **simulated controller** (`eh3d_controller::sim`, in EH3D-COMMON): a machine in memory with travel limits that raise an alarm; the controller families of the market are listed in `eh3d-controller`, GRBL is the first one written and the others show as not driven yet.
 * The **themes and the words** of `eh3d-view`: Forge (the default), Neon Arcade, Glass Pro, the classic Windows grey and one that follows Windows, and the interface in English, Spanish, Italian, German, French, Portuguese, Chinese and Japanese. What it will be: one program to drill, to route and to do 2D and 3D CNC work on the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO; that part does not exist yet.
-* The **menus, the settings and the files**: the menus File, View, Program, Machine and Help with the usual entries (open, recent files, save, edit, the zeros, the stored positions, the spindle and the coolant); a settings window (units, language, eleven themes, travel limits, jog) that is kept between runs; and the Open and Save windows of the suite (`eh3d-filedialog`: places, sorting, filters, the extension of a saved file and the question before a file is replaced).
+* The **menus, the settings and the files**: the menus File, Edit, View, Program, Machine, Window and Help with the usual entries (open, recent files, save, edit, the zeros, the stored positions, the spindle and the coolant); a settings window (units, language, eleven themes, travel limits, jog) that is kept between runs; and the Open and Save windows of the suite (`eh3d-filedialog`: places, sorting, filters, the extension of a saved file and the question before a file is replaced).
 * **GRBL on a serial port:** built with `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` drives a GRBL controller (115200 baud by default) instead of the simulator and `phoenix-cnc --ports` lists the serial ports; a build without the feature, or a port that does not open, says so and leaves. It has been tried only against a scripted controller, never against a real one. With a real controller, `--start` (open the file and start it as the window opens) is refused unless `--start-real` is also given, and `--start-real` alone is an error; `busy_wait` in the settings file (4 hours by default) is the most a line waits for its answer while the machine says it is working, and the stop is heard meanwhile.
 * **A window that follows the screen:** it opens maximized, and from 720p to 1080p and on to larger and wider screens everything grows or shrinks with it.
 * **Going on after a failure:** while a program runs, the line it has reached is saved to a small file; if the window, the computer or the link goes down, the next start asks whether to go on from that line or to leave it. Nothing is sent to the controller until the operator answers.
@@ -170,7 +171,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 869 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 916 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -189,7 +190,7 @@ The version lives in `Cargo.toml` and in `eh3d.project.json`, and each version h
 EH3D-PHOENIX-CNC/
 ├── src/
 │   ├── lib.rs                                   the modules, and the view of eh3d-view re-exported under this program's name
-│   ├── gui.rs                                   the window: position, jog, program, path, commands and log
+│   ├── gui.rs                                   the window: state, top bars, position and jog blocks, start and end of each frame
 │   ├── session.rs                               what is done with a controller: jog, zero, home, a program, pause, stop, alarms
 │   ├── queue.rs                                 the queue: order, state, runs, skip, remove, reorder, stop on failure, state file
 │   ├── progcheck.rs                             second check of a program: units, offsets, probing, planes
@@ -244,36 +245,41 @@ EH3D-PHOENIX-CNC/
 │   ├── dialect.rs                               the reports of GRBL and grblHAL as data: build, $$ settings and the parser state
 │   ├── ctltext.rs                               alarms, errors and guard messages by number in eight languages
 │   ├── faulty.rs                                a controller that goes wrong on purpose: silence, busy, error at a line, false position
-│   ├── guard.rs                                 the guard that fails closed: no resend of a move, stop on silence, one jog order at a time
+│   ├── guard.rs                                 the guard that fails closed, and the handle the window feeds with the time
 │   ├── lookahead.rs                             the planner on paper: corner speeds, acceleration per axis, profiles and the time
 │   ├── import.rs                                bounded readers of HPGL, DXF and SVG, and the G-code that cuts along them
 │   ├── post.rs                                  post-processors as rules in a text file: header, footer, words, numbers, decimals
 │   ├── toolsetter.rs                            the tool setter: tool length measured by touch, written to the table of tools
 │   ├── motioncfg.rs                             the motion file: planner, guard, importers and tool setter values
+│   ├── panels.rs                                the panels, workspaces and menus of the window as data
+│   ├── paneltext.rs                             the words of the new panels and menu entries in eight languages
+│   ├── workflow.rs                              what the panels decide: time with and without look-ahead, drawing import, setter rules
 │   ├── notes.rs                                 words of the importers and the planner tool in eight languages
 │   ├── problem.rs                               what is wrong with a line of a motion or post file, said in eight languages
 │   ├── bin/phoenix-cnc.rs                       the program that opens the window
 │   ├── server.rs                                the link to the EH3D server: send, follow, hold, stop
 │   ├── serverlink.rs                            the settings of the server link over the panel of the suite, and the login the job uses
 │   ├── settings.rs                              what is kept between runs
-│   ├── gui/dialogs.rs                           menus, settings, Open, Save, editor
+│   ├── gui/dialogs.rs                           settings, Open, Save, editor, About
 │   ├── gui/prefs.rs                             the settings sections of the program tools: checks, probe, queue, tool changer, materials
 │   ├── gui/remote.rs                            the program on the server: Start, Pause, Stop and going on
 │   ├── gui/machine.rs                           the machine on the server: position, jog, emergency stop and release
-│   ├── gui/views.rs                             the centre of the window: the path from above or in 3D, with the tool
+│   ├── gui/views.rs                             the viewer panel: the path from above or in 3D, with the tool
+│   ├── gui/shell.rs                             the window: the panels in the frame of the suite, the menus and the commands
+│   ├── gui/dockpanels.rs                        the panels: state, jog, files, program, console, tools, probe, import, time, report
 │   ├── gui/pathview.rs                          the row of the viewer: colours, tool layers, zoom, the clicked line
 │   ├── gui/editwin.rs                           the editor window: line numbers, find and replace, notes, Save
 │   ├── gui/xform.rs                             the Transform window and Undo of the Program menu
 │   ├── gui/lines.rs                             the Bookmarks window and the start from a line, with its question
 │   ├── gui/summary.rs                           the summary window before a start and the list of keys
-│   ├── gui/probe.rs                             the probe in the window: questions and height-map entries
+│   ├── gui/probe.rs                             the probe in the window: the questions before it moves and the height-map words
 │   ├── gui/numfield.rs                          a number set with the minus and plus buttons or by writing it
-│   ├── gui/keys.rs                              the keys of the keyboard and the table the menus and the list of keys read
+│   ├── gui/keys.rs                              the keys of the keyboard and the table the list of keys reads
 │   ├── gui/queue.rs                             the queue in the window: runs, repeats, a question or a wait between runs
 │   ├── gui/check.rs                             the Check window: what the checkers find, line by line
 │   ├── gui/keepout.rs                           the editor of the keep-out boxes and the refusal of a program that enters one
 │   ├── gui/sim.rs                               statistics and simulation: the tool on the path, the line, the time left
-│   ├── gui/macros.rs                            the Macros menu and the question before a macro runs
+│   ├── gui/macros.rs                            the list of macros and the question before a macro runs
 │   ├── gui/files.rs                             the height map and the session log as files, through the file windows
 │   └── gui/icons.rs                             the pictures of the buttons, drawn with lines, and the toolbar button
 ├── examples/                                    three sample G-code programs, from a square to a long spiral

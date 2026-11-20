@@ -49,14 +49,14 @@
         {
           "name": "gui.rs",
           "desc": {
-            "en": "the window: position, jog, program, path, commands and log",
-            "es": "la ventana: posición, jog, programa, trayectoria, órdenes y registro",
-            "de": "das Fenster: Position, Jog, Programm, Bahn, Befehle und Protokoll",
-            "fr": "la fenêtre : position, jog, programme, trajectoire, commandes et journal",
-            "it": "la finestra: posizione, jog, programma, percorso, comandi e registro",
-            "ja": "ウィンドウ：位置、ジョグ、プログラム、経路、コマンド、ログ",
-            "zh": "窗口：位置、点动、程序、路径、命令和日志",
-            "pt": "a janela: posição, jog, programa, trajetória, comandos e registo"
+            "en": "the window: state, top bars, position and jog blocks, start and end of each frame",
+            "es": "la ventana: estado, barras, bloques de posición y jog, inicio y fin de cada fotograma",
+            "de": "das Fenster: Zustand, Leisten, Positions- und Jog-Blöcke, Anfang und Ende jedes Bildes",
+            "fr": "la fenêtre : état, barres, blocs position et jog, début et fin de chaque image",
+            "it": "la finestra: stato, barre, blocchi posizione e jog, inizio e fine di ogni fotogramma",
+            "ja": "ウィンドウ：状態、バー、位置とジョグのブロック、各フレームの開始と終了",
+            "zh": "窗口：状态、工具栏、位置与点动区块、每帧的开始与结束",
+            "pt": "a janela: estado, barras, blocos de posição e jog, início e fim de cada fotograma"
           }
         },
         {
@@ -764,14 +764,14 @@
         {
           "name": "guard.rs",
           "desc": {
-            "en": "the guard that fails closed: no resend of a move, stop on silence, one jog order at a time",
-            "es": "el guardián seguro: no reenvía movimientos, para ante el silencio, un jog a la vez",
-            "de": "der Wächter, der sicher ausfällt: keine Wiederholung von Bewegungen, Stopp bei Stille, ein Jog",
-            "fr": "le garde sûr : pas de renvoi d'un mouvement, arrêt sur silence, un jog à la fois",
-            "it": "la guardia sicura: nessun rinvio dei movimenti, stop al silenzio, un jog alla volta",
-            "ja": "安全側に倒れるガード：移動の再送なし、無応答で停止、ジョグ命令は一度に1つ",
-            "zh": "故障即安全的守卫：运动命令绝不重发，无应答即停止，一次只允许一个点动命令",
-            "pt": "o guarda seguro: sem reenvio de movimentos, paragem no silêncio, um jog de cada vez"
+            "en": "the guard that fails closed, and the handle the window feeds with the time",
+            "es": "el guardián seguro y el enlace al que la ventana da la hora",
+            "de": "der sichere Wächter und sein Zugriff, dem das Fenster die Zeit gibt",
+            "fr": "le garde sûr et son accès, auquel la fenêtre donne l'heure",
+            "it": "la guardia sicura e il suo accesso, a cui la finestra dà l'ora",
+            "ja": "安全側に倒れるガードと、ウィンドウが時刻を渡すハンドル",
+            "zh": "故障即安全的守卫，及窗口为其提供时间的句柄",
+            "pt": "o guarda seguro e o acesso a que a janela dá a hora"
           }
         },
         {
@@ -837,6 +837,45 @@
             "ja": "モーションファイル：プランナー、ガード、インポーター、ツールセッターの値",
             "zh": "运动文件：规划器、守卫、导入器和对刀仪的数值",
             "pt": "o ficheiro de movimento: valores do planeador, do guarda, dos importadores e do sensor"
+          }
+        },
+        {
+          "name": "panels.rs",
+          "desc": {
+            "en": "the panels, workspaces and menus of the window as data",
+            "es": "los paneles, espacios de trabajo y menús de la ventana como datos",
+            "de": "Panels, Arbeitsbereiche und Menüs des Fensters als Daten",
+            "fr": "les panneaux, espaces de travail et menus de la fenêtre en données",
+            "it": "pannelli, aree di lavoro e menu della finestra come dati",
+            "ja": "ウィンドウのパネル、ワークスペース、メニューのデータ",
+            "zh": "窗口的面板、工作区和菜单数据",
+            "pt": "os painéis, espaços de trabalho e menus da janela como dados"
+          }
+        },
+        {
+          "name": "paneltext.rs",
+          "desc": {
+            "en": "the words of the new panels and menu entries in eight languages",
+            "es": "las palabras de los paneles y entradas de menú nuevos en ocho idiomas",
+            "de": "die Wörter der neuen Panels und Menüeinträge in acht Sprachen",
+            "fr": "les mots des nouveaux panneaux et entrées de menu en huit langues",
+            "it": "le parole dei nuovi pannelli e voci di menu in otto lingue",
+            "ja": "新しいパネルとメニュー項目の8言語の文言",
+            "zh": "新面板和菜单项的八种语言文字",
+            "pt": "as palavras dos novos painéis e entradas de menu em oito idiomas"
+          }
+        },
+        {
+          "name": "workflow.rs",
+          "desc": {
+            "en": "what the panels decide: time with and without look-ahead, drawing import, setter rules",
+            "es": "lo que deciden los paneles: tiempo con y sin anticipación, importación, reglas del medidor",
+            "de": "was die Panels entscheiden: Zeit mit/ohne Vorausschau, Zeichnungsimport, Sensorregeln",
+            "fr": "ce que décident les panneaux : temps avec/sans anticipation, import, règles du capteur",
+            "it": "ciò che decidono i pannelli: tempo con/senza anticipo, importazione, regole del sensore",
+            "ja": "パネルの判断：先読みあり/なしの時間、図面インポート、ツールセッターの規則",
+            "zh": "面板的判断：有无前瞻的时间、图纸导入、对刀仪规则",
+            "pt": "o que os painéis decidem: tempo com/sem antecipação, importação, regras do sensor"
           }
         },
         {
@@ -920,14 +959,14 @@
         {
           "name": "gui/dialogs.rs",
           "desc": {
-            "en": "menus, settings, Open, Save, editor",
-            "es": "menús, ajustes, Abrir, Guardar, editor",
-            "de": "Menüs, Einstellungen, Öffnen, Speichern",
-            "fr": "menus, réglages, Ouvrir, Enregistrer",
-            "it": "menu, impostazioni, Apri, Salva, editor",
-            "ja": "メニュー、設定、開く、保存、編集",
-            "zh": "菜单、设置、打开、保存、编辑器",
-            "pt": "menus, definições, Abrir, Guardar, editor"
+            "en": "settings, Open, Save, editor, About",
+            "es": "ajustes, Abrir, Guardar, editor, Acerca de",
+            "de": "Einstellungen, Öffnen, Speichern, Editor, Über",
+            "fr": "réglages, Ouvrir, Enregistrer, éditeur, À propos",
+            "it": "impostazioni, Apri, Salva, editor, Informazioni",
+            "ja": "設定、開く、保存、編集、バージョン情報",
+            "zh": "设置、打开、保存、编辑器、关于",
+            "pt": "definições, Abrir, Guardar, editor, Acerca de"
           }
         },
         {
@@ -972,14 +1011,40 @@
         {
           "name": "gui/views.rs",
           "desc": {
-            "en": "the centre of the window: the path from above or in 3D, with the tool",
-            "es": "el centro de la ventana: la trayectoria vista desde arriba o en 3D, con la herramienta",
-            "de": "die Fenstermitte: die Bahn von oben oder in 3D, mit dem Werkzeug",
-            "fr": "le centre de la fenêtre : la trajectoire vue de dessus ou en 3D, avec l'outil",
-            "it": "il centro della finestra: il percorso dall'alto o in 3D, con l'utensile",
-            "ja": "ウィンドウの中央：上から見た、または 3D の経路と工具",
-            "zh": "窗口中央：俯视或 3D 的路径与刀具",
-            "pt": "o centro da janela: a trajetória vista de cima ou em 3D, com a ferramenta"
+            "en": "the viewer panel: the path from above or in 3D, with the tool",
+            "es": "el panel visor: la trayectoria vista desde arriba o en 3D, con la herramienta",
+            "de": "das Betrachter-Panel: die Bahn von oben oder in 3D, mit dem Werkzeug",
+            "fr": "le panneau visionneuse : la trajectoire vue de dessus ou en 3D, avec l'outil",
+            "it": "il pannello visualizzatore: il percorso dall'alto o in 3D, con l'utensile",
+            "ja": "ビューアパネル：上から見た、または 3D の経路と工具",
+            "zh": "查看器面板：俯视或 3D 的路径与刀具",
+            "pt": "o painel visualizador: a trajetória vista de cima ou em 3D, com a ferramenta"
+          }
+        },
+        {
+          "name": "gui/shell.rs",
+          "desc": {
+            "en": "the window: the panels in the frame of the suite, the menus and the commands",
+            "es": "la ventana: los paneles en el marco de la suite, los menús y las órdenes",
+            "de": "das Fenster: die Panels im Rahmen der Suite, die Menüs und die Befehle",
+            "fr": "la fenêtre : les panneaux dans le cadre de la suite, les menus et les commandes",
+            "it": "la finestra: i pannelli nel telaio della suite, i menu e i comandi",
+            "ja": "ウィンドウ：スイートの枠の中のパネル、メニュー、コマンド",
+            "zh": "窗口：套件框架中的面板、菜单和命令",
+            "pt": "a janela: os painéis na moldura da suite, os menus e os comandos"
+          }
+        },
+        {
+          "name": "gui/dockpanels.rs",
+          "desc": {
+            "en": "the panels: state, jog, files, program, console, tools, probe, import, time, report",
+            "es": "los paneles: estado, jog, archivos, programa, consola, herramientas, sonda, importar, tiempo, informe",
+            "de": "die Panels: Zustand, Jog, Dateien, Programm, Konsole, Werkzeuge, Taster, Import, Zeit, Bericht",
+            "fr": "les panneaux : état, jog, fichiers, programme, console, outils, sonde, import, temps, rapport",
+            "it": "i pannelli: stato, jog, file, programma, console, utensili, sonda, importa, tempo, rapporto",
+            "ja": "パネル：状態、ジョグ、ファイル、プログラム、コンソール、工具、プローブ、インポート、時間、レポート",
+            "zh": "各面板：状态、点动、文件、程序、控制台、刀具、探针、导入、时间、报告",
+            "pt": "os painéis: estado, jog, ficheiros, programa, consola, ferramentas, sonda, importar, tempo, relatório"
           }
         },
         {
@@ -1050,14 +1115,14 @@
         {
           "name": "gui/probe.rs",
           "desc": {
-            "en": "the probe in the window: questions and height-map entries",
-            "es": "la sonda en la ventana: preguntas y entradas del mapa de alturas",
-            "de": "der Taster im Fenster: Rückfragen und Höhenkarten-Einträge",
-            "fr": "la sonde dans la fenêtre : questions et entrées de la carte",
-            "it": "la sonda nella finestra: domande e voci della mappa delle altezze",
-            "ja": "ウィンドウ内のプローブ：確認と高さマップの項目",
-            "zh": "窗口中的探针：确认与高度图菜单项",
-            "pt": "a sonda na janela: perguntas e entradas do mapa de alturas"
+            "en": "the probe in the window: the questions before it moves and the height-map words",
+            "es": "la sonda en la ventana: las preguntas antes de moverse y las palabras del mapa",
+            "de": "der Taster im Fenster: Rückfragen vor dem Fahren und Höhenkarten-Wörter",
+            "fr": "la sonde dans la fenêtre : questions avant de bouger et mots de la carte",
+            "it": "la sonda nella finestra: domande prima del movimento e parole della mappa",
+            "ja": "ウィンドウ内のプローブ：動作前の確認と高さマップの文言",
+            "zh": "窗口中的探针：移动前的询问与高度图文字",
+            "pt": "a sonda na janela: perguntas antes de mover e palavras do mapa de alturas"
           }
         },
         {
@@ -1076,14 +1141,14 @@
         {
           "name": "gui/keys.rs",
           "desc": {
-            "en": "the keys of the keyboard and the table the menus and the list of keys read",
-            "es": "las teclas del teclado y la tabla que leen los menús y la lista de teclas",
-            "de": "die Tasten der Tastatur und die Tabelle, die Menüs und Tastenliste lesen",
-            "fr": "les touches du clavier et le tableau que lisent les menus et la liste des touches",
-            "it": "i tasti della tastiera e la tabella che leggono i menu e l'elenco dei tasti",
-            "ja": "キーボードのキーと、メニューとキー一覧が読む表",
-            "zh": "键盘按键以及菜单和按键列表所读取的表",
-            "pt": "as teclas do teclado e a tabela que os menus e a lista de teclas leem"
+            "en": "the keys of the keyboard and the table the list of keys reads",
+            "es": "las teclas del teclado y la tabla que lee la lista de teclas",
+            "de": "die Tasten der Tastatur und die Tabelle, die die Tastenliste liest",
+            "fr": "les touches du clavier et le tableau que lit la liste des touches",
+            "it": "i tasti della tastiera e la tabella che legge l'elenco dei tasti",
+            "ja": "キーボードのキーと、キー一覧が読む表",
+            "zh": "键盘按键以及按键列表所读取的表",
+            "pt": "as teclas do teclado e a tabela que a lista de teclas lê"
           }
         },
         {
@@ -1141,14 +1206,14 @@
         {
           "name": "gui/macros.rs",
           "desc": {
-            "en": "the Macros menu and the question before a macro runs",
-            "es": "el menú de macros y la pregunta antes de ejecutar una macro",
-            "de": "das Makro-Menü und die Rückfrage vor dem Ausführen eines Makros",
-            "fr": "le menu des macros et la question avant de lancer une macro",
-            "it": "il menu delle macro e la domanda prima di eseguirne una",
-            "ja": "マクロメニューと、マクロ実行前の確認",
-            "zh": "宏菜单和运行宏之前的询问",
-            "pt": "o menu de macros e a pergunta antes de executar uma macro"
+            "en": "the list of macros and the question before a macro runs",
+            "es": "la lista de macros y la pregunta antes de ejecutar una macro",
+            "de": "die Makroliste und die Rückfrage vor dem Ausführen eines Makros",
+            "fr": "la liste des macros et la question avant de lancer une macro",
+            "it": "l'elenco delle macro e la domanda prima di eseguirne una",
+            "ja": "マクロ一覧と、マクロ実行前の確認",
+            "zh": "宏列表和运行宏之前的询问",
+            "pt": "a lista de macros e a pergunta antes de executar uma macro"
           }
         },
         {
