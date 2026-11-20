@@ -49,6 +49,11 @@ pub struct Settings {
     pub server_max_answer_mib: u64,
     /// When a program goes on after a stop, also start the spindle and the coolant again as they were (off: the operator starts them).
     pub server_restore_outputs: bool,
+    /// The limits of a jog sent to the machine of the server, the same keys and ranges as the machine of the server (`server_jog_max_mm` 0.01 to 500, `server_jog_max_feed` 1 to 30000),
+    /// and the length above which the window asks before it sends a jog (`server_jog_confirm_mm`, 0 to 500; 0 asks for every jog).
+    pub server_jog_max_mm: f64,
+    pub server_jog_max_feed: f64,
+    pub server_jog_confirm_mm: f64,
     /// When a program goes on after a failure: the Z (work coordinates) the head goes up to before it moves sideways, and the seconds the spindle gets to reach its speed.
     pub resume_safe_z_mm: f64,
     pub resume_spindle_wait_s: f64,
@@ -127,6 +132,9 @@ impl Default for Settings {
             server_mdns: false,
             server_max_answer_mib: 8,
             server_restore_outputs: false,
+            server_jog_max_mm: crate::cncroutes::DEFAULT_JOG_MAX_MM,
+            server_jog_max_feed: crate::cncroutes::DEFAULT_JOG_MAX_FEED,
+            server_jog_confirm_mm: crate::cncroutes::DEFAULT_CONFIRM_MM,
             resume_safe_z_mm: 5.0,
             resume_spindle_wait_s: 3.0,
             confirm_start: true,
@@ -254,6 +262,33 @@ impl Settings {
                         .unwrap_or(s.server_max_answer_mib)
                 }
                 "server_restore_outputs" => s.server_restore_outputs = on(v),
+                "server_jog_max_mm" => {
+                    s.server_jog_max_mm = num(v)
+                        .filter(|x| {
+                            (crate::cncroutes::JOG_MAX_MM_RANGE.0
+                                ..=crate::cncroutes::JOG_MAX_MM_RANGE.1)
+                                .contains(x)
+                        })
+                        .unwrap_or(s.server_jog_max_mm)
+                }
+                "server_jog_max_feed" => {
+                    s.server_jog_max_feed = num(v)
+                        .filter(|x| {
+                            (crate::cncroutes::JOG_MAX_FEED_RANGE.0
+                                ..=crate::cncroutes::JOG_MAX_FEED_RANGE.1)
+                                .contains(x)
+                        })
+                        .unwrap_or(s.server_jog_max_feed)
+                }
+                "server_jog_confirm_mm" => {
+                    s.server_jog_confirm_mm = num(v)
+                        .filter(|x| {
+                            (crate::cncroutes::CONFIRM_MM_RANGE.0
+                                ..=crate::cncroutes::CONFIRM_MM_RANGE.1)
+                                .contains(x)
+                        })
+                        .unwrap_or(s.server_jog_confirm_mm)
+                }
                 "resume_safe_z" => {
                     s.resume_safe_z_mm = num(v)
                         .filter(|x| (-500.0..=500.0).contains(x))
@@ -400,7 +435,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         let mut out = format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_timeout_s = {}\nserver_retries = {}\nserver_mdns = {}\nserver_max_answer_mib = {}\nserver_restore_outputs = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_timeout_s = {}\nserver_retries = {}\nserver_mdns = {}\nserver_max_answer_mib = {}\nserver_restore_outputs = {}\nserver_jog_max_mm = {}\nserver_jog_max_feed = {}\nserver_jog_confirm_mm = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -431,6 +466,9 @@ impl Settings {
             yes(self.server_mdns),
             self.server_max_answer_mib,
             yes(self.server_restore_outputs),
+            self.server_jog_max_mm,
+            self.server_jog_max_feed,
+            self.server_jog_confirm_mm,
             self.resume_safe_z_mm,
             self.resume_spindle_wait_s,
             yes(self.confirm_start),
@@ -621,6 +659,9 @@ mod tests {
             server_mdns: true,
             server_max_answer_mib: 64,
             server_restore_outputs: true,
+            server_jog_max_mm: 25.0,
+            server_jog_max_feed: 600.0,
+            server_jog_confirm_mm: 3.0,
             resume_safe_z_mm: 7.5,
             resume_spindle_wait_s: 4.0,
             confirm_start: false,
@@ -717,6 +758,51 @@ mod tests {
         assert_eq!(s.step_mm, 3.0);
         assert_eq!(s.tuning.pause_s, 4.0);
         assert_eq!(Settings::default().tuning, Tuning::default());
+    }
+
+    #[test]
+    fn the_limits_of_a_jog_on_the_server_are_read_inside_their_ranges_and_written_back() {
+        let limits = |s: &Settings| {
+            (
+                s.server_jog_max_mm,
+                s.server_jog_max_feed,
+                s.server_jog_confirm_mm,
+            )
+        };
+        assert_eq!(limits(&Settings::default()), (50.0, 1000.0, 10.0));
+        let top = "server_jog_max_mm = 500
+server_jog_max_feed = 30000
+server_jog_confirm_mm = 500
+";
+        assert_eq!(limits(&Settings::parse(top)), (500.0, 30000.0, 500.0));
+        let bottom = "server_jog_max_mm = 0.01
+server_jog_max_feed = 1
+server_jog_confirm_mm = 0
+";
+        assert_eq!(limits(&Settings::parse(bottom)), (0.01, 1.0, 0.0));
+        // a value out of its range, or not a number, changes nothing
+        for bad in [
+            "server_jog_max_mm = 0",
+            "server_jog_max_mm = 500.1",
+            "server_jog_max_mm = -3",
+            "server_jog_max_mm = far",
+            "server_jog_max_mm = inf",
+            "server_jog_max_feed = 0.5",
+            "server_jog_max_feed = 30001",
+            "server_jog_confirm_mm = -1",
+            "server_jog_confirm_mm = 501",
+            "server_jog_confirm_mm = nan",
+        ] {
+            assert_eq!(limits(&Settings::parse(bad)), (50.0, 1000.0, 10.0), "{bad}");
+        }
+        // what is written is read back
+        let s = Settings {
+            server_jog_max_mm: 12.5,
+            server_jog_max_feed: 450.0,
+            server_jog_confirm_mm: 2.0,
+            ..Settings::default()
+        };
+        assert_eq!(limits(&Settings::parse(&s.to_text())), (12.5, 450.0, 2.0));
     }
 
     #[test]

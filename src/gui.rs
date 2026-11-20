@@ -29,6 +29,7 @@ mod icons;
 mod keepout;
 mod keys;
 mod lines;
+mod machine;
 mod macros;
 mod numfield;
 mod pathview;
@@ -204,6 +205,9 @@ pub struct App {
     server_snap: crate::server::Snapshot,
     server_key: Option<(String, String)>,
     server_err: Option<String>,
+    /// The login the panel of the settings makes and the panel itself: the job that is sent to the server uses that login.
+    server_login: crate::serverlink::LoginStore,
+    server_pane: Option<crate::serverlink::ServerPane>,
     /// How the path is looked at: the zoom and shift of the plan, the turn and zoom of the 3D view.
     plan2d: Plan2d,
     orbit: Orbit,
@@ -317,6 +321,8 @@ impl App {
             server_snap: crate::server::Snapshot::default(),
             server_key: None,
             server_err: None,
+            server_login: crate::serverlink::LoginStore::new(),
+            server_pane: None,
             plan2d: Plan2d::default(),
             orbit: Orbit::default(),
             preview: None,

@@ -17,6 +17,7 @@ use std::time::Duration;
 use eh3d_serverclient as sc;
 use serde_json::{json, Value};
 
+use crate::serverlink::LoginStore;
 use crate::settings::Settings;
 
 pub use sc::Link;
@@ -33,6 +34,8 @@ pub const APP: &str = "phoenix-cnc";
 pub struct Client {
     link: sc::Settings,
     lang: sc::Lang,
+    /// Where the login of the person is kept (the panel of the settings logs in there); none: only the token of the program is used.
+    login: Option<LoginStore>,
 }
 
 /// What the server says of a job.
@@ -169,6 +172,7 @@ impl Client {
         Some(Client {
             link,
             lang: sc::Lang::En,
+            login: None,
         })
     }
 
@@ -200,9 +204,19 @@ impl Client {
         &self.link
     }
 
+    /// The same client keeping its login in this store: a person who logged in through the panel of the settings sends the job with that login.
+    pub fn with_login(mut self, store: LoginStore) -> Client {
+        self.login = Some(store);
+        self
+    }
+
     /// A connection over plain HTTP to the address of the settings.
     pub fn connect(&self) -> Conn {
-        Conn::over(sc::Client::connect(self.link.clone()), self.lang)
+        let mut inner = sc::Client::connect(self.link.clone());
+        if let Some(store) = &self.login {
+            inner = inner.with_store(Box::new(store.clone()));
+        }
+        Conn::over(inner, self.lang)
     }
 }
 
@@ -216,6 +230,11 @@ impl Conn {
     /// A connection over a client already made (a server in memory for the tests, a tunnel).
     pub fn over(inner: sc::Client, lang: sc::Lang) -> Conn {
         Conn { inner, lang }
+    }
+
+    /// Whether a login or a token of a program is there to send.
+    pub fn has_login(&self) -> bool {
+        self.inner.has_token()
     }
 
     /// The state of the link for the corner of the window.

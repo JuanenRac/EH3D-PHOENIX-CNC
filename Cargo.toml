@@ -9,7 +9,7 @@ readme = "README.md"
 
 [features]
 default = []
-gui = ["dep:eframe", "dep:png", "dep:arboard"]
+gui = ["dep:eframe", "dep:png", "dep:arboard", "eh3d-view/gui"]
 # GRBL on a real serial port
 serial = ["eh3d-controller/serial"]
 

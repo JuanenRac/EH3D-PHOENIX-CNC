@@ -57,15 +57,27 @@ pub struct Options {
     pub times: bool,
     /// Checks the `H` and `D` words and the length offsets against the table of tools and leaves (`--offsets`, with the file).
     pub offsets: bool,
-    /// Checks the format of the program for a kind of controller and leaves (`--format grbl|full|generic`, with the file).
+    /// Checks the format of the program for a kind of controller and leaves (`--format grbl|full|generic`, or the name or the path of a profile file of the
+    /// user, with the file).
     pub format: Option<String>,
+    /// Checks the tool holder against the material (the `reach` of the tools in the table) and leaves (`--holder`, with the file).
+    pub holder: bool,
+    /// Prints the wear of the tools pass by pass and leaves (`--life`, with the file).
+    pub life: bool,
+    /// Prints the program as it would restart from this line (from 1), with the state rebuilt, and leaves (`--restart LINE`, with the file).
+    pub restart: Option<usize>,
+    /// Prints the settings of a kind of machine and leaves (`--template NAME`), or lists them (`--templates`); no file.
+    pub template: Option<String>,
+    pub templates: bool,
+    /// Writes what a tool prints to this file instead of the standard output, and never over a file that is there (`--out FILE`).
+    pub out: Option<PathBuf>,
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
     pub version: bool,
     pub help: bool,
 }
 
 /// The windows that `--window` opens, in the order of the help.
-pub const WINDOWS: [&str; 21] = [
+pub const WINDOWS: [&str; 22] = [
     "settings",
     "settings-checks",
     "settings-probe",
@@ -87,6 +99,7 @@ pub const WINDOWS: [&str; 21] = [
     "probe",
     "probe-grid",
     "resume",
+    "machine",
 ];
 
 /// The text of `--help`: every option the command line reads.
@@ -107,7 +120,13 @@ pub fn help_text() -> String {
          \x20 --compare FILE2    compare the program with another one (lengths, time, tools, reach, depth, findings), and leave (exit code 0 equal, 1 different, 2 error)\n\
          \x20 --times            print the time of the program by kind of move (rapid, cutting, plunges, arcs, dwells, tool changes), and leave\n\
          \x20 --offsets          check the H and D words and the length offsets against the table of tools, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
-         \x20 --format PROFILE   check the format of the program for a kind of controller (grbl, full, generic), and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --format PROFILE   check the format of the program for a kind of controller (grbl, full, generic, or the name or the path of a profile file of your own), and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --holder           check the tool holder against the material with the reach of each tool in the table of tools, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --life             print the wear of the tools pass by pass against the life in the table of tools, and leave (exit code 0 none worn out, 1 one is, 2 error)\n\
+         \x20 --restart LINE     print the program as it restarts from that line (from 1), with the state before it rebuilt and a pause before the first move, and leave\n\
+         \x20 --template NAME    print the settings of a kind of machine (small-mill, router, engraver, pcb-mill) to start from, and leave\n\
+         \x20 --templates        list the machine templates, and leave\n\
+         \x20 --out FILE         write what the tool prints to FILE and never over a file that is there (exit code 2 if it is)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
          \x20 --view VIEW        how the path is seen at the start (plan, 3d, top, front, side or iso)\n\
@@ -224,14 +243,42 @@ impl Options {
                 "--offsets" => o.offsets = true,
                 "--format" => {
                     let v = value("--format")?;
-                    if crate::postcheck::Profile::named(&v).is_none() {
+                    if v.trim().is_empty() {
                         return Err(format!(
-                            "unknown format profile '{v}' ({})",
+                            "--format needs a profile ({}) or the name or the path of a profile file",
                             crate::postcheck::NAMES.join(", ")
                         ));
                     }
-                    o.format = Some(v.trim().to_ascii_lowercase());
+                    // one of the three of the program is kept in lower case; anything else is the name or the path of a file of the user, read when it is used
+                    o.format = Some(if crate::postcheck::Profile::named(&v).is_some() {
+                        v.trim().to_ascii_lowercase()
+                    } else {
+                        v.trim().to_string()
+                    });
                 }
+                "--holder" => o.holder = true,
+                "--life" => o.life = true,
+                "--restart" => {
+                    let v = value("--restart")?;
+                    o.restart = match v.trim().parse::<usize>() {
+                        Ok(n) if n >= 1 => Some(n),
+                        _ => {
+                            return Err(format!("--restart needs a line number from 1, not '{v}'"))
+                        }
+                    };
+                }
+                "--template" => {
+                    let v = value("--template")?;
+                    if crate::templates::find(&v).is_none() {
+                        return Err(format!(
+                            "unknown template '{v}' ({})",
+                            crate::templates::names().join(", ")
+                        ));
+                    }
+                    o.template = Some(v.trim().to_ascii_lowercase());
+                }
+                "--templates" => o.templates = true,
+                "--out" => o.out = Some(PathBuf::from(value("--out")?)),
                 "--version" | "-V" => o.version = true,
                 "--help" | "-h" => o.help = true,
                 other if !other.starts_with("--") => {
@@ -257,10 +304,19 @@ impl Options {
             (o.times, "--times"),
             (o.offsets, "--offsets"),
             (o.format.is_some(), "--format"),
+            (o.holder, "--holder"),
+            (o.life, "--life"),
+            (o.restart.is_some(), "--restart"),
         ] {
             if asked && o.file.is_none() {
                 return Err(format!("{name} needs a G-code file"));
             }
+        }
+        if o.out.is_some() && !crate::cli_tools::wanted(&o) {
+            return Err(
+                "--out only goes with a tool that prints (--convert, --compare, --times, --offsets, --format, --holder, --life, --restart, --template, --templates)"
+                    .to_string(),
+            );
         }
         if o.html.is_some() && !o.report {
             return Err("--html only goes with --report".to_string());
@@ -380,6 +436,12 @@ mod tests {
             "--times",
             "--offsets",
             "--format",
+            "--holder",
+            "--life",
+            "--restart",
+            "--template",
+            "--templates",
+            "--out",
             "--lang",
             "--theme",
             "--view",
@@ -484,8 +546,14 @@ mod tests {
         assert!(parse("--offsets job.nc").unwrap().offsets);
         let f = parse("--format GRBL job.nc").unwrap();
         assert_eq!(f.format.as_deref(), Some("grbl"));
-        let bad = parse("--format nosuchprofile job.nc").unwrap_err();
-        assert!(bad.contains("grbl, full, generic"), "{bad}");
+        // a name that is none of the three is the name or the path of a profile file of the user, looked for when it is used
+        assert_eq!(
+            parse("--format nosuchprofile job.nc")
+                .unwrap()
+                .format
+                .as_deref(),
+            Some("nosuchprofile")
+        );
         // each one needs the program to read
         for args in [
             "--convert in",
@@ -537,5 +605,101 @@ mod tests {
         assert!(parse("--wait many").is_err());
         assert!(parse("--bogus").is_err());
         assert!(parse("--shot").is_err());
+    }
+
+    #[test]
+    fn the_holder_the_life_the_restart_and_the_templates_are_asked_for_with_their_own_options() {
+        assert!(parse("--holder job.nc").unwrap().holder);
+        assert!(parse("--life job.nc").unwrap().life);
+        assert_eq!(parse("--restart 12 job.nc").unwrap().restart, Some(12));
+        assert_eq!(parse("--restart  1 job.nc").unwrap().restart, Some(1));
+        for bad in [
+            "--restart 0 job.nc",
+            "--restart -3 job.nc",
+            "--restart two job.nc",
+            "--restart",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+        // the first three need the program, the templates do not
+        for args in ["--holder", "--life", "--restart 4"] {
+            assert!(
+                parse(args).unwrap_err().ends_with("needs a G-code file"),
+                "{args}"
+            );
+        }
+        assert_eq!(
+            parse("--template ROUTER").unwrap().template.as_deref(),
+            Some("router")
+        );
+        let why = parse("--template lathe").unwrap_err();
+        assert!(
+            why.contains("small-mill, router, engraver, pcb-mill"),
+            "{why}"
+        );
+        assert!(parse("--templates").unwrap().templates);
+        let plain = parse("job.nc").unwrap();
+        assert!(!plain.holder && !plain.life && plain.restart.is_none());
+        assert!(plain.template.is_none() && !plain.templates && plain.out.is_none());
+    }
+
+    #[test]
+    fn a_format_profile_of_the_user_is_given_by_name_or_by_path() {
+        let by_path = parse("--format shop/my-profile.txt job.nc").unwrap();
+        assert_eq!(by_path.format.as_deref(), Some("shop/my-profile.txt"));
+        // the case of a name that is not one of the three is kept
+        assert_eq!(
+            parse("--format Shop job.nc").unwrap().format.as_deref(),
+            Some("Shop")
+        );
+        assert_eq!(
+            parse("--format FULL job.nc").unwrap().format.as_deref(),
+            Some("full")
+        );
+        assert!(Options::parse([
+            "--format".to_string(),
+            "  ".to_string(),
+            "job.nc".to_string()
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn the_output_file_goes_with_a_tool_that_prints_and_with_nothing_else() {
+        assert_eq!(
+            parse("--convert in --out new.nc job.nc").unwrap().out,
+            Some(PathBuf::from("new.nc"))
+        );
+        assert!(parse("--times --out t.txt job.nc").unwrap().out.is_some());
+        assert!(parse("--templates --out t.txt").unwrap().out.is_some());
+        assert!(parse("--restart 3 --out r.nc job.nc")
+            .unwrap()
+            .out
+            .is_some());
+        for bad in [
+            "--out new.nc job.nc",
+            "--out new.nc",
+            "--report job.nc --out x.txt",
+        ] {
+            let why = parse(bad).unwrap_err();
+            assert!(
+                why.starts_with("--out only goes with a tool"),
+                "{bad}: {why}"
+            );
+        }
+        assert!(parse("--convert in --out").is_err());
+        let h = help_text();
+        for word in [
+            "--holder",
+            "--life",
+            "--restart LINE",
+            "--template NAME",
+            "--templates",
+            "--out FILE",
+        ] {
+            assert!(h.contains(word), "{word}");
+        }
+        // the help lines still start where they did
+        assert!(h.lines().filter(|l| l.starts_with("  --")).count() >= 28);
     }
 }

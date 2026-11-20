@@ -1,8 +1,12 @@
 //! The tools of the command line that read a program and print a text, with no window: `--convert` (millimetres and inches), `--times` (the time by kind
-//! of move), `--offsets` (the `H` and the `D` against the table of tools), `--format` (the format a controller takes) and `--compare` (two programs). The
-//! work is in `units`, `timesplit`, `offsets`, `postcheck` and `compare`; this module reads the files, picks the language and the settings, and makes
-//! the text and the exit code (0 clean, 1 something to read, 2 error), so the binary only prints what it is given. Nothing is sent to a machine.
+//! of move), `--offsets` (the `H` and the `D` against the table of tools), `--format` (the format a controller takes, one of the three of the program or a
+//! profile file of the user), `--compare` (two programs), `--holder` (the tool holder against the material), `--life` (the wear of the tools pass by pass),
+//! `--restart` (the program as it restarts from a line) and `--template` / `--templates` (the settings of a kind of machine). The work is in `units`,
+//! `timesplit`, `offsets`, `postcheck`, `compare`, `holder`, `life`, `restart` and `templates`; this module reads the files, picks the language and the
+//! settings, and makes the text and the exit code (0 clean, 1 something to read, 2 error), so the binary only prints what it is given. With `--out` what
+//! a tool prints goes to a new file instead, and never over one that is there. Nothing is sent to a machine.
 
+use std::io::Write;
 use std::path::Path;
 
 use crate::cli::Options;
@@ -37,7 +41,16 @@ impl Outcome {
 
 /// Whether the options ask for one of these tools.
 pub fn wanted(o: &Options) -> bool {
-    o.convert.is_some() || o.compare.is_some() || o.times || o.offsets || o.format.is_some()
+    o.convert.is_some()
+        || o.compare.is_some()
+        || o.times
+        || o.offsets
+        || o.format.is_some()
+        || o.holder
+        || o.life
+        || o.restart.is_some()
+        || o.template.is_some()
+        || o.templates
 }
 
 /// The lines of a program file: every byte is a character, so a file in any code page is read (as the report reads it).
@@ -117,14 +130,124 @@ pub fn offsets(lines: &[String], s: &Settings, lang: &str) -> Outcome {
 
 /// `--format`: the format of the program for a family of controllers.
 pub fn format_check(lines: &[String], profile: &str, lang: &str) -> Outcome {
-    let Some(p) = crate::postcheck::Profile::named(profile) else {
-        return Outcome::failed(say(lang, Msg::FmtUnknownProfile, &[profile]));
-    };
-    let found = crate::postcheck::check(lines, &p);
+    format_check_in(lines, profile, lang, None)
+}
+
+/// As `format_check`, where the profile may also be a file of the user: found by its name next to the settings file `settings`, or by its path.
+pub fn format_check_in(
+    lines: &[String],
+    profile: &str,
+    lang: &str,
+    settings: Option<&Path>,
+) -> Outcome {
+    use crate::postcheck::{resolve, Found};
+    match resolve(profile, settings) {
+        Found::Profile(p) => {
+            let found = crate::postcheck::check(lines, &p);
+            Outcome {
+                out: texts(&found, lang),
+                err: String::new(),
+                code: i32::from(to_read(&found)),
+            }
+        }
+        Found::NotFound => Outcome::failed(say(lang, Msg::FmtUnknownProfile, &[profile.trim()])),
+        Found::Invalid(findings) => Outcome {
+            out: String::new(),
+            err: texts(&findings, lang),
+            code: 2,
+        },
+    }
+}
+
+/// `--holder`: the tool holder against the material.
+pub fn holder(lines: &[String], s: &Settings, lang: &str) -> Outcome {
+    let found = crate::holder::check(lines, &s.tuning.tools);
     Outcome {
         out: texts(&found, lang),
         err: String::new(),
         code: i32::from(to_read(&found)),
+    }
+}
+
+/// `--life`: the wear of the tools pass by pass. The material of the settings sets how fast it uses a tool up (the wood of the table when it is not known).
+pub fn life(lines: &[String], s: &Settings, lang: &str) -> Outcome {
+    let factor = crate::consumption::factor(&s.material).unwrap_or(1.0);
+    let wear = crate::life::passes(
+        lines,
+        &s.tuning.tools,
+        rates(s),
+        s.tuning.accel_mm_s2,
+        factor,
+    );
+    let mut out = crate::life::lines(&wear, lang).join("\n");
+    out.push('\n');
+    Outcome {
+        out,
+        err: String::new(),
+        code: i32::from(!wear.worn_out.is_empty()),
+    }
+}
+
+/// `--restart`: the program as it restarts from a line, with the state before it rebuilt; what was read goes to the other stream.
+pub fn restart(lines: &[String], line: usize, lang: &str) -> Outcome {
+    match crate::restart::plan(lines, line) {
+        Ok(plan) => {
+            let mut out = plan.program.join("\n");
+            out.push('\n');
+            let mut err = crate::restart::remarks(&plan, lang).join("\n");
+            err.push('\n');
+            Outcome { out, err, code: 0 }
+        }
+        Err(why) => Outcome::failed(why.text(lang)),
+    }
+}
+
+/// `--template` and `--templates`: the settings of a kind of machine, or the list of them.
+pub fn template(name: Option<&str>, lang: &str) -> Outcome {
+    match name {
+        None => {
+            let mut out = crate::templates::list(lang).join("\n");
+            out.push('\n');
+            Outcome {
+                out,
+                err: String::new(),
+                code: 0,
+            }
+        }
+        Some(n) => match crate::templates::find(n) {
+            Some(t) => Outcome {
+                out: t.settings_text(),
+                err: String::new(),
+                code: 0,
+            },
+            None => Outcome::failed(crate::templates::unknown(n, lang)),
+        },
+    }
+}
+
+/// What the tool printed, written to the file `--out` names instead of the standard output. The file is made new: one that is there is never written over
+/// (not even the program that was read), and the tool ends with 2 and says so.
+pub fn deliver(o: &Options, r: Outcome, lang: &str) -> Outcome {
+    let Some(path) = o.out.as_ref() else {
+        return r;
+    };
+    let shown = path.display().to_string();
+    let wrote = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .and_then(|mut f| f.write_all(r.out.as_bytes()));
+    let (said, code) = match wrote {
+        Ok(()) => (say(lang, Msg::OutWritten, &[shown]), r.code),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            (say(lang, Msg::OutExists, &[shown]), 2)
+        }
+        Err(e) => (say(lang, Msg::OutError, &[shown, e.to_string()]), 2),
+    };
+    Outcome {
+        out: String::new(),
+        err: format!("{}{said}\n", r.err),
+        code,
     }
 }
 
@@ -152,6 +275,23 @@ pub fn compare(
 
 /// Runs the tool the options ask for with these settings (they are read from the settings file by `run`).
 pub fn run_in(o: &Options, s: &Settings) -> Outcome {
+    run_with(o, s, None)
+}
+
+/// As `run_in`, knowing where the settings file is: the profiles of the user named in `--format` are looked for next to it.
+pub fn run_with(o: &Options, s: &Settings, settings_file: Option<&Path>) -> Outcome {
+    let lang = o.lang.unwrap_or(s.lang).code();
+    let r = run_tool(o, s, settings_file, lang);
+    deliver(o, r, lang)
+}
+
+fn run_tool(o: &Options, s: &Settings, settings_file: Option<&Path>, lang: &str) -> Outcome {
+    if o.templates {
+        return template(None, lang);
+    }
+    if let Some(name) = o.template.as_deref() {
+        return template(Some(name), lang);
+    }
     let Some(path) = o.file.as_ref() else {
         return Outcome::failed("this needs a G-code file".to_string());
     };
@@ -159,7 +299,6 @@ pub fn run_in(o: &Options, s: &Settings) -> Outcome {
         Ok(l) => l,
         Err(why) => return Outcome::failed(why),
     };
-    let lang = o.lang.unwrap_or(s.lang).code();
     if let Some(unit) = o.convert.as_deref() {
         return convert(&lines, unit == "in", lang);
     }
@@ -182,8 +321,17 @@ pub fn run_in(o: &Options, s: &Settings) -> Outcome {
     if o.offsets {
         return offsets(&lines, s, lang);
     }
+    if o.holder {
+        return holder(&lines, s, lang);
+    }
+    if o.life {
+        return life(&lines, s, lang);
+    }
+    if let Some(line) = o.restart {
+        return restart(&lines, line, lang);
+    }
     match o.format.as_deref() {
-        Some(profile) => format_check(&lines, profile, lang),
+        Some(profile) => format_check_in(&lines, profile, lang, settings_file),
         None => Outcome::failed("nothing to do".to_string()),
     }
 }
@@ -199,7 +347,7 @@ pub fn run(o: &Options) -> i32 {
         }
     }
     s.resolve_tool_table(crate::tools::load(&crate::settings::settings_path()));
-    let r = run_in(o, &s);
+    let r = run_with(o, &s, Some(&crate::settings::settings_path()));
     print!("{}", r.out);
     eprint!("{}", r.err);
     r.code
@@ -375,5 +523,314 @@ mod tests {
             ..Options::default()
         };
         assert_eq!(run_in(&nothing, &s).code, 2);
+    }
+
+    /// A path in the temporary folder that nothing is at, removed when the test is over whatever was written there.
+    struct Spot(PathBuf);
+
+    impl Spot {
+        fn new(name: &str) -> Spot {
+            let path = std::env::temp_dir()
+                .join(format!("phoenix-cnc-tools-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_file(&path);
+            Spot(path)
+        }
+
+        fn arg(&self) -> String {
+            self.0.to_string_lossy().to_string()
+        }
+    }
+
+    impl Drop for Spot {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn what_a_tool_prints_goes_to_a_new_file_and_never_over_one_that_is_there() {
+        let input = Temp::new("out-in.nc", "G21\nG1 X25.4 F254\n");
+        let out = Spot::new("out.nc");
+        let s = Settings::default();
+        let o = options(&["--convert", "in", "--out", &out.arg(), &input.arg()]);
+        let r = run_in(&o, &s);
+        assert_eq!((r.out.as_str(), r.code), ("", 0));
+        assert!(
+            r.err.contains("2 numbers in 2 lines were converted"),
+            "{}",
+            r.err
+        );
+        assert!(
+            r.err.ends_with(&format!("{} was written\n", out.arg())),
+            "{}",
+            r.err
+        );
+        assert_eq!(std::fs::read_to_string(&out.0).unwrap(), "G20\nG1 X1 F10\n");
+        // the same file again is refused and keeps what it had
+        let again = run_in(&o, &s);
+        assert_eq!(again.code, 2);
+        assert!(
+            again
+                .err
+                .contains("is there already and is not written over"),
+            "{}",
+            again.err
+        );
+        assert_eq!(std::fs::read_to_string(&out.0).unwrap(), "G20\nG1 X1 F10\n");
+        // the program that was read is not written over either
+        let same = options(&["--convert", "in", "--out", &input.arg(), &input.arg()]);
+        assert_eq!(run_in(&same, &s).code, 2);
+        assert_eq!(
+            std::fs::read_to_string(&input.0).unwrap(),
+            "G21\nG1 X25.4 F254\n"
+        );
+        // the refusal is told in the language asked for
+        let es = run_in(
+            &options(&[
+                "--convert",
+                "in",
+                "--out",
+                &out.arg(),
+                "--lang",
+                "es",
+                &input.arg(),
+            ]),
+            &s,
+        );
+        assert!(
+            es.err.contains("ya existe y no se sobrescribe"),
+            "{}",
+            es.err
+        );
+        // a place that cannot be written is an error that says so
+        let nowhere = std::env::temp_dir()
+            .join("phoenix-cnc-no-such-folder")
+            .join("x.nc");
+        let bad = run_in(
+            &options(&["--times", "--out", &nowhere.to_string_lossy(), &input.arg()]),
+            &s,
+        );
+        assert_eq!(bad.code, 2);
+        assert!(bad.err.contains("could not be written"), "{}", bad.err);
+    }
+
+    #[test]
+    fn the_exit_code_of_the_tool_is_kept_when_its_text_goes_to_a_file() {
+        let input = Temp::new("out-code.nc", "G21\nG1 X1\nG20\nG1 X1\n");
+        let out = Spot::new("out-code.txt");
+        let o = options(&["--convert", "mm", "--out", &out.arg(), &input.arg()]);
+        assert_eq!(run_in(&o, &Settings::default()).code, 1);
+        assert!(out.0.is_file());
+    }
+
+    #[test]
+    fn a_format_profile_of_the_user_is_found_by_its_path_or_by_its_name_beside_the_settings() {
+        let program = Temp::new("fmt.nc", "G90\nG41 G1 X5 F100\nM30\n");
+        let mine = Temp::new("mine.txt", "base = grbl\nallow_g = 41\n");
+        let s = Settings::default();
+        // GRBL does not list G41; the profile of the user does
+        let grbl = run_in(&options(&["--format", "grbl", &program.arg()]), &s);
+        assert_eq!(grbl.code, 1);
+        let user = run_in(&options(&["--format", &mine.arg(), &program.arg()]), &s);
+        assert_eq!((user.out.as_str(), user.code), ("", 0), "{}", user.err);
+        // by name, next to the settings file
+        let settings = std::env::temp_dir().join(format!("cnc-fmt-{}.cfg", std::process::id()));
+        let beside = crate::postcheck::profile_path(&settings, "shop").unwrap();
+        std::fs::write(&beside, "base = grbl\nallow_g = 41\n").unwrap();
+        let named = run_with(
+            &options(&["--format", "shop", &program.arg()]),
+            &s,
+            Some(&settings),
+        );
+        let _ = std::fs::remove_file(&beside);
+        assert_eq!((named.out.as_str(), named.code), ("", 0), "{}", named.err);
+        // without the settings file the name is not known
+        let lost = run_in(&options(&["--format", "shop", &program.arg()]), &s);
+        assert_eq!(lost.code, 2);
+        assert!(lost.err.contains("no file has that name"), "{}", lost.err);
+        // a file with lines that cannot be used is named line by line
+        let broken = Temp::new(
+            "broken.txt",
+            "base = grbl\nflavour = sweet\nmax_line = lots\n",
+        );
+        let b = run_in(&options(&["--format", &broken.arg(), &program.arg()]), &s);
+        assert_eq!(b.code, 2);
+        assert!(
+            b.err.contains("Line 2 of the profile: 'flavour'"),
+            "{}",
+            b.err
+        );
+        assert!(
+            b.err
+                .contains("Line 3 of the profile: the value of 'max_line'"),
+            "{}",
+            b.err
+        );
+    }
+
+    #[test]
+    fn the_holder_the_life_the_restart_and_the_templates_run_from_the_options() {
+        let program = Temp::new(
+            "tools4.nc",
+            "T1 M6\nG21 G90\nM3 S9000\nG0 Z5\nG1 Z-6 F600\nG1 X60\nG0 Z5\nG0 X0\nG1 Z-1 F600\nG1 X60\nM30\n",
+        );
+        let mut s = Settings::default();
+        s.tuning.tools =
+            crate::tools::ToolTable::parse("tool = 1 | diameter=3 | reach=5 | life=0.15\n");
+        // the holder
+        let h = run_in(&options(&["--holder", &program.arg()]), &s);
+        assert_eq!(h.code, 1);
+        assert!(
+            h.out
+                .contains("Line 5: tool 1 cuts 6.00 mm below the surface"),
+            "{}",
+            h.out
+        );
+        // the life: the tool wears out in the second pass
+        let l = run_in(&options(&["--life", &program.arg()]), &s);
+        assert_eq!(l.code, 1);
+        assert!(
+            l.out.starts_with("Wear of the tools by pass\n"),
+            "{}",
+            l.out
+        );
+        assert!(l.out.contains("Tool 1 is worn out in pass"), "{}", l.out);
+        s.tuning.tools = crate::tools::ToolTable::parse("tool = 1 | diameter=3 | life=100\n");
+        let calm = run_in(&options(&["--life", &program.arg()]), &s);
+        assert_eq!(calm.code, 0);
+        // the restart
+        let r = run_in(&options(&["--restart", "8", &program.arg()]), &s);
+        assert_eq!(r.code, 0);
+        assert!(
+            r.out
+                .starts_with("(restart at line 8 of the program)\nG21\nG90\n"),
+            "{}",
+            r.out
+        );
+        assert!(
+            r.out
+                .contains("M0 (restart: check the machine, then resume)\nG0 X0\n"),
+            "{}",
+            r.out
+        );
+        assert!(
+            r.err
+                .starts_with("Restart at line 8: the 7 lines before it were read"),
+            "{}",
+            r.err
+        );
+        let past = run_in(&options(&["--restart", "99", &program.arg()]), &s);
+        assert_eq!(past.code, 2);
+        assert!(past.err.contains("there is no line 99"), "{}", past.err);
+        // the templates need no program
+        let t = run_in(&options(&["--template", "router"]), &s);
+        assert_eq!(
+            (t.code, t.out.as_str()),
+            (
+                0,
+                crate::templates::find("router")
+                    .unwrap()
+                    .settings_text()
+                    .as_str()
+            )
+        );
+        let list = run_in(&options(&["--templates", "--lang", "de"]), &s);
+        assert!(list.out.starts_with("Maschinenvorlagen"), "{}", list.out);
+        assert_eq!(list.out.lines().count(), 5);
+        // and can go to a file
+        let out = Spot::new("template.cfg");
+        let w = run_in(
+            &options(&["--template", "pcb-mill", "--out", &out.arg()]),
+            &s,
+        );
+        assert_eq!(w.code, 0);
+        assert!(std::fs::read_to_string(&out.0)
+            .unwrap()
+            .starts_with("# phoenix-cnc template pcb-mill\n"));
+        assert_eq!(
+            run_in(
+                &options(&["--template", "pcb-mill", "--out", &out.arg()]),
+                &s
+            )
+            .code,
+            2
+        );
+    }
+
+    #[test]
+    fn programs_from_a_fixed_seed_go_through_every_tool_without_a_panic_or_a_hole_in_any_language()
+    {
+        let pieces = [
+            "T1 M6",
+            "T2 M6",
+            "G20",
+            "G21",
+            "G90",
+            "G91",
+            "G17",
+            "G18",
+            "G54",
+            "G55",
+            "M3 S9000",
+            "M5",
+            "M8",
+            "G0 X5 Y5",
+            "G0 Z5",
+            "G1 Z-3 F200",
+            "G1 X10 Y12 F400",
+            "G2 X20 Y0 R12 F300",
+            "G81 X3 Y3 Z-4 R1 F100",
+            "G80",
+            "G41 D1",
+            "G40",
+            "G43 H1",
+            "G92 X1",
+            "G4 P1",
+            "M30",
+            "(a comment)",
+            "",
+            "G1 X-2.123456789 F80",
+            "G83 X1 Y1 Z-9 R1 Q2 F100",
+        ];
+        let mut seed = 31u64;
+        let mut next = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) as usize
+        };
+        let mut s = Settings::default();
+        s.tuning.tools = crate::tools::ToolTable::parse(
+            "tool = 1 | diameter=3 | reach=4 | life=0.2\ntool = 2 | diameter=6 | reach=8 | life=5 | used=4.9\n",
+        );
+        let mut texts = 0;
+        for _ in 0..250 {
+            let n = 1 + next() % 25;
+            let p: Vec<String> = (0..n)
+                .map(|_| pieces[next() % pieces.len()].to_string())
+                .collect();
+            let line = 1 + next() % p.len();
+            for lang in crate::words::LANGS {
+                let all = [
+                    holder(&p, &s, lang),
+                    life(&p, &s, lang),
+                    restart(&p, line, lang),
+                    format_check(&p, "full", lang),
+                    convert(&p, true, lang),
+                    template(Some("engraver"), lang),
+                ];
+                for r in all {
+                    assert!((0..=2).contains(&r.code), "{p:?}");
+                    assert!(
+                        !r.out.contains('{') && !r.err.contains('{'),
+                        "{lang} {p:?}\n{}\n{}",
+                        r.out,
+                        r.err
+                    );
+                    texts += 1;
+                }
+            }
+        }
+        assert_eq!(texts, 250 * 8 * 6);
     }
 }

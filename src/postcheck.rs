@@ -4,15 +4,35 @@
 //! and say what the documentation of GRBL lists and what a controller with canned cycles, cutter compensation and tool changes takes, so a code a profile
 //! does not list is a reason to read the line, not a proof that the
 //! controller refuses it. Only a reading: nothing is sent and nothing is changed.
+//!
+//! Besides the three profiles of the program the user can write one in a file (`key = value`, `#` and `;` start a comment):
+//!
+//! ```text
+//! name = my-controller
+//! base = grbl            # grbl, full or generic: the codes it lists start from this one (generic when left out)
+//! max_line = 60          # 0: no limit
+//! max_decimals = 3       # 0: no limit
+//! percent = no           # a line with only % is taken
+//! needs_end = yes        # the program must end with M2 or M30
+//! allow_g = 5.1, 64      # G codes it lists besides the base's
+//! deny_g = 28.1          # G codes it does not list, whatever the base says (this wins over allow_g)
+//! allow_m = 6
+//! deny_m = 7, 8
+//! ```
+//!
+//! A file is found by its path, or by its name next to the settings file (`phoenix-cnc-format-NAME.txt`); see [`resolve`].
+
+use std::path::{Path, PathBuf};
 
 use crate::gcode::words;
+use crate::profiles::clean_name;
 use crate::progcheck::{Finding, Level};
 use crate::words::Msg;
 
 /// A kind of controller and what its format asks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Profile {
-    pub name: &'static str,
+    pub name: String,
     /// The most characters of a line once its spaces and its comments are taken out (0: no limit).
     pub max_line: usize,
     /// The most decimals of a number (0: no limit).
@@ -22,6 +42,11 @@ pub struct Profile {
     /// The program must end with `M2` or `M30`.
     pub needs_end: bool,
     dialect: Dialect,
+    /// Codes a profile of the user lists besides (`allow_g`, `allow_m`) or does not list (`deny_g`, `deny_m`) whatever its base says; the G codes in tenths.
+    extra_g: Vec<i32>,
+    deny_g: Vec<i32>,
+    extra_m: Vec<i32>,
+    deny_m: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,34 +77,52 @@ impl Profile {
     pub fn named(name: &str) -> Option<Profile> {
         match name.trim().to_ascii_lowercase().as_str() {
             "grbl" => Some(Profile {
-                name: "grbl",
+                name: "grbl".to_string(),
                 max_line: 79,
                 max_decimals: 4,
                 percent: false,
                 needs_end: true,
                 dialect: Dialect::Grbl,
+                extra_g: Vec::new(),
+                deny_g: Vec::new(),
+                extra_m: Vec::new(),
+                deny_m: Vec::new(),
             }),
             "full" => Some(Profile {
-                name: "full",
+                name: "full".to_string(),
                 max_line: 255,
                 max_decimals: 6,
                 percent: true,
                 needs_end: true,
                 dialect: Dialect::Full,
+                extra_g: Vec::new(),
+                deny_g: Vec::new(),
+                extra_m: Vec::new(),
+                deny_m: Vec::new(),
             }),
             "generic" => Some(Profile {
-                name: "generic",
+                name: "generic".to_string(),
                 max_line: 0,
                 max_decimals: 0,
                 percent: true,
                 needs_end: false,
                 dialect: Dialect::Generic,
+                extra_g: Vec::new(),
+                deny_g: Vec::new(),
+                extra_m: Vec::new(),
+                deny_m: Vec::new(),
             }),
             _ => None,
         }
     }
 
     fn lists_g(&self, tenths: i32) -> bool {
+        if self.deny_g.contains(&tenths) {
+            return false;
+        }
+        if self.extra_g.contains(&tenths) {
+            return true;
+        }
         match self.dialect {
             Dialect::Generic => true,
             Dialect::Grbl => GRBL_G.contains(&tenths),
@@ -88,6 +131,12 @@ impl Profile {
     }
 
     fn lists_m(&self, code: i32) -> bool {
+        if self.deny_m.contains(&code) {
+            return false;
+        }
+        if self.extra_m.contains(&code) {
+            return true;
+        }
         match self.dialect {
             Dialect::Generic => true,
             Dialect::Grbl => GRBL_M.contains(&code),
@@ -102,6 +151,216 @@ impl Profile {
                     || (100..=199).contains(&code)
             }
         }
+    }
+}
+
+/// The biggest file of a profile that is read, in bytes.
+pub const MAX_PROFILE_BYTES: u64 = 16 * 1024;
+
+fn bad(line: usize, msg: Msg, args: Vec<String>) -> Finding {
+    Finding {
+        line: Some(line),
+        level: Level::Danger,
+        msg,
+        args,
+    }
+}
+
+fn yes_no(v: &str) -> Option<bool> {
+    match v.trim().to_ascii_lowercase().as_str() {
+        "yes" | "on" | "true" | "1" => Some(true),
+        "no" | "off" | "false" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+/// A list of codes written `5.1, 64` (a leading `G` or `M` is allowed): the G codes in tenths, the M codes as they are. Gives the item that is not a code.
+fn code_list(v: &str, g: bool) -> Result<Vec<i32>, String> {
+    let mut out = Vec::new();
+    if v.trim().is_empty() {
+        return Ok(out);
+    }
+    for item in v.split(',') {
+        let t = item.trim();
+        let digits = t.trim_start_matches(['G', 'g', 'M', 'm']);
+        let n = digits
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite())
+            .ok_or_else(|| t.to_string())?;
+        let code = if g {
+            let tenths = (n * 10.0).round();
+            if (n * 10.0 - tenths).abs() > 1e-6 || !(0.0..=9999.0).contains(&tenths) {
+                return Err(t.to_string());
+            }
+            tenths as i32
+        } else {
+            if n.fract() != 0.0 || !(0.0..=999.0).contains(&n) {
+                return Err(t.to_string());
+            }
+            n as i32
+        };
+        if !out.contains(&code) {
+            out.push(code);
+        }
+    }
+    Ok(out)
+}
+
+impl Profile {
+    /// A profile written in the text of a file (see the top of this module). `default_name` names it when the text does not. Every line that cannot be
+    /// used is named, with its number, in the error.
+    pub fn from_text(text: &str, default_name: &str) -> Result<Profile, Vec<Finding>> {
+        let mut errors: Vec<Finding> = Vec::new();
+        let mut entries: Vec<(usize, String, String)> = Vec::new();
+        for (n, raw) in text.trim_start_matches('\u{feff}').lines().enumerate() {
+            let line = raw.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+            match line.split_once('=') {
+                Some((k, v)) => {
+                    entries.push((n, k.trim().to_ascii_lowercase(), v.trim().to_string()))
+                }
+                None => errors.push(bad(n, Msg::FmtProfileSyntax, Vec::new())),
+            }
+        }
+        let generic = || Profile::named("generic").expect("the generic profile is there");
+        let base = entries.iter().rev().find(|(_, k, _)| k == "base");
+        let mut p = match base {
+            None => generic(),
+            Some((n, _, v)) => Profile::named(v).unwrap_or_else(|| {
+                errors.push(bad(*n, Msg::FmtProfileValue, vec!["base".to_string()]));
+                generic()
+            }),
+        };
+        p.name = clean_name(default_name).unwrap_or_else(|| "custom".to_string());
+        for (n, k, v) in &entries {
+            let wrong = |errors: &mut Vec<Finding>| {
+                errors.push(bad(*n, Msg::FmtProfileValue, vec![k.clone()]));
+            };
+            match k.as_str() {
+                "base" => {}
+                "name" => match clean_name(v) {
+                    Some(name) => p.name = name,
+                    None => wrong(&mut errors),
+                },
+                "max_line" => match v.parse::<usize>() {
+                    Ok(x) if x <= 100_000 => p.max_line = x,
+                    _ => wrong(&mut errors),
+                },
+                "max_decimals" => match v.parse::<usize>() {
+                    Ok(x) if x <= 15 => p.max_decimals = x,
+                    _ => wrong(&mut errors),
+                },
+                "percent" => match yes_no(v) {
+                    Some(b) => p.percent = b,
+                    None => wrong(&mut errors),
+                },
+                "needs_end" => match yes_no(v) {
+                    Some(b) => p.needs_end = b,
+                    None => wrong(&mut errors),
+                },
+                "allow_g" | "deny_g" | "allow_m" | "deny_m" => {
+                    let g = k.ends_with('g');
+                    match code_list(v, g) {
+                        Ok(list) => match k.as_str() {
+                            "allow_g" => p.extra_g = list,
+                            "deny_g" => p.deny_g = list,
+                            "allow_m" => p.extra_m = list,
+                            _ => p.deny_m = list,
+                        },
+                        Err(item) => errors.push(bad(*n, Msg::FmtProfileCode, vec![item])),
+                    }
+                }
+                other => errors.push(bad(*n, Msg::FmtProfileKey, vec![other.to_string()])),
+            }
+        }
+        if errors.is_empty() {
+            Ok(p)
+        } else {
+            errors.sort_by_key(|f| f.line);
+            Err(errors)
+        }
+    }
+
+    /// The profile in a file. A file that is too big, is not a file or cannot be read is one error with no line.
+    pub fn load(path: &Path) -> Result<Profile, Vec<Finding>> {
+        let stem = path
+            .file_stem()
+            .map_or_else(String::new, |s| s.to_string_lossy().to_string());
+        Profile::load_named(path, &stem)
+    }
+
+    /// As `load`, with the name the profile gets when the text does not give one.
+    pub fn load_named(path: &Path, default_name: &str) -> Result<Profile, Vec<Finding>> {
+        let unreadable = || {
+            vec![Finding {
+                line: None,
+                level: Level::Danger,
+                msg: Msg::FmtProfileUnreadable,
+                args: vec![path.display().to_string()],
+            }]
+        };
+        let meta = std::fs::metadata(path).map_err(|_| unreadable())?;
+        if !meta.is_file() || meta.len() > MAX_PROFILE_BYTES {
+            return Err(unreadable());
+        }
+        let bytes = std::fs::read(path).map_err(|_| unreadable())?;
+        Profile::from_text(&String::from_utf8_lossy(&bytes), default_name)
+    }
+}
+
+/// Where the profile of the user named `name` is: next to the settings, with the name of the settings file in front (`phoenix-cnc-format-NAME.txt`). Only
+/// a name of letters, digits, `-` and `_` has a place there.
+pub fn profile_path(settings: &Path, name: &str) -> Option<PathBuf> {
+    let ok = !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !ok {
+        return None;
+    }
+    let stem = settings.file_stem().map_or_else(
+        || "phoenix-cnc".to_string(),
+        |s| s.to_string_lossy().to_string(),
+    );
+    Some(settings.with_file_name(format!("{stem}-format-{name}.txt")))
+}
+
+/// What the name given to `--format` came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Found {
+    Profile(Profile),
+    /// It is neither one of the three profiles nor a file.
+    NotFound,
+    /// It is a file that cannot be used: what is wrong with it.
+    Invalid(Vec<Finding>),
+}
+
+/// The profile a name stands for: one of the three of the program (the case does not matter), else the file of that name next to the settings file
+/// `settings` (when it is given), else the path as it is written.
+pub fn resolve(name: &str, settings: Option<&Path>) -> Found {
+    if let Some(p) = Profile::named(name) {
+        return Found::Profile(p);
+    }
+    let t = name.trim();
+    let beside = settings
+        .and_then(|s| profile_path(s, t))
+        .filter(|p| p.is_file());
+    let path = beside.clone().unwrap_or_else(|| PathBuf::from(t));
+    if t.is_empty() || !path.is_file() {
+        return Found::NotFound;
+    }
+    let loaded = if beside.is_some() {
+        Profile::load_named(&path, t)
+    } else {
+        Profile::load(&path)
+    };
+    match loaded {
+        Ok(p) => Found::Profile(p),
+        Err(findings) => Found::Invalid(findings),
     }
 }
 
@@ -326,6 +585,7 @@ pub fn check(lines: &[String], profile: &Profile) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn lines(text: &str) -> Vec<String> {
         text.lines().map(str::to_string).collect()
@@ -528,5 +788,232 @@ mod tests {
         assert_eq!(most_decimals("G1 X10").0, 0);
         assert_eq!(g_name(431), "G43.1");
         assert_eq!(g_name(540), "G54");
+    }
+
+    const MINE: &str = "# a controller of my own\nname = my-controller\nbase = grbl\nmax_line = 60\nmax_decimals = 3\npercent = yes\nneeds_end = no\nallow_g = 41, G64, 5.1\ndeny_g = 28.1\nallow_m = 6\ndeny_m = 7, M8\n";
+
+    /// A folder of its own in the temporary one, removed when the test is over.
+    struct Folder(PathBuf);
+
+    impl Folder {
+        fn new(tag: &str) -> Folder {
+            let d = std::env::temp_dir().join(format!(
+                "phoenix-cnc-postcheck-{tag}-{}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).unwrap();
+            Folder(d)
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn a_profile_of_the_user_is_read_from_its_text() {
+        let p = Profile::from_text(MINE, "file-name").unwrap();
+        assert_eq!(p.name, "my-controller");
+        assert_eq!((p.max_line, p.max_decimals), (60, 3));
+        assert!(p.percent && !p.needs_end);
+        // the base is the one named, wherever the line is
+        let late = Profile::from_text("max_line = 10\nbase = full\n", "x").unwrap();
+        assert_eq!((late.max_line, late.max_decimals), (10, 6));
+        assert!(late.lists_g(810));
+        // with no base the profile lists everything and has no limits; the name is the one of the file
+        let bare = Profile::from_text("# nothing\n", "plain").unwrap();
+        assert_eq!(bare.name, "plain");
+        assert_eq!(
+            (bare.max_line, bare.max_decimals, bare.needs_end),
+            (0, 0, false)
+        );
+        assert!(bare.lists_g(1234) && bare.lists_m(999));
+        // the case of the keys and the byte order mark do not matter
+        let loud = Profile::from_text("\u{feff}MAX_LINE = 33\nPercent = No\n", "x").unwrap();
+        assert_eq!((loud.max_line, loud.percent), (33, false));
+    }
+
+    #[test]
+    fn the_codes_a_profile_adds_or_takes_away_change_what_it_lists() {
+        let p = Profile::from_text(MINE, "x").unwrap();
+        // GRBL does not list these; the profile does
+        assert!(p.lists_g(410) && p.lists_g(640) && p.lists_g(51));
+        assert!(p.lists_m(6));
+        // GRBL lists these; the profile does not
+        assert!(!p.lists_g(281) && !p.lists_m(7) && !p.lists_m(8));
+        // the rest is the base's
+        assert!(p.lists_g(10) && !p.lists_g(1230));
+        // taking a code away wins over adding it
+        let both = Profile::from_text("base = grbl\nallow_g = 41\ndeny_g = 41\n", "x").unwrap();
+        assert!(!both.lists_g(410));
+        // and the check uses it, with the name of the profile in the sentence
+        let found = check(&lines("G41 G1 X1 F100\nM7\nM6\nM2"), &p);
+        let said: Vec<String> = found.iter().map(|f| f.text("en")).collect();
+        assert!(
+            said.iter()
+                .any(|t| t.contains("M7 is not in the list of my-controller")),
+            "{said:?}"
+        );
+        assert!(
+            !said.iter().any(|t| t.contains("G41") || t.contains("M6")),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn every_line_of_a_profile_that_cannot_be_used_is_named_with_its_number() {
+        let text = "max_line = many\nnot a pair\nflavour = sweet\nbase = nosuch\nallow_g = 41, abc\nallow_m = 6.5\nmax_decimals = 16\npercent = maybe\nname = |\n";
+        let errors = Profile::from_text(text, "x").unwrap_err();
+        let at: Vec<Option<usize>> = errors.iter().map(|e| e.line).collect();
+        assert_eq!(at, (0..=8).map(Some).collect::<Vec<_>>(), "{errors:?}");
+        let kinds: Vec<Msg> = errors.iter().map(|e| e.msg).collect();
+        assert_eq!(kinds[1], Msg::FmtProfileSyntax);
+        assert_eq!(kinds[2], Msg::FmtProfileKey);
+        assert_eq!(kinds[4], Msg::FmtProfileCode);
+        assert_eq!(
+            errors[2].text("en"),
+            "Line 3 of the profile: 'flavour' is not a key of a format profile"
+        );
+        assert_eq!(errors[4].args, vec!["abc".to_string()]);
+        // each one is told in the eight languages with its holes filled
+        for lang in crate::words::LANGS {
+            for e in &errors {
+                assert!(!e.text(lang).contains('{'), "{:?} {lang}", e.msg);
+            }
+        }
+        // a G code is a number of tenths, an M code a whole number
+        assert!(Profile::from_text("allow_g = 5.15\n", "x").is_err());
+        assert!(Profile::from_text("allow_g = -1\n", "x").is_err());
+        assert!(Profile::from_text("allow_m = 1000\n", "x").is_err());
+        assert!(Profile::from_text("allow_g =\nallow_m =\n", "x").is_ok());
+    }
+
+    #[test]
+    fn a_profile_is_loaded_from_a_file_and_is_named_after_it_when_the_text_does_not() {
+        let d = Folder::new("load");
+        let named = d.0.join("lathe.txt");
+        std::fs::write(&named, "base = full\nmax_line = 40\n").unwrap();
+        let p = Profile::load(&named).unwrap();
+        assert_eq!((p.name.as_str(), p.max_line), ("lathe", 40));
+        // not there, a folder, and too big are the same error: the file could not be read
+        let big = d.0.join("big.txt");
+        std::fs::write(&big, "#".repeat(MAX_PROFILE_BYTES as usize + 1)).unwrap();
+        for path in [d.0.join("missing.txt"), d.0.clone(), big] {
+            let e = Profile::load(&path).unwrap_err();
+            assert_eq!(
+                (e.len(), e[0].line, e[0].msg),
+                (1, None, Msg::FmtProfileUnreadable)
+            );
+        }
+    }
+
+    #[test]
+    fn a_name_is_one_of_the_three_a_file_beside_the_settings_or_a_path() {
+        let d = Folder::new("resolve");
+        let settings = d.0.join("phoenix-cnc.cfg");
+        std::fs::write(
+            d.0.join("phoenix-cnc-format-shop.txt"),
+            "base = grbl\nmax_line = 50\n",
+        )
+        .unwrap();
+        let other = d.0.join("elsewhere.txt");
+        std::fs::write(&other, "max_decimals = 2\n").unwrap();
+        let broken = d.0.join("broken.txt");
+        std::fs::write(&broken, "oops\n").unwrap();
+        let get = |n: &str| resolve(n, Some(&settings));
+        assert!(matches!(get("GRBL"), Found::Profile(p) if p.name == "grbl"));
+        assert!(matches!(get("shop"), Found::Profile(p) if p.name == "shop" && p.max_line == 50));
+        assert!(matches!(get(&other.to_string_lossy()), Found::Profile(p) if p.max_decimals == 2));
+        assert!(matches!(get(&broken.to_string_lossy()), Found::Invalid(f) if f.len() == 1));
+        for nothing in ["nosuch", "", "  ", "..", "no-such-folder/x.txt"] {
+            assert_eq!(get(nothing), Found::NotFound, "{nothing:?}");
+        }
+        // with no settings file only the three and the paths are known
+        assert_eq!(resolve("shop", None), Found::NotFound);
+        // a name that is not letters, digits, - and _ has no place beside the settings
+        for odd in ["", "a b", "a/b", "..", "a.b", &"x".repeat(65)] {
+            assert_eq!(profile_path(&settings, odd), None, "{odd:?}");
+        }
+        assert_eq!(
+            profile_path(&settings, "shop")
+                .unwrap()
+                .file_name()
+                .unwrap(),
+            "phoenix-cnc-format-shop.txt"
+        );
+    }
+
+    #[test]
+    fn texts_from_a_fixed_seed_never_panic_and_give_a_profile_or_errors_with_lines() {
+        let tokens = [
+            "name",
+            "base",
+            "max_line",
+            "max_decimals",
+            "percent",
+            "needs_end",
+            "allow_g",
+            "deny_g",
+            "allow_m",
+            "deny_m",
+            "=",
+            "grbl",
+            "full",
+            "generic",
+            "yes",
+            "no",
+            "41",
+            "5.1",
+            "G64",
+            "M6",
+            "-3",
+            "1e9",
+            ",",
+            "#",
+            ";",
+            "\n",
+            "\n",
+            " ",
+            "\u{e9}",
+            "x",
+            "12",
+        ];
+        let mut seed = 99u64;
+        let mut next = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) as usize
+        };
+        let (mut good, mut wrong) = (0, 0);
+        for _ in 0..600 {
+            let n = next() % 30;
+            let text: String = (0..n)
+                .map(|_| tokens[next() % tokens.len()])
+                .collect::<Vec<_>>()
+                .join(" ");
+            let rows = text.lines().count();
+            match Profile::from_text(&text, "fuzz") {
+                Ok(p) => {
+                    good += 1;
+                    assert!(p.max_line <= 100_000 && p.max_decimals <= 15, "{text:?}");
+                }
+                Err(e) => {
+                    wrong += 1;
+                    assert!(!e.is_empty());
+                    assert!(
+                        e.iter().all(|f| f.line.is_none_or(|l| l < rows.max(1))),
+                        "{text:?} {e:?}"
+                    );
+                    for f in &e {
+                        assert!(!f.text("en").contains('{'));
+                    }
+                }
+            }
+        }
+        assert!(good > 20 && wrong > 20, "{good} {wrong}");
     }
 }

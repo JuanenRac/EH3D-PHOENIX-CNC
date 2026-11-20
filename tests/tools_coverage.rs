@@ -182,3 +182,77 @@ fn the_examples_are_in_the_format_of_the_controllers_they_are_for() {
         }
     }
 }
+
+/// The settings with the table of tools of `examples/tools.txt`.
+fn settings_with_tools() -> Settings {
+    let mut s = Settings::default();
+    let text = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/tools.txt"),
+    )
+    .unwrap();
+    s.tuning.tools = eh3d_phoenix_cnc::tools::ToolTable::parse(&text);
+    assert!(
+        s.tuning.tools.issues.is_empty(),
+        "{:?}",
+        s.tuning.tools.issues
+    );
+    s
+}
+
+#[test]
+fn the_holder_the_life_the_restart_and_the_templates_run_on_every_example_in_every_language_with_no_hole_left(
+) {
+    let s = settings_with_tools();
+    for (path, lines) in examples() {
+        let file = path.to_string_lossy().to_string();
+        let middle = (lines.len() / 2).max(1).to_string();
+        let tools: [Vec<&str>; 4] = [
+            vec!["--holder"],
+            vec!["--life"],
+            vec!["--restart", "1"],
+            vec!["--restart", &middle],
+        ];
+        for tool in &tools {
+            for lang in LANGS {
+                let mut args = tool.clone();
+                args.extend(["--lang", lang, &file]);
+                let o = parse(&args);
+                assert!(wanted(&o), "{args:?}");
+                let r = run_in(&o, &s);
+                // a restart from a line the state cannot be rebuilt at is refused with 2; the others only read
+                assert!(r.code <= 2, "{args:?}: {} {}", r.code, r.err);
+                if tool[0] != "--restart" {
+                    assert!(r.code <= 1, "{args:?}: {} {}", r.code, r.err);
+                }
+                assert!(!r.out.contains('{') && !r.err.contains('{'), "{args:?}");
+            }
+        }
+        // from the first line the program restarts as it is, after the lines that set the defaults
+        let first = run_in(&parse(&["--restart", "1", &file]), &s);
+        assert_eq!(first.code, 0, "{}: {}", path.display(), first.err);
+        assert!(
+            first.out.ends_with(&format!("{}\n", lines.join("\n"))),
+            "{}",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn every_machine_template_runs_the_tools_on_every_example() {
+    for name in eh3d_phoenix_cnc::templates::names() {
+        let t = eh3d_phoenix_cnc::templates::find(name).unwrap();
+        let mut s = Settings::default();
+        t.apply(&mut s);
+        for (path, _) in examples() {
+            let file = path.to_string_lossy().to_string();
+            for tool in ["--times", "--offsets", "--holder"] {
+                let r = run_in(&parse(&[tool, &file]), &s);
+                assert!(r.code <= 1, "{name} {tool} {}: {}", path.display(), r.err);
+            }
+        }
+        // what the template prints is the same settings
+        let printed = run_in(&parse(&["--template", name]), &s);
+        assert_eq!(Settings::parse(&printed.out).travel, t.travel);
+    }
+}

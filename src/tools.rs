@@ -4,8 +4,8 @@
 //! report and the statistics list the tools a program takes with what the table says of each, and a tool that the table does not have is
 //! named as a warning (a program may still use it). Nothing here moves anything.
 //!
-//! A line of the file: `tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N | life=MIN | used=MIN`; the diameter is needed, the
-//! rest may be left out. `life` is the minutes of work the tool is good for and `used` the minutes it has worked already: with a life, the
+//! A line of the file: `tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N | reach=MM | life=MIN | used=MIN`; the diameter is needed, the
+//! rest may be left out. `reach` is how far the tool stands out below its holder: the deepest it may go into the material (`holder`). `life` is the minutes of work the tool is good for and `used` the minutes it has worked already: with a life, the
 //! report says a tool that is worn out, one that the program would wear out and one that has little life left. Empty lines and lines that
 //! start with `#` or `;` are skipped; every other line that cannot be used is left out and named, with its number and the reason, in the
 //! report.
@@ -44,6 +44,8 @@ pub struct Tool {
     pub length_mm: f64,
     /// The number of flutes (0 when the line has none).
     pub flutes: u32,
+    /// How far the tool stands out below its holder, in mm (0 when the line has none: the depth it can cut to is not checked).
+    pub reach_mm: f64,
     /// The minutes of work the tool is good for (0 when the line has none: its wear is not followed) and the minutes it has worked.
     pub life_min: f64,
     pub used_min: f64,
@@ -121,6 +123,7 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
         .filter(|n| (1..=MAX_TOOL).contains(n))
         .ok_or(ToolError::Number)?;
     let (mut name, mut diameter, mut length, mut flutes) = (String::new(), None, 0.0, 0);
+    let mut reach = 0.0;
     let (mut life, mut used) = (0.0, 0.0);
     let minutes = |v: &str| {
         v.trim()
@@ -158,6 +161,14 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
                     .filter(|f| *f <= MAX_FLUTES)
                     .ok_or(ToolError::Other)?
             }
+            "reach" => {
+                reach = v
+                    .trim()
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|r| r.is_finite() && (0.0..=MAX_LENGTH_MM).contains(r))
+                    .ok_or(ToolError::Other)?
+            }
             "life" => life = minutes(v)?,
             "used" => used = minutes(v)?,
             _ => {}
@@ -169,6 +180,7 @@ fn parse_tool(line: &str) -> Result<Tool, ToolError> {
         diameter_mm: diameter.ok_or(ToolError::Diameter)?,
         length_mm: length,
         flutes,
+        reach_mm: reach,
         life_min: life,
         used_min: used,
     })
@@ -415,6 +427,7 @@ mod tests {
                 diameter_mm: 3.0,
                 length_mm: -2.5,
                 flutes: 2,
+                reach_mm: 0.0,
                 life_min: 0.0,
                 used_min: 0.0
             }
@@ -427,6 +440,7 @@ mod tests {
                 diameter_mm: 0.8,
                 length_mm: 0.0,
                 flutes: 0,
+                reach_mm: 0.0,
                 life_min: 0.0,
                 used_min: 0.0
             }

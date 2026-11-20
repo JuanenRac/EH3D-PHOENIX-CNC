@@ -48,6 +48,8 @@ pub(super) enum Win {
     Transform(Box<xform::XformState>),
     /// The bookmarks and the start from a line.
     Lines(Box<lines::LinesState>),
+    /// The machine on the EH3D server: its position, a jog, the emergency stop and the release of its latch.
+    Machine(Box<machine::MachineState>),
 }
 
 /// The settings as they are being changed; they take effect with Ok.
@@ -149,6 +151,7 @@ impl App {
             "macros" => Some(Win::Macros),
             "transform" => Some(Win::Transform(Box::default())),
             "bookmarks" => Some(Win::Lines(Box::default())),
+            "machine" => Some(Win::Machine(Box::new(self.machine_state()))),
             "probe" => Some(Win::Probe(probe::Ask::Z)),
             "probe-grid" => Some(Win::Probe(probe::Ask::Grid {
                 area: [0.0, 0.0, 50.0, 40.0],
@@ -524,6 +527,11 @@ impl App {
                 ui.close();
             }
             self.probe_menu(ui);
+            ui.separator();
+            if ui.button(self.w(Msg::CncMenu)).clicked() {
+                self.open_window("machine");
+                ui.close();
+            }
         });
     }
 
@@ -564,6 +572,7 @@ impl App {
             Win::Macros => self.macros_list_window(ctx),
             Win::Transform(s) => self.xform_window(ctx, s),
             Win::Lines(s) => self.lines_window(ctx, s),
+            Win::Machine(s) => self.machine_window(ctx, s),
         };
         // a window that opened another one while it closed (the end of a run asks for the summary of the next) leaves that one open
         if next.is_some() || self.win.is_none() {
@@ -1112,6 +1121,9 @@ impl App {
     fn settings_window(&mut self, ctx: &egui::Context, mut d: Box<Draft>) -> Option<Win> {
         let mut ok = false;
         let mut cancel = false;
+        let mut pane = self.server_pane.take().unwrap_or_else(|| {
+            crate::serverlink::ServerPane::new(&self.settings, self.server_login.clone())
+        });
         self.window(self.t(Text::SettingsTitle))
             .default_size([620.0, 460.0])
             .show(ctx, |ui| {
@@ -1240,34 +1252,13 @@ impl App {
                                 }
                             }
                             4 => {
-                                egui::Grid::new("server")
-                                    .num_columns(2)
-                                    .spacing([10.0, 6.0])
-                                    .show(ui, |ui| {
-                                        ui.label(self.t(Text::McServerAddress));
-                                        super::clipmenu::text_box(
-                                            ui,
-                                            egui::TextEdit::singleline(&mut d.s.server_address)
-                                                .desired_width(260.0)
-                                                .hint_text("192.168.0.180:18200"),
-                                        );
-                                        ui.end_row();
-                                        ui.label(self.t(Text::McServerToken));
-                                        super::clipmenu::text_box(
-                                            ui,
-                                            egui::TextEdit::singleline(&mut d.s.server_token)
-                                                .desired_width(260.0)
-                                                .password(true),
-                                        );
-                                        ui.end_row();
-                                        ui.label(self.t(Text::McServerMachine));
-                                        super::clipmenu::text_box(
-                                            ui,
-                                            egui::TextEdit::singleline(&mut d.s.server_machine)
-                                                .desired_width(260.0),
-                                        );
-                                        ui.end_row();
-                                    });
+                                // the panel of the suite: the boxes, the state of the link, the login and the logout
+                                pane.refresh();
+                                if let Some(action) =
+                                    eh3d_view::server_gui::show(ui, &mut pane.panel, d.s.lang)
+                                {
+                                    pane.handle(action, &mut d.s);
+                                }
                             }
                             5 => {
                                 ui.checkbox(&mut d.s.confirm_start, self.t(Text::McConfirmStart));
@@ -1343,13 +1334,18 @@ impl App {
             }
             self.apply_settings();
             self.save_settings();
+            pane.reset(&self.settings);
+            self.server_pane = Some(pane);
             return None;
         }
         if cancel {
+            pane.reset(&self.settings);
+            self.server_pane = Some(pane);
             return None;
         }
         // the buttons of the tool changer and of the materials act on files, which needs the whole program
         self.tool_file_actions(&mut d);
+        self.server_pane = Some(pane);
         Some(Win::Settings(d))
     }
 }

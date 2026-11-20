@@ -6,13 +6,16 @@
 # out and named, with its number, in the report: a tool number from 1 to 255, a diameter above 0 up to 1000 mm, one line for each tool,
 # up to 64 tools, a file of up to 16 KiB.
 #
-# tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N | life=MIN | used=MIN      (the diameter is needed; the rest may be left out)
+# tool = NUMBER | name=NAME | diameter=MM | length=MM | flutes=N | reach=MM | life=MIN | used=MIN      (the diameter is needed; the rest may be left out)
+#
+# reach is how far the tool stands out below its holder, from 0 to 10000 mm. With a reach, --holder says a cut that goes deeper than it,
+# where the holder would touch the material (Z0 is taken as the surface of the material).
 #
 # life is the minutes of work a tool is good for and used the minutes it has worked already (both from 0 to 100000). With a life, the
 # report says a tool that is worn out, one that the program would wear out and one with a fifth of its life left or less. Add the time
 # of every job to used by hand: the program never writes this file.
 tool = 1 | name=Engraving V bit | diameter=0.2 | flutes=1
-tool = 2 | name=End mill 1 mm | diameter=1 | flutes=2 | life=240 | used=0
+tool = 2 | name=End mill 1 mm | diameter=1 | flutes=2 | reach=6 | life=240 | used=0
 tool = 3 | name=End mill 2 mm | diameter=2 | flutes=2
 tool = 4 | name=Drill 0.8 mm | diameter=0.8
 tool = 5 | name=Drill 1 mm | diameter=1

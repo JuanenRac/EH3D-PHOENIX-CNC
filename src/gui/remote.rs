@@ -6,7 +6,7 @@ use crate::server::{job_request, Client, Follow, Start};
 
 impl App {
     pub(super) fn server_client(&self) -> Option<Client> {
-        Client::from_settings(&self.settings)
+        Client::from_settings(&self.settings).map(|c| c.with_login(self.server_login.clone()))
     }
 
     /// A job on the server is being followed (it runs or waits).
