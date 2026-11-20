@@ -155,12 +155,44 @@ pub fn arc_curves(lines: &[String], step_mm: f64) -> Vec<(usize, Vec<Point>)> {
     } else {
         0.5
     };
+    curves_with(lines, 720, |g| {
+        (g.sweep.abs() * g.radius / step).ceil() as usize
+    })
+}
+
+/// The curve of each arc as straight pieces that leave the arc by no more than `tolerance_mm` (the sagitta of a piece), with the
+/// angle of a piece worked out from the radius: a small arc gets few pieces and a large one many (never more than 4096 for an arc).
+/// A tolerance that is not a positive number is taken as 0.01 mm.
+pub fn arc_curves_within(lines: &[String], tolerance_mm: f64) -> Vec<(usize, Vec<Point>)> {
+    let tol = if tolerance_mm.is_finite() && tolerance_mm > 0.0 {
+        tolerance_mm
+    } else {
+        0.01
+    };
+    curves_with(lines, 4096, |g| {
+        if tol >= g.radius {
+            return 4;
+        }
+        let piece = 2.0 * (1.0 - tol / g.radius).clamp(-1.0, 1.0).acos();
+        if piece > 1e-9 {
+            (g.sweep.abs() / piece).ceil() as usize
+        } else {
+            4096
+        }
+    })
+}
+
+fn curves_with(
+    lines: &[String],
+    most: usize,
+    pieces: impl Fn(&ArcGeo) -> usize,
+) -> Vec<(usize, Vec<Point>)> {
     let mut out = Vec::new();
     for a in trace(lines).1 {
         let Some(g) = arc_geo(&a) else { continue };
         let at = |p: Point, i: usize| [p.0, p.1, p.2][i];
         let rise = at(a.to, g.axes.2) - at(a.from, g.axes.2);
-        let n = ((g.sweep.abs() * g.radius / step).ceil() as usize).clamp(1, 720);
+        let n = pieces(&g).clamp(1, most);
         let mut pts: Vec<Point> = Vec::with_capacity(n + 1);
         pts.push(a.from);
         for k in 1..n {
