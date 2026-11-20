@@ -723,6 +723,149 @@
           }
         },
         {
+          "name": "dialect.rs",
+          "desc": {
+            "en": "the reports of GRBL and grblHAL as data: build, $$ settings and the parser state",
+            "es": "los informes de GRBL y grblHAL como datos: versión, ajustes $$ y estado del parser",
+            "de": "die Meldungen von GRBL und grblHAL als Daten: Version, $$-Einstellungen, Parserzustand",
+            "fr": "les rapports de GRBL et grblHAL en données : version, réglages $$ et état de l'analyseur",
+            "it": "i rapporti di GRBL e grblHAL come dati: versione, impostazioni $$ e stato del parser",
+            "ja": "GRBL と grblHAL のレポートをデータとして読む：ビルド、$$ 設定、パーサー状態",
+            "zh": "把 GRBL 和 grblHAL 的报告读成数据：版本、$$ 设置和解析器状态",
+            "pt": "os relatórios do GRBL e do grblHAL como dados: versão, definições $$ e estado do parser"
+          }
+        },
+        {
+          "name": "ctltext.rs",
+          "desc": {
+            "en": "alarms, errors and guard messages by number in eight languages",
+            "es": "alarmas, errores y mensajes del guardián por número, en ocho idiomas",
+            "de": "Alarme, Fehler und Wächtermeldungen nach Nummer in acht Sprachen",
+            "fr": "alarmes, erreurs et messages du garde par numéro, en huit langues",
+            "it": "allarmi, errori e messaggi della guardia per numero, in otto lingue",
+            "ja": "アラーム、エラー、ガードのメッセージを番号別に8言語で",
+            "zh": "按编号提供的报警、错误和守卫消息，八种语言",
+            "pt": "alarmes, erros e mensagens do guarda por número, em oito idiomas"
+          }
+        },
+        {
+          "name": "faulty.rs",
+          "desc": {
+            "en": "a controller that goes wrong on purpose: silence, busy, error at a line, false position",
+            "es": "un controlador que falla a propósito: silencio, ocupado, error en una línea, posición falsa",
+            "de": "eine absichtlich fehlerhafte Steuerung: Stille, belegt, Fehler in einer Zeile, falsche Position",
+            "fr": "un contrôleur qui se trompe exprès : silence, occupé, erreur à une ligne, fausse position",
+            "it": "un controllore che sbaglia di proposito: silenzio, occupato, errore a una riga, posizione falsa",
+            "ja": "意図的に誤動作するコントローラー：無応答、ビジー、行エラー、偽の位置",
+            "zh": "故意出错的控制器：无应答、忙、某行出错、位置错误",
+            "pt": "um controlador que falha de propósito: silêncio, ocupado, erro numa linha, posição falsa"
+          }
+        },
+        {
+          "name": "guard.rs",
+          "desc": {
+            "en": "the guard that fails closed: no resend of a move, stop on silence, one jog order at a time",
+            "es": "el guardián seguro: no reenvía movimientos, para ante el silencio, un jog a la vez",
+            "de": "der Wächter, der sicher ausfällt: keine Wiederholung von Bewegungen, Stopp bei Stille, ein Jog",
+            "fr": "le garde sûr : pas de renvoi d'un mouvement, arrêt sur silence, un jog à la fois",
+            "it": "la guardia sicura: nessun rinvio dei movimenti, stop al silenzio, un jog alla volta",
+            "ja": "安全側に倒れるガード：移動の再送なし、無応答で停止、ジョグ命令は一度に1つ",
+            "zh": "故障即安全的守卫：运动命令绝不重发，无应答即停止，一次只允许一个点动命令",
+            "pt": "o guarda seguro: sem reenvio de movimentos, paragem no silêncio, um jog de cada vez"
+          }
+        },
+        {
+          "name": "lookahead.rs",
+          "desc": {
+            "en": "the planner on paper: corner speeds, acceleration per axis, profiles and the time",
+            "es": "el planificador en papel: velocidades en esquinas, aceleración por eje, perfiles y tiempo",
+            "de": "der Planer auf dem Papier: Eckengeschwindigkeiten, Beschleunigung je Achse, Profile, Zeit",
+            "fr": "le planificateur sur le papier : vitesses aux coins, accélération par axe, profils et durée",
+            "it": "il pianificatore su carta: velocità negli angoli, accelerazione per asse, profili e tempo",
+            "ja": "紙上のプランナー：コーナー速度、軸ごとの加速度、速度プロファイルと時間",
+            "zh": "纸面规划器：拐角速度、各轴加速度、速度曲线和时间",
+            "pt": "o planeador em papel: velocidades nos cantos, aceleração por eixo, perfis e tempo"
+          }
+        },
+        {
+          "name": "import.rs",
+          "desc": {
+            "en": "bounded readers of HPGL, DXF and SVG, and the G-code that cuts along them",
+            "es": "lectores acotados de HPGL, DXF y SVG, y el G-code que corta siguiéndolos",
+            "de": "begrenzte Leser für HPGL, DXF und SVG und der G-Code, der entlang schneidet",
+            "fr": "lecteurs bornés de HPGL, DXF et SVG, et le G-code qui coupe le long des tracés",
+            "it": "lettori limitati di HPGL, DXF e SVG, e il G-code che taglia lungo i percorsi",
+            "ja": "HPGL・DXF・SVG の上限付きリーダーと、それに沿って切削する G コード",
+            "zh": "有上限的 HPGL、DXF、SVG 读取器，以及沿路径切割的 G 代码",
+            "pt": "leitores limitados de HPGL, DXF e SVG, e o G-code que corta ao longo deles"
+          }
+        },
+        {
+          "name": "post.rs",
+          "desc": {
+            "en": "post-processors as rules in a text file: header, footer, words, numbers, decimals",
+            "es": "postprocesadores como reglas en un fichero de texto: cabecera, pie, palabras, números",
+            "de": "Postprozessoren als Regeln in einer Textdatei: Kopf, Fuß, Wörter, Nummern, Dezimalstellen",
+            "fr": "post-processeurs en règles dans un fichier texte : en-tête, pied, mots, numéros, décimales",
+            "it": "post-processori come regole in un file di testo: intestazione, coda, parole, numeri, decimali",
+            "ja": "テキストファイルのルールで書くポストプロセッサー：ヘッダー、フッター、語、行番号、小数桁",
+            "zh": "以文本文件规则编写的后处理器：头部、尾部、字、行号、小数位",
+            "pt": "pós-processadores como regras num ficheiro de texto: cabeçalho, rodapé, palavras, números"
+          }
+        },
+        {
+          "name": "toolsetter.rs",
+          "desc": {
+            "en": "the tool setter: tool length measured by touch, written to the table of tools",
+            "es": "el medidor de herramienta: longitud medida por contacto y escrita en la tabla de herramientas",
+            "de": "der Werkzeugsensor: Werkzeuglänge per Antasten gemessen und in die Werkzeugtabelle geschrieben",
+            "fr": "le capteur d'outil : longueur mesurée par contact et écrite dans la table des outils",
+            "it": "il sensore utensile: lunghezza misurata al tocco e scritta nella tabella utensili",
+            "ja": "ツールセッター：接触で工具長を測り、工具テーブルに書き込む",
+            "zh": "对刀仪：通过接触测量刀具长度并写入刀具表",
+            "pt": "o sensor de ferramenta: comprimento medido por toque e escrito na tabela de ferramentas"
+          }
+        },
+        {
+          "name": "motioncfg.rs",
+          "desc": {
+            "en": "the motion file: planner, guard, importers and tool setter values",
+            "es": "el fichero de movimiento: valores del planificador, el guardián, los importadores y el medidor",
+            "de": "die Bewegungsdatei: Werte für Planer, Wächter, Importer und Werkzeugsensor",
+            "fr": "le fichier de mouvement : valeurs du planificateur, du garde, des importateurs et du capteur",
+            "it": "il file di movimento: valori di pianificatore, guardia, importatori e sensore utensile",
+            "ja": "モーションファイル：プランナー、ガード、インポーター、ツールセッターの値",
+            "zh": "运动文件：规划器、守卫、导入器和对刀仪的数值",
+            "pt": "o ficheiro de movimento: valores do planeador, do guarda, dos importadores e do sensor"
+          }
+        },
+        {
+          "name": "notes.rs",
+          "desc": {
+            "en": "words of the importers and the planner tool in eight languages",
+            "es": "textos de los importadores y de la herramienta del planificador en ocho idiomas",
+            "de": "Texte der Importer und des Planerwerkzeugs in acht Sprachen",
+            "fr": "textes des importateurs et de l'outil du planificateur en huit langues",
+            "it": "testi degli importatori e dello strumento del pianificatore in otto lingue",
+            "ja": "インポーターとプランナーツールの文言（8言語）",
+            "zh": "导入器和规划器工具的文字，八种语言",
+            "pt": "textos dos importadores e da ferramenta do planeador em oito idiomas"
+          }
+        },
+        {
+          "name": "problem.rs",
+          "desc": {
+            "en": "what is wrong with a line of a motion or post file, said in eight languages",
+            "es": "qué falla en una línea de un fichero de movimiento o de postprocesador, en ocho idiomas",
+            "de": "was an einer Zeile einer Bewegungs- oder Postdatei falsch ist, in acht Sprachen",
+            "fr": "ce qui ne va pas dans une ligne d'un fichier de mouvement ou de post, en huit langues",
+            "it": "cosa non va in una riga di un file di movimento o di post, in otto lingue",
+            "ja": "モーション／ポストファイルの行の誤りを8言語で説明",
+            "zh": "运动文件或后处理文件某一行的问题，八种语言",
+            "pt": "o que está errado numa linha de um ficheiro de movimento ou de pós-processador"
+          }
+        },
+        {
           "name": "bin/phoenix-cnc.rs",
           "desc": {
             "en": "the program that opens the window",
