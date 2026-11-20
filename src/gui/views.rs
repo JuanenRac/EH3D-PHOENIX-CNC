@@ -44,9 +44,9 @@ impl App {
     }
 
     /// The path of the program on the table, what is done, and where the tool is.
-    pub(super) fn center(&mut self, ui: &mut egui::Ui) {
+    pub(super) fn panel_viewer(&mut self, ui: &mut egui::Ui) {
         let t = self.theme.clone();
-        egui::CentralPanel::default().show(ui, |ui| {
+        {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new(self.t(Text::McToolpath).to_uppercase()).color(col(t.accent)),
@@ -126,7 +126,7 @@ impl App {
             if pick.is_some() {
                 self.select_segment(picked);
             }
-        });
+        }
     }
 
     /// How the plan fits the table (or the program) into the area: its size and the true view from above that draws it.

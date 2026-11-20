@@ -16,6 +16,8 @@ use eh3d_view::texts::{tr, Lang, Text};
 use eh3d_view::theme::{Rgb, Theme, ThemeId};
 
 use crate::cli::Options;
+use crate::guard::GuardHandle;
+use crate::motioncfg::{motion_path, MotionCfg};
 use crate::queue::Queue;
 use crate::recovery::{self, Recovery};
 use crate::settings::{settings_path, Settings};
@@ -23,6 +25,7 @@ use crate::settings::{settings_path, Settings};
 mod check;
 mod clipmenu;
 mod dialogs;
+mod dockpanels;
 mod editwin;
 mod files;
 mod icons;
@@ -37,6 +40,7 @@ mod prefs;
 mod probe;
 mod queue;
 mod remote;
+mod shell;
 mod sim;
 mod summary;
 mod views;
@@ -49,7 +53,6 @@ const PUMP_BATCH: usize = 8;
 use crate::view::{Orbit, Plan2d};
 use dialogs::{lang_name, Win};
 use files::Purpose;
-use keys::Shortcut;
 
 fn col(c: Rgb) -> Color32 {
     Color32::from_rgb(c.0, c.1, c.2)
@@ -240,6 +243,18 @@ pub struct App {
     /// Whether a box of text, or any widget, had the keyboard at the end of the last frame.
     typing_prev: bool,
     focus_prev: bool,
+    /// The values of the motion file (the planner, the guard, the importers, the tool setter) and the lines of it that could not be used.
+    motion: MotionCfg,
+    /// The guard of the controller, when the motion file has it on, and why it stopped the machine the last time it could be asked.
+    guard: Option<GuardHandle>,
+    guard_trip: Option<crate::guard::Trip>,
+    /// What the panels of the docking window ask of the frame: panels to show, and files that were opened (for the list of recent files).
+    pending_dock: Vec<eh3d_dock::menu::DockAction>,
+    recent_added: Vec<String>,
+    /// The state of the panels of the import, the time and the tool setter.
+    import_ui: dockpanels::ImportUi,
+    plan_ui: Option<crate::workflow::TimeCompare>,
+    setter_ui: dockpanels::SetterUi,
 }
 
 impl App {
@@ -266,6 +281,7 @@ impl App {
     pub fn with_controller(o: &Options, controller: crate::session::BoxedController) -> App {
         let path = settings_path();
         let mut settings = Settings::load(&path);
+        let (motion, motion_problems) = MotionCfg::read(&motion_path(&path));
         if let Some(l) = o.lang {
             settings.lang = l;
         }
@@ -289,6 +305,7 @@ impl App {
         let mut session = Session::new(controller);
         session.step_mm = settings.step_mm;
         session.feed_mm_min = settings.feed_mm_min;
+        session.cancel_crossing_jog = motion.guard.jog_cancel_crossing;
         session.resume_plunge_feed_mm_min = settings.resume_plunge_feed_mm_min;
         session.set_travel(settings.travel);
         if settings.read_controller_travel {
@@ -344,6 +361,14 @@ impl App {
             sim_pos: None,
             typing_prev: false,
             focus_prev: false,
+            motion,
+            guard: None,
+            guard_trip: None,
+            pending_dock: Vec::new(),
+            recent_added: Vec::new(),
+            import_ui: dockpanels::ImportUi::default(),
+            plan_ui: None,
+            setter_ui: dockpanels::SetterUi::default(),
             shot: o.shot.clone().map(|file| Shot {
                 file,
                 wait: o.wait,
@@ -384,6 +409,15 @@ impl App {
         if o.file.is_none() && o.window.is_none() && o.shot.is_none() && !cfg!(test) {
             app.restore_queue();
         }
+        // the lines of the motion file that could not be used are said in the log, with the name of the file
+        for p in &motion_problems {
+            let said = format!(
+                "{}: {}",
+                motion_path(&app.settings_path).display(),
+                p.text(app.lang.code())
+            );
+            app.session.log.push(said);
+        }
         if let Some(name) = profile_missing {
             let said = app.ws(crate::words::Msg::ProfileUnknown, &[name]);
             app.session.log.push(said);
@@ -391,6 +425,13 @@ impl App {
         if let Some(w) = &o.window {
             app.open_window(w);
         }
+        app
+    }
+
+    /// The window over the controller of the link: the guard it is in, when the motion file has it on, is kept to be told the time.
+    pub fn with_link(o: &Options, linked: crate::link::Linked) -> App {
+        let mut app = App::with_controller(o, linked.controller);
+        app.guard = linked.guard;
         app
     }
 
@@ -671,32 +712,6 @@ impl App {
                     self.open_window("settings");
                 }
             });
-        });
-    }
-
-    /// The left panel, made as a column of buttons: a column of buttons for the zeros and the stored positions, the position with its
-    /// tabs (work, machine, operator, GCode), the speed and the spindle, the codes in force or the inputs and outputs, and the jog.
-    fn left(&mut self, ui: &mut egui::Ui) {
-        if self.settings.show_buttons {
-            egui::Panel::left("icons").exact_size(74.0).show(ui, |ui| {
-                ui.add_space(4.0);
-                self.icon_column(ui);
-            });
-        }
-        egui::Panel::left("left").exact_size(360.0).show(ui, |ui| {
-            ui.add_space(4.0);
-            egui::ScrollArea::vertical()
-                .id_salt("leftscroll")
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    self.position_block(ui);
-                    ui.add_space(4.0);
-                    self.speed_rows(ui);
-                    ui.add_space(4.0);
-                    self.info_block(ui);
-                    ui.separator();
-                    self.jog_block(ui);
-                });
         });
     }
 
@@ -1017,205 +1032,12 @@ impl App {
             ui.end_row();
         });
     }
-
-    fn right(&mut self, ui: &mut egui::Ui) {
-        if !self.settings.show_program {
-            return;
-        }
-        egui::Panel::right("right")
-            .exact_size(330.0)
-            .show(ui, |ui| {
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new(self.t(Text::McProgram).to_uppercase())
-                        .color(col(self.theme.accent)),
-                );
-                ui.horizontal(|ui| {
-                    clipmenu::text_box(
-                        ui,
-                        egui::TextEdit::singleline(&mut self.path)
-                            .desired_width(190.0)
-                            .hint_text("job.nc"),
-                    );
-                    if ui.button(self.t(Text::McOpenGcode)).clicked() && !self.path.is_empty() {
-                        let p = PathBuf::from(self.path.clone());
-                        self.open(&p);
-                    }
-                });
-                ui.horizontal(|ui| {
-                    if ui
-                        .add_enabled(self.can_start(), egui::Button::new(self.t(Text::Start)))
-                        .clicked()
-                    {
-                        self.request_start();
-                    }
-                    if ui
-                        .add_enabled(self.can_pause(), egui::Button::new(self.t(Text::Pause)))
-                        .clicked()
-                    {
-                        self.program_pause();
-                    }
-                    if ui
-                        .add_enabled(self.can_stop(), egui::Button::new(self.t(Text::Stop)))
-                        .clicked()
-                    {
-                        self.program_stop();
-                    }
-                    if ui
-                        .add_enabled(
-                            self.can_send_to_server(),
-                            egui::Button::new(self.t(Text::McSendServer)),
-                        )
-                        .clicked()
-                    {
-                        self.request_send();
-                    }
-                });
-                ui.label(format!(
-                    "{} {} / {}",
-                    self.t(Text::McLine),
-                    self.program_line(),
-                    self.session.program.len()
-                ));
-                if let Some(left) = self.time_left_text() {
-                    ui.label(RichText::new(left).color(col(self.theme.dim)));
-                }
-                ui.separator();
-                self.queue_panel(ui);
-                let next = self.program_line();
-                let running = self.session.running || self.server_busy();
-                let (focus, scroll_to_focus) = (self.focus_line, self.focus_scroll);
-                let mut scrolled = false;
-                let mut clicked: Option<usize> = None;
-                let mut double_clicked: Option<usize> = None;
-                egui::ScrollArea::vertical()
-                    .id_salt("program")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for (n, line) in self.session.program.iter().enumerate() {
-                            let current = running && n == next;
-                            let marked = focus == Some(n);
-                            // a bookmarked line has a star after its number
-                            let star = if self.bookmarks.contains(n) { '*' } else { ' ' };
-                            let text =
-                                RichText::new(format!("{:>4}{star} {line}", n + 1)).monospace();
-                            let text = if n < next {
-                                text.color(col(self.theme.ok))
-                            } else if current {
-                                text.color(col(self.theme.accent)).strong()
-                            } else {
-                                text.color(col(self.theme.dim))
-                            };
-                            // a line that a window asked to show is marked until another one is
-                            let text = if marked {
-                                text.strong()
-                                    .background_color(alpha(col(self.theme.accent), 70))
-                            } else {
-                                text
-                            };
-                            let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
-                            if r.double_clicked() {
-                                double_clicked = Some(n);
-                            } else if r.clicked() {
-                                clicked = Some(n);
-                            }
-                            if current {
-                                r.scroll_to_me(None);
-                            } else if marked && scroll_to_focus {
-                                r.scroll_to_me(None);
-                                scrolled = true;
-                            }
-                        }
-                    });
-                if scrolled {
-                    self.focus_scroll = false;
-                }
-                // a click selects a line and a double click bookmarks it
-                if let Some(n) = double_clicked {
-                    self.focus_line = Some(n);
-                    self.bookmarks.toggle(n);
-                } else if let Some(n) = clicked {
-                    self.focus_line = Some(n);
-                }
-            });
-    }
-
-    fn bottom(&mut self, ui: &mut egui::Ui) {
-        let height = if self.settings.show_log { 120.0 } else { 44.0 };
-        egui::Panel::bottom("bottom")
-            .exact_size(height)
-            .show(ui, |ui| {
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    ui.label(self.t(Text::McMdi));
-                    // Tab finishes the code being typed (`complete`), only while the box has the keyboard
-                    let id = egui::Id::unique("command-box");
-                    let completed = ui.memory(|m| m.has_focus(id))
-                        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab))
-                        && self.complete_command();
-                    let r = clipmenu::text_box(
-                        ui,
-                        egui::TextEdit::singleline(&mut self.mdi)
-                            .id(id)
-                            .desired_width(420.0)
-                            .font(egui::TextStyle::Monospace)
-                            .hint_text("G0 X10 Y10"),
-                    );
-                    if completed {
-                        // the cursor goes to the end of the text that was finished
-                        if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
-                            let end = egui::text::CCursor::new(self.mdi.chars().count());
-                            state
-                                .cursor
-                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
-                            state.store(ui.ctx(), id);
-                        }
-                    } else if r.changed() {
-                        self.mdi_options.clear();
-                    }
-                    let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                    if ui.button(self.t(Text::McSend)).clicked() || enter {
-                        let line = std::mem::take(&mut self.mdi);
-                        self.mdi_options.clear();
-                        self.session.mdi(&line);
-                        r.request_focus();
-                    }
-                    if !self.mdi_options.is_empty() {
-                        ui.label(
-                            RichText::new(self.mdi_options.join("  "))
-                                .monospace()
-                                .color(col(self.theme.dim)),
-                        );
-                    }
-                });
-                if !self.settings.show_log {
-                    return;
-                }
-                ui.separator();
-                ui.label(
-                    RichText::new(self.t(Text::McLog).to_uppercase()).color(col(self.theme.dim)),
-                );
-                egui::ScrollArea::vertical()
-                    .id_salt("log")
-                    .stick_to_bottom(true)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for l in &self.session.log {
-                            let c = if l.contains(':') && !l.starts_with('>') {
-                                col(self.theme.warn)
-                            } else {
-                                col(self.theme.dim)
-                            };
-                            ui.label(RichText::new(l).monospace().color(c));
-                        }
-                    });
-            });
-    }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let ctx = ui.ctx().clone();
+impl App {
+    /// Everything of a frame that comes before the panels are drawn: the size of the window, the lines that go out, the queue, the guard, the keys.
+    pub(super) fn begin_frame(&mut self, ctx: &egui::Context) {
+        let ctx = ctx.clone();
         self.frame += 1;
         clipmenu::start_frame(&ctx, self.lang);
         // the window follows its size: from 720p to 1080p and on to the large and the wide screens everything grows or shrinks with it
@@ -1269,13 +1091,12 @@ impl eframe::App for App {
         self.track_recovery();
         self.server_tick(&ctx);
         self.keys(&ctx);
-        self.menu_bar(ui);
-        self.toolbar(ui);
-        self.top(ui);
-        self.bottom(ui);
-        self.left(ui);
-        self.right(ui);
-        self.center(ui);
+        self.feed_guard();
+    }
+
+    /// Everything of a frame that comes after the panels: the windows, the focus, the close and the picture.
+    pub(super) fn end_frame(&mut self, ctx: &egui::Context) {
+        let ctx = ctx.clone();
         self.sim_guard();
         self.windows(&ctx);
         self.note_focus(&ctx);
@@ -1313,14 +1134,15 @@ pub fn run(o: &Options) -> eframe::Result {
         return Ok(());
     }
     let busy = std::time::Duration::from_secs_f64(Settings::load(&settings_path()).busy_wait_s);
-    let controller = match crate::link::controller_for_with(o, busy) {
-        Ok(c) => c,
+    let (motion, _) = MotionCfg::read(&motion_path(&settings_path()));
+    let linked = match crate::link::guarded_for_with(o, busy, &motion.guard) {
+        Ok(l) => l,
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");
             std::process::exit(2);
         }
     };
-    let app = App::with_controller(o, controller);
+    let app = App::with_link(o, linked);
     let size = if o.shot.is_some() {
         Vec2::new(1400.0, 800.0)
     } else {
@@ -1343,7 +1165,7 @@ pub fn run(o: &Options) -> eframe::Result {
         options,
         Box::new(move |cc| {
             install_fonts(&cc.egui_ctx);
-            Ok(Box::new(app))
+            Ok(Box::new(shell::Shell::new(app)))
         }),
     )
 }

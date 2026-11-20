@@ -73,44 +73,6 @@ impl App {
         self.session.log.push(said);
     }
 
-    /// The Macros menu.
-    pub(super) fn menu_macros(&mut self, ui: &mut egui::Ui) {
-        let mut chosen: Option<String> = None;
-        ui.menu_button(self.w(Msg::MenuMacros), |ui| {
-            let lib = self.macro_library();
-            let idle = self.macros_idle();
-            if lib.macros.is_empty() {
-                let file = macros_path(&self.settings_path).display().to_string();
-                ui.add_enabled(false, egui::Button::new(self.ws(Msg::MacroNone, &[file])));
-            }
-            if !lib.problems.is_empty() {
-                ui.colored_label(
-                    col(self.theme.warn),
-                    self.ws(Msg::MacroProblems, &[lib.problems.len().to_string()]),
-                );
-                for p in lib.problems.iter().take(5) {
-                    ui.label(RichText::new(p.text(self.lang.code())).color(col(self.theme.dim)));
-                }
-            }
-            for m in &lib.macros {
-                let r = ui.add_enabled(idle, egui::Button::new(m.name.as_str()));
-                let r = if m.info.is_empty() {
-                    r
-                } else {
-                    r.on_hover_text(m.info.as_str())
-                        .on_disabled_hover_text(m.info.as_str())
-                };
-                if r.clicked() {
-                    chosen = Some(m.name.clone());
-                    ui.close();
-                }
-            }
-        });
-        if let Some(n) = chosen {
-            self.request_macro(&n);
-        }
-    }
-
     /// The list of the macros in a window: the name, what it says of itself and its lines, with a button to run each one (which asks first when
     /// it has to). Opened by `--window macros` for the pictures.
     pub(super) fn macros_list_window(&mut self, ctx: &egui::Context) -> Option<Win> {

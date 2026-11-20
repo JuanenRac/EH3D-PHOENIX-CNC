@@ -52,46 +52,10 @@ impl W {
 /// The word in the language (English for a language outside the eight). The order: en, es, de, fr, it, ja, zh, pt.
 pub(super) fn word(lang: Lang, w: W) -> &'static str {
     let t: [&'static str; 8] = match w {
-        W::MenuZ => [
-            "Probe Z (touch plate)...",
-            "Sondear Z (placa de contacto)...",
-            "Z antasten (Tastplatte)...",
-            "Palper Z (plaque de contact)...",
-            "Tastare Z (piastra di contatto)...",
-            "Z プローブ（接触プレート）...",
-            "探测 Z（对刀块）...",
-            "Sondar Z (placa de contacto)...",
-        ],
-        W::MenuGrid => [
-            "Probe a grid (height map)...",
-            "Sondear una rejilla (mapa de alturas)...",
-            "Raster antasten (Höhenkarte)...",
-            "Palper une grille (carte des hauteurs)...",
-            "Tastare una griglia (mappa delle altezze)...",
-            "グリッドをプローブ（高さマップ）...",
-            "探测网格（高度图）...",
-            "Sondar uma grelha (mapa de alturas)...",
-        ],
-        W::MenuUseMap => [
-            "Correct the program with the height map",
-            "Corregir el programa con el mapa de alturas",
-            "Programm mit der Höhenkarte korrigieren",
-            "Corriger le programme avec la carte des hauteurs",
-            "Correggere il programma con la mappa delle altezze",
-            "高さマップでプログラムを補正",
-            "用高度图校正程序",
-            "Corrigir o programa com o mapa de alturas",
-        ],
-        W::MenuDropMap => [
-            "Undo the height correction",
-            "Deshacer la corrección de altura",
-            "Höhenkorrektur rückgängig machen",
-            "Annuler la correction de hauteur",
-            "Annullare la correzione di altezza",
-            "高さ補正を元に戻す",
-            "撤销高度校正",
-            "Anular a correção de altura",
-        ],
+        W::MenuZ => return crate::paneltext::text(lang.code(), crate::paneltext::Pt::MenuProbeZ),
+        W::MenuGrid => return crate::paneltext::text(lang.code(), crate::paneltext::Pt::MenuProbeGrid),
+        W::MenuUseMap => return crate::paneltext::text(lang.code(), crate::paneltext::Pt::MenuUseMap),
+        W::MenuDropMap => return crate::paneltext::text(lang.code(), crate::paneltext::Pt::MenuDropMap),
         W::TitleZ => [
             "Probe Z",
             "Sondear Z",
@@ -167,52 +131,6 @@ pub(super) fn word(lang: Lang, w: W) -> &'static str {
 }
 
 impl App {
-    /// The entries of the Machine menu that have to do with the probe.
-    pub(super) fn probe_menu(&mut self, ui: &mut egui::Ui) {
-        ui.separator();
-        let idle = !self.session.running && !self.session.busy();
-        if ui
-            .add_enabled(idle, egui::Button::new(word(self.lang, W::MenuZ)))
-            .clicked()
-        {
-            self.win = Some(Win::Probe(Ask::Z));
-            ui.close();
-        }
-        if ui
-            .add_enabled(idle, egui::Button::new(word(self.lang, W::MenuGrid)))
-            .clicked()
-        {
-            if let Some(ask) = self.grid_ask() {
-                self.win = Some(Win::Probe(ask));
-            }
-            ui.close();
-        }
-        let can_use = idle
-            && self.session.height_map.is_some()
-            && !self.session.corrected()
-            && !self.session.program.is_empty();
-        if ui
-            .add_enabled(can_use, egui::Button::new(word(self.lang, W::MenuUseMap)))
-            .clicked()
-        {
-            self.use_height_map();
-            ui.close();
-        }
-        if ui
-            .add_enabled(
-                idle && self.session.corrected(),
-                egui::Button::new(word(self.lang, W::MenuDropMap)),
-            )
-            .clicked()
-        {
-            if self.session.drop_height_correction() {
-                self.refresh_path();
-            }
-            ui.close();
-        }
-        self.map_files_menu(ui);
-    }
-
     /// Corrects the program with the map and draws the corrected path.
     pub(super) fn use_height_map(&mut self) {
         if self

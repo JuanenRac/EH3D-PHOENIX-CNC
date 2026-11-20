@@ -192,7 +192,8 @@ pub(super) const BINDINGS: [Binding; 18] = [
     },
 ];
 
-/// The words of the key that does this, for the menus.
+/// The words of the key that does this.
+#[cfg(test)]
 pub(super) fn label_of(s: Shortcut) -> &'static str {
     BINDINGS
         .iter()
@@ -229,21 +230,6 @@ impl App {
                 .find(|b| i.consume_key(b.modifiers, b.key))
                 .map(|b| b.shortcut)
         })
-    }
-
-    /// An entry of a menu, with the key written beside it when the keys are on.
-    pub(super) fn menu_item(
-        &self,
-        ui: &mut egui::Ui,
-        text: &str,
-        s: Shortcut,
-        enabled: bool,
-    ) -> bool {
-        let mut b = egui::Button::new(text);
-        if self.settings.shortcuts {
-            b = b.shortcut_text(label_of(s));
-        }
-        ui.add_enabled(enabled, b).clicked()
     }
 
     /// Called at the end of each frame: whether a box of text, or any widget, had the keyboard (see `pressed_shortcut`).
