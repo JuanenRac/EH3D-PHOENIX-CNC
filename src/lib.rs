@@ -41,6 +41,8 @@ pub mod materials;
 pub mod motioncfg;
 pub mod notes;
 pub mod offsets;
+pub mod panels;
+pub mod paneltext;
 pub mod plan;
 pub mod post;
 pub mod postcheck;
@@ -71,6 +73,7 @@ pub mod view;
 pub mod viewer;
 pub mod wcs;
 pub mod words;
+pub mod workflow;
 pub mod workreport;
 
 #[cfg(test)]

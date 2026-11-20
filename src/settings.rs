@@ -106,6 +106,9 @@ pub struct Settings {
     pub profile: String,
     /// The name of the material in use, from the library of materials ("" for none): its ranges of feed and speed are held in `lint`.
     pub material: String,
+    /// The lines of the docking window (`dock.*`): the arrangement of the panels, the workspaces, the shortcuts of the frame and the recent
+    /// files. The program keeps them as they are; the frame reads and writes them.
+    pub dock_lines: Vec<(String, String)>,
 }
 
 impl Default for Settings {
@@ -161,6 +164,7 @@ impl Default for Settings {
             profiles: Vec::new(),
             profile: String::new(),
             material: String::new(),
+            dock_lines: Vec::new(),
         }
     }
 }
@@ -425,6 +429,10 @@ impl Settings {
                         }
                     }
                 }
+                other if other.starts_with("dock.") => {
+                    s.dock_lines.retain(|(k, _)| k != other);
+                    s.dock_lines.push((other.to_string(), v.to_string()));
+                }
                 _ => {}
             }
         }
@@ -509,7 +517,27 @@ impl Settings {
         out.push_str(&self.profiles_text());
         out.push_str(&format!("material = {}\n", one_line(&self.material)));
         out.push_str(&self.tuning.to_text());
+        for (k, v) in &self.dock_lines {
+            out.push_str(&format!("{k} = {v}\n"));
+        }
         out
+    }
+
+    /// The lines of the docking window, as the text the frame reads.
+    pub fn dock_text(&self) -> String {
+        self.dock_lines
+            .iter()
+            .map(|(k, v)| format!("{k} = {v}\n"))
+            .collect()
+    }
+
+    /// Takes the lines the frame wrote (they replace the ones there were).
+    pub fn set_dock(&mut self, pairs: &[(String, String)]) {
+        self.dock_lines = pairs
+            .iter()
+            .filter(|(k, _)| k.starts_with("dock."))
+            .cloned()
+            .collect();
     }
 
     /// Gives the checker the ranges of the material in use (the name in `material`, looked for in the library), or none when there is no
@@ -709,6 +737,7 @@ mod tests {
             profiles: Vec::new(),
             profile: String::new(),
             material: String::new(),
+            dock_lines: Vec::new(),
         };
         s.save_profile("Small mill");
         s.spindle_rpm = 21_000.0;
@@ -1141,5 +1170,34 @@ server_jog_confirm_mm = 0
         let text = Settings::parse("material = Oak\n").to_text();
         assert_eq!(text.matches("material = Oak").count(), 1);
         assert_eq!(Settings::parse(&text), Settings::parse("material = Oak\n"));
+    }
+
+    #[test]
+    fn the_lines_of_the_docking_window_are_kept_and_written_back_with_the_rest() {
+        let text = "lang = es\ndock.version = 1\ndock.current = 2\ndock.ws.1.name = Prepare\ndock.ws.1.tree = H220(T0(a),T0(b))\ndock.ws.1.tree = H300(T0(a),T0(b))\n";
+        let s = Settings::parse(text);
+        assert_eq!(s.lang, Lang::Es);
+        // the last line of a key wins
+        assert_eq!(s.dock_lines.len(), 4);
+        assert!(s
+            .dock_text()
+            .contains("dock.ws.1.tree = H300(T0(a),T0(b))\n"));
+        assert!(!s.dock_text().contains("H220"));
+        // written with the other keys and read back the same
+        let back = Settings::parse(&s.to_text());
+        assert_eq!(back.dock_lines, s.dock_lines);
+        assert_eq!(back.lang, Lang::Es);
+        // the frame hands over its lines: only the ones of the frame are taken
+        let mut t = Settings::default();
+        t.set_dock(&[
+            ("dock.current".to_string(), "0".to_string()),
+            ("lang".to_string(), "fr".to_string()),
+        ]);
+        assert_eq!(
+            t.dock_lines,
+            vec![("dock.current".to_string(), "0".to_string())]
+        );
+        // a settings file with no layout writes none
+        assert!(!Settings::default().to_text().contains("dock."));
     }
 }
