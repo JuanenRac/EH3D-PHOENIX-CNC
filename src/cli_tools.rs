@@ -49,6 +49,9 @@ pub fn wanted(o: &Options) -> bool {
         || o.holder
         || o.life
         || o.restart.is_some()
+        || o.lookahead
+        || o.import
+        || o.post.is_some()
         || o.template.is_some()
         || o.templates
 }
@@ -202,6 +205,155 @@ pub fn restart(lines: &[String], line: usize, lang: &str) -> Outcome {
     }
 }
 
+/// The lines of the problems of a text file of the motion layer, in the language, with the name of the file in front.
+fn problems_text(file: &str, problems: &[crate::problem::Problem], lang: &str) -> String {
+    problems
+        .iter()
+        .map(|p| format!("{file}: {}\n", p.text(lang)))
+        .collect()
+}
+
+/// `--lookahead`: the time of the program with the look-ahead of the planner, next to the time of the same moves stopping at each one.
+pub fn lookahead(
+    lines: &[String],
+    s: &Settings,
+    cfg: &crate::motioncfg::MotionCfg,
+    lang: &str,
+) -> Outcome {
+    use crate::notes::Label;
+    let change_s = s.tuning.change_seconds(s.rapid_mm_min);
+    let mut planner = cfg.planner.clone();
+    if s.tuning.accel_mm_s2 > 0.0
+        && planner.accel_mm_s2 == crate::motioncfg::PlannerCfg::default().accel_mm_s2
+    {
+        // the acceleration of the settings is used for the three axes when the motion file says nothing of its own
+        planner.accel_mm_s2 = [s.tuning.accel_mm_s2; 3];
+    }
+    let p = crate::lookahead::plan_lines(lines, rates(s), &planner, change_s);
+    let line = |label: Label, v: String| format!("{}: {v}\n", label.text(lang));
+    let mut out = String::new();
+    out.push_str(&line(
+        Label::Time,
+        format!("{} ({:.1} s)", crate::sim::hms(p.total_s), p.total_s),
+    ));
+    out.push_str(&line(
+        Label::TimeStopToStop,
+        format!(
+            "{} ({:.1} s)",
+            crate::sim::hms(p.stop_to_stop_s),
+            p.stop_to_stop_s
+        ),
+    ));
+    out.push_str(&line(Label::Blocks, p.blocks.len().to_string()));
+    out.push_str(&line(Label::Stops, p.stops.to_string()));
+    out.push_str(&line(Label::Length, format!("{:.1}", p.length_mm)));
+    if planner.arcs {
+        out.push_str(&line(Label::ArcsRebuilt, p.arcs_rebuilt.to_string()));
+    }
+    Outcome {
+        out,
+        err: String::new(),
+        code: 0,
+    }
+}
+
+/// The post-processor the options name: a file given by its path, or one beside the settings by its name. `None` for no `--post`; an error
+/// text when it is not there.
+fn post_of(
+    o: &Options,
+    settings_file: Option<&Path>,
+    lang: &str,
+) -> Result<Option<(crate::post::Post, String)>, Outcome> {
+    let Some(name) = o.post.as_deref() else {
+        return Ok(None);
+    };
+    let direct = Path::new(name);
+    let path = if direct.is_file() {
+        Some(direct.to_path_buf())
+    } else {
+        settings_file.and_then(|f| crate::post::post_path(f, name))
+    };
+    match path.as_deref().and_then(crate::post::read) {
+        Some((post, problems)) => Ok(Some((post, problems_text(name, &problems, lang)))),
+        None => Err(Outcome::failed(
+            crate::notes::Label::NoPost.text(lang).to_string(),
+        )),
+    }
+}
+
+/// What the post-processor does to a program: the lines it gives and what is to be said (its problems and a script that is not run).
+fn post_apply(
+    post: &(crate::post::Post, String),
+    cfg: &crate::motioncfg::MotionCfg,
+    lines: &[String],
+    lang: &str,
+) -> (Vec<String>, String) {
+    let mut said = post.1.clone();
+    if let Err(label) = post.0.script_state(cfg.import.post_scripts) {
+        said.push_str(&format!("{}\n", label.text(lang)));
+    }
+    (post.0.apply(lines), said)
+}
+
+fn joined(lines: &[String]) -> String {
+    let mut s = lines.join("\n");
+    s.push('\n');
+    s
+}
+
+/// `--import`: a drawing as the program that cuts along it, moved to the zero of the work; what the readers did not understand is said on the
+/// standard error and makes the exit code 1.
+pub fn import(
+    path: &Path,
+    cfg: &crate::motioncfg::MotionCfg,
+    post: Option<&(crate::post::Post, String)>,
+    lang: &str,
+) -> Outcome {
+    use crate::notes::Label;
+    let mut drawing = match crate::import::read_file(path, &cfg.import) {
+        Ok(d) => d,
+        Err(why) => return Outcome::failed(why.text(lang).to_string()),
+    };
+    crate::import::to_origin(&mut drawing);
+    let mut lines = crate::import::to_gcode(&drawing, &cfg.import);
+    let mut err = String::new();
+    for n in &drawing.notes {
+        err.push_str(&format!("{}\n", n.text(lang)));
+    }
+    if let Some(p) = post {
+        let (l, said) = post_apply(p, cfg, &lines, lang);
+        lines = l;
+        err.push_str(&said);
+    }
+    err.push_str(&format!(
+        "{}: {}\n{}: {}\n",
+        Label::Paths.text(lang),
+        drawing.paths.len(),
+        Label::Lines.text(lang),
+        lines.len()
+    ));
+    Outcome {
+        out: joined(&lines),
+        err,
+        code: i32::from(!drawing.notes.is_empty()),
+    }
+}
+
+/// `--post` on a program: the program as the post-processor writes it.
+pub fn post_program(
+    post: &(crate::post::Post, String),
+    cfg: &crate::motioncfg::MotionCfg,
+    lines: &[String],
+    lang: &str,
+) -> Outcome {
+    let (out, said) = post_apply(post, cfg, lines, lang);
+    Outcome {
+        out: joined(&out),
+        err: said,
+        code: 0,
+    }
+}
+
 /// `--template` and `--templates`: the settings of a kind of machine, or the list of them.
 pub fn template(name: Option<&str>, lang: &str) -> Outcome {
     match name {
@@ -295,6 +447,37 @@ fn run_tool(o: &Options, s: &Settings, settings_file: Option<&Path>, lang: &str)
     let Some(path) = o.file.as_ref() else {
         return Outcome::failed("this needs a G-code file".to_string());
     };
+    let (cfg, cfg_problems) = settings_file
+        .map(crate::motioncfg::motion_path)
+        .map(|p| crate::motioncfg::MotionCfg::read(&p))
+        .unwrap_or_default();
+    let mut r = run_on_file(o, s, settings_file, lang, path, &cfg);
+    if !cfg_problems.is_empty() {
+        let name = settings_file.map_or_else(String::new, |f| {
+            crate::motioncfg::motion_path(f)
+                .file_name()
+                .map_or_else(String::new, |n| n.to_string_lossy().to_string())
+        });
+        r.err = format!("{}{}", problems_text(&name, &cfg_problems, lang), r.err);
+    }
+    r
+}
+
+fn run_on_file(
+    o: &Options,
+    s: &Settings,
+    settings_file: Option<&Path>,
+    lang: &str,
+    path: &Path,
+    cfg: &crate::motioncfg::MotionCfg,
+) -> Outcome {
+    let post = match post_of(o, settings_file, lang) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    if o.import {
+        return import(path, cfg, post.as_ref(), lang);
+    }
     let lines = match read_lines(path) {
         Ok(l) => l,
         Err(why) => return Outcome::failed(why),
@@ -329,6 +512,12 @@ fn run_tool(o: &Options, s: &Settings, settings_file: Option<&Path>, lang: &str)
     }
     if let Some(line) = o.restart {
         return restart(&lines, line, lang);
+    }
+    if o.lookahead {
+        return lookahead(&lines, s, cfg, lang);
+    }
+    if let Some(p) = post.as_ref() {
+        return post_program(p, cfg, &lines, lang);
     }
     match o.format.as_deref() {
         Some(profile) => format_check_in(&lines, profile, lang, settings_file),
@@ -832,5 +1021,144 @@ mod tests {
             }
         }
         assert_eq!(texts, 250 * 8 * 6);
+    }
+
+    #[test]
+    fn lookahead_prints_the_two_times_and_the_motion_file_changes_them() {
+        let program = Temp::new("la.nc", "G21 G90\nG1 X10 F600\nG1 X20\nG1 X30\nG1 X40\n");
+        let s = Settings::default();
+        let r = run_in(&options(&["--lookahead", &program.arg()]), &s);
+        assert_eq!(r.code, 0, "{}", r.err);
+        let lines: Vec<&str> = r.out.lines().collect();
+        assert!(lines[0].starts_with("Time with look-ahead: "), "{}", r.out);
+        assert!(lines[1].starts_with("Time stopping at every move: "));
+        assert!(r.out.contains("Moves: 4") && r.out.contains("Full stops: 1"));
+        // in Portuguese of Portugal
+        let pt = run_in(
+            &options(&["--lookahead", "--lang", "pt", &program.arg()]),
+            &s,
+        );
+        assert!(pt.out.starts_with("Tempo com antecipação: "), "{}", pt.out);
+        // a motion file beside the settings: its lines that are wrong are told in the language and the rest is read
+        let dir = std::env::temp_dir().join(format!("cnc_clitools_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("phoenix-cnc.txt");
+        std::fs::write(
+            dir.join("phoenix-cnc-motion.txt"),
+            "accel_x = 400\nbogus = 1\njog_stale_ms = 5\n",
+        )
+        .unwrap();
+        let es = run_with(
+            &options(&["--lookahead", "--lang", "es", &program.arg()]),
+            &s,
+            Some(&settings),
+        );
+        assert_eq!(es.code, 0);
+        assert!(
+            es.err
+                .contains("phoenix-cnc-motion.txt: 2: clave desconocida"),
+            "{}",
+            es.err
+        );
+        assert!(es.err.contains("3: fuera de rango"), "{}", es.err);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn import_prints_the_program_of_a_drawing_and_says_what_it_did_not_read() {
+        let svg = Temp::new(
+            "imp.svg",
+            r#"<svg width="20mm" height="20mm" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10"/><text>x</text></svg>"#,
+        );
+        let s = Settings::default();
+        let r = run_in(&options(&["--import", &svg.arg()]), &s);
+        assert_eq!(r.code, 1, "{}", r.err);
+        assert!(
+            r.out.starts_with("G21 G90 G17\n") && r.out.contains("G1 Z-0.5 F100"),
+            "{}",
+            r.out
+        );
+        assert!(r
+            .err
+            .contains("Some commands or elements of the file are not read."));
+        assert!(r.err.contains("Paths read: 1"));
+        // the program can be read back by the path of the program
+        let lines: Vec<String> = r.out.lines().map(str::to_string).collect();
+        assert!(crate::gcode::toolpath(&lines).len() > 4);
+        // a file that is not a drawing is an error in the language, and a missing one too
+        let junk = Temp::new("imp.txt", "hello");
+        let e = run_in(&options(&["--import", "--lang", "de", &junk.arg()]), &s);
+        assert_eq!(e.code, 2);
+        assert!(
+            e.err.contains("Das Format der Datei ist nicht bekannt."),
+            "{}",
+            e.err
+        );
+        assert_eq!(
+            run_in(&options(&["--import", "cnc_no_such_drawing.svg"]), &s).code,
+            2
+        );
+    }
+
+    #[test]
+    fn post_runs_a_post_processor_on_a_program_or_on_an_import() {
+        let program = Temp::new("post.nc", "G0 X1\nT1 M6\nG1 X2 F100 (cut)\n");
+        let post = Temp::new(
+            "post-rules.txt",
+            "header = G21\nreplace = G0 -> G00\ndrop = M6\nscript = tidy\n",
+        );
+        let s = Settings::default();
+        let r = run_in(&options(&["--post", &post.arg(), &program.arg()]), &s);
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert_eq!(r.out, "G21\nG00 X1\nT1\nG1 X2 F100 (cut)\n");
+        // the script is not run and the program says so (the switch is off)
+        assert!(r.err.contains("Scripts are switched off"), "{}", r.err);
+        // with an import
+        let svg = Temp::new(
+            "post.svg",
+            r#"<svg width="10mm" height="10mm" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="0"/></svg>"#,
+        );
+        let i = run_in(
+            &options(&["--import", "--post", &post.arg(), &svg.arg()]),
+            &s,
+        );
+        assert!(i.out.starts_with("G21\n"), "{}", i.out);
+        // a post-processor that is not there
+        let none = run_in(&options(&["--post", "nothere", &program.arg()]), &s);
+        assert_eq!(none.code, 2);
+        assert!(none
+            .err
+            .contains("There is no post-processor with that name."));
+        // by its name, beside the settings
+        let dir = std::env::temp_dir().join(format!("cnc_clipost_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("phoenix-cnc-post-mine.txt"), "footer = M30\n").unwrap();
+        let byname = run_with(
+            &options(&["--post", "mine", &program.arg()]),
+            &s,
+            Some(&dir.join("phoenix-cnc.txt")),
+        );
+        assert!(byname.out.ends_with("M30\n"), "{}", byname.out);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_new_options_need_a_file_and_are_tools_that_print() {
+        for args in [["--lookahead"], ["--import"]] {
+            assert!(Options::parse(args.iter().map(|a| a.to_string())).is_err());
+        }
+        assert!(Options::parse(["--post".to_string(), "x".to_string()]).is_err());
+        assert!(Options::parse(["--post".to_string()]).is_err());
+        assert!(
+            Options::parse(["--post".to_string(), " ".to_string(), "a.nc".to_string()]).is_err()
+        );
+        let o = options(&["--lookahead", "a.nc"]);
+        assert!(wanted(&o));
+        assert!(wanted(&options(&["--import", "a.svg"])));
+        assert!(wanted(&options(&["--post", "x", "a.nc"])));
+        let help = crate::cli::help_text();
+        for w in ["--lookahead", "--import", "--post NAME"] {
+            assert!(help.contains(w), "{w}");
+        }
     }
 }

@@ -69,6 +69,13 @@ pub struct Options {
     /// Prints the settings of a kind of machine and leaves (`--template NAME`), or lists them (`--templates`); no file.
     pub template: Option<String>,
     pub templates: bool,
+    /// Prints the time of the program with the look-ahead of the planner and leaves (`--lookahead`, with the file).
+    pub lookahead: bool,
+    /// The file is a drawing (HPGL, DXF or SVG) to turn into a program that is printed, and leaves (`--import`, with the file).
+    pub import: bool,
+    /// The post-processor (its name beside the settings, or the path of its file) the program printed by `--import`, or the program of the
+    /// file, goes through, and leaves (`--post NAME`, with the file).
+    pub post: Option<String>,
     /// Writes what a tool prints to this file instead of the standard output, and never over a file that is there (`--out FILE`).
     pub out: Option<PathBuf>,
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
@@ -126,6 +133,9 @@ pub fn help_text() -> String {
          \x20 --restart LINE     print the program as it restarts from that line (from 1), with the state before it rebuilt and a pause before the first move, and leave\n\
          \x20 --template NAME    print the settings of a kind of machine (small-mill, router, engraver, pcb-mill) to start from, and leave\n\
          \x20 --templates        list the machine templates, and leave\n\
+         \x20 --lookahead        print the time of the program with the look-ahead of the planner (corners, acceleration of each axis), and leave\n\
+         \x20 --import           read the file as a drawing (HPGL, DXF or SVG) and print the G-code that cuts along it, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --post NAME        pass the program (or the one --import makes) through the post-processor NAME (a file beside the settings, or its path), and leave\n\
          \x20 --out FILE         write what the tool prints to FILE and never over a file that is there (exit code 2 if it is)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
          \x20 --theme NAME       the colours\n\
@@ -256,6 +266,15 @@ impl Options {
                         v.trim().to_string()
                     });
                 }
+                "--lookahead" => o.lookahead = true,
+                "--import" => o.import = true,
+                "--post" => {
+                    let v = value("--post")?;
+                    if v.trim().is_empty() {
+                        return Err("--post needs the name of a post-processor".to_string());
+                    }
+                    o.post = Some(v.trim().to_string());
+                }
                 "--holder" => o.holder = true,
                 "--life" => o.life = true,
                 "--restart" => {
@@ -307,6 +326,9 @@ impl Options {
             (o.holder, "--holder"),
             (o.life, "--life"),
             (o.restart.is_some(), "--restart"),
+            (o.lookahead, "--lookahead"),
+            (o.import, "--import"),
+            (o.post.is_some(), "--post"),
         ] {
             if asked && o.file.is_none() {
                 return Err(format!("{name} needs a G-code file"));
@@ -314,7 +336,7 @@ impl Options {
         }
         if o.out.is_some() && !crate::cli_tools::wanted(&o) {
             return Err(
-                "--out only goes with a tool that prints (--convert, --compare, --times, --offsets, --format, --holder, --life, --restart, --template, --templates)"
+                "--out only goes with a tool that prints (--convert, --compare, --times, --offsets, --format, --holder, --life, --restart, --lookahead, --import, --post, --template, --templates)"
                     .to_string(),
             );
         }

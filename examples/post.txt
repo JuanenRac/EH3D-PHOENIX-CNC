@@ -1,0 +1,22 @@
+# A post-processor of phoenix-cnc: rules that change a program on its way to a controller.
+# To use it, copy this file next to the settings file as phoenix-cnc-post-NAME.txt and run the program with --post NAME.
+# One key = value per line. header, footer, replace and drop may repeat; the rest are set once.
+#
+# lines put at the start and at the end of the program
+header = G21 G90 G17
+footer = M5
+footer = M30
+# a whole word written another way (OLD -> NEW), and a whole word taken out
+replace = G0 -> G00
+replace = G1 -> G01
+drop = M6
+# number the lines N10, N20...
+line_numbers = off
+line_number_start = 10
+line_number_step = 10
+# decimals of the axes (0 to 6), the comments (keep or strip) and the case (keep or upper)
+decimals = 3
+comments = keep
+case = keep
+# a script only runs with post_scripts = on in the motion file (off by default)
+# script = tidy.script
