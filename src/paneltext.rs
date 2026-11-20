@@ -40,6 +40,13 @@ pub enum Pt {
     ImportNeedsFile,
     ImportCfgNote,
     ImportUsed,
+    ImportLayer,
+    ImportLayerAuto,
+    ImportLayerIsolation,
+    ImportLayerProfile,
+    ImportLayerDrill,
+    ImportMirror,
+    ImportBoard,
     // the panel of the tool setter
     SetterTool,
     SetterMeasure,
@@ -66,7 +73,7 @@ pub enum Pt {
 }
 
 /// All of them, for the tests and for anything that has to go through them.
-pub const ALL: [Pt; 48] = [
+pub const ALL: [Pt; 55] = [
     Pt::PanelProgram,
     Pt::PanelMachineState,
     Pt::PanelToolSetter,
@@ -96,6 +103,13 @@ pub const ALL: [Pt; 48] = [
     Pt::ImportNeedsFile,
     Pt::ImportCfgNote,
     Pt::ImportUsed,
+    Pt::ImportLayer,
+    Pt::ImportLayerAuto,
+    Pt::ImportLayerIsolation,
+    Pt::ImportLayerProfile,
+    Pt::ImportLayerDrill,
+    Pt::ImportMirror,
+    Pt::ImportBoard,
     Pt::SetterTool,
     Pt::SetterMeasure,
     Pt::SetterConfirm,
@@ -410,6 +424,76 @@ pub fn text8(w: Pt) -> Text8 {
             "图纸现在是程序：{0} 行。",
             "図面がプログラムになりました：{0} 行。",
         ],
+        Pt::ImportLayer => [
+            "Board layer",
+            "Capa de la placa",
+            "Strato della scheda",
+            "Platinenlage",
+            "Couche de la carte",
+            "Camada da placa",
+            "电路板图层",
+            "基板のレイヤー",
+        ],
+        Pt::ImportLayerAuto => [
+            "What the file says",
+            "Lo que dice el archivo",
+            "Quello che dice il file",
+            "Was die Datei sagt",
+            "Ce que dit le fichier",
+            "O que diz o ficheiro",
+            "按文件内容",
+            "ファイルの記載どおり",
+        ],
+        Pt::ImportLayerIsolation => [
+            "Isolation",
+            "Aislamiento",
+            "Isolamento",
+            "Isolationsfräsen",
+            "Isolation",
+            "Isolamento",
+            "隔离铣削",
+            "アイソレーション",
+        ],
+        Pt::ImportLayerProfile => [
+            "Profile",
+            "Contorno",
+            "Contorno del bordo",
+            "Kontur",
+            "Contour",
+            "Contorno da placa",
+            "外形",
+            "外形加工",
+        ],
+        Pt::ImportLayerDrill => [
+            "Drill",
+            "Taladrado",
+            "Foratura",
+            "Bohren",
+            "Perçage",
+            "Furação",
+            "钻孔",
+            "穴あけ",
+        ],
+        Pt::ImportMirror => [
+            "Mirror about the Y axis",
+            "Reflejar respecto al eje Y",
+            "Specchia rispetto all'asse Y",
+            "An der Y-Achse spiegeln",
+            "Inverser par rapport à l'axe Y",
+            "Espelhar em relação ao eixo Y",
+            "沿 Y 轴镜像",
+            "Y 軸で反転",
+        ],
+        Pt::ImportBoard => [
+            "Cut as {0}: {1} cuts or holes, {2} drill sizes.",
+            "Se corta como {0}: {1} cortes o agujeros, {2} diámetros de broca.",
+            "Taglio come {0}: {1} tagli o fori, {2} diametri di punta.",
+            "Geschnitten als {0}: {1} Schnitte oder Löcher, {2} Bohrergrößen.",
+            "Coupé en {0} : {1} coupes ou trous, {2} diamètres de foret.",
+            "Cortado como {0}: {1} cortes ou furos, {2} diâmetros de broca.",
+            "按{0}加工：{1} 条切削路径或孔，{2} 种钻头直径。",
+            "{0}として加工：切削パスまたは穴 {1} 件、ドリル径 {2} 種類。",
+        ],
         Pt::SetterTool => [
             "Tool number",
             "Número de herramienta",
@@ -657,8 +741,8 @@ mod tests {
             assert!(seen.insert(w), "{w:?} twice");
         }
         // the number is the number of variants: a variant that is not in the list is not tested
-        assert_eq!(ALL.len(), 48);
-        assert_eq!(seen.len(), 48);
+        assert_eq!(ALL.len(), 55);
+        assert_eq!(seen.len(), 55);
     }
 
     #[test]

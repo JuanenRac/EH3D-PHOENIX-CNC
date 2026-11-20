@@ -1082,7 +1082,7 @@ pub fn to_origin(d: &mut Drawing) {
     }
 }
 
-fn num(v: f64) -> String {
+pub(crate) fn num(v: f64) -> String {
     let t = format!("{v:.3}");
     let t = t.trim_end_matches('0').trim_end_matches('.');
     if t.is_empty() || t == "-0" {

@@ -1,16 +1,122 @@
-//! The controller the program drives: the simulated one, or GRBL on a serial port (`--grbl PORT[@BAUD]`).
+//! The controller the program drives: the simulated one, GRBL, grblHAL or Marlin on a serial port (`--grbl`, `--grblhal` and `--marlin`,
+//! each `PORT[@BAUD]`), or the dialect of one of them on a simulated cable (`--sim grbl|grblhal|marlin`, see `wire`).
 
 use std::time::Duration;
 
+use eh3d_controller::grbl::GrblController;
 use eh3d_controller::sim::SimController;
+use eh3d_controller::Family;
 
 use crate::cli::Options;
+use crate::grblsim::{Flavor, GrblDevice};
 use crate::guard::GuardHandle;
-use crate::motioncfg::GuardCfg;
+use crate::marlin::{MarlinController, MarlinDevice, E_HOMING};
+use crate::motioncfg::{GuardCfg, MotionCfg, WireCfg};
 use crate::session::BoxedController;
+use crate::wire::{Impair, WireLink};
 
 /// The baud rate of GRBL 1.1 when the option names only the port.
 pub const GRBL_BAUD: u32 = 115_200;
+/// The baud rate Marlin is usually flashed with.
+pub const MARLIN_BAUD: u32 = 250_000;
+
+/// The dialects the program speaks over a line of text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dialect {
+    Grbl,
+    GrblHal,
+    Marlin,
+}
+
+impl Dialect {
+    pub const ALL: [Dialect; 3] = [Dialect::Grbl, Dialect::GrblHal, Dialect::Marlin];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Dialect::Grbl => "grbl",
+            Dialect::GrblHal => "grblhal",
+            Dialect::Marlin => "marlin",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Dialect> {
+        let k = key.trim().to_ascii_lowercase();
+        Dialect::ALL.into_iter().find(|d| d.key() == k)
+    }
+
+    pub fn family(self) -> Family {
+        match self {
+            Dialect::Grbl => Family::Grbl,
+            Dialect::GrblHal => Family::GrblHal,
+            Dialect::Marlin => Family::Marlin,
+        }
+    }
+
+    /// The baud rate used when the option names only the port.
+    pub fn default_baud(self) -> u32 {
+        match self {
+            Dialect::Marlin => MARLIN_BAUD,
+            _ => GRBL_BAUD,
+        }
+    }
+
+    /// The number the simulator of the dialect answers with when a line is made to fail (see [`simulated_with`]).
+    pub fn failing_code(self) -> u32 {
+        match self {
+            Dialect::Grbl => 22,
+            Dialect::GrblHal => 46,
+            Dialect::Marlin => E_HOMING,
+        }
+    }
+}
+
+/// The cable of the settings as the simulator takes it.
+pub fn impair_of(wire: &WireCfg) -> Impair {
+    Impair {
+        seed: wire.seed,
+        chunk_max: wire.chunk_max,
+        noise_per_mille: wire.noise_per_mille,
+        flip_per_mille: wire.flip_per_mille,
+        mute_from: None,
+        mute_lines: 0,
+    }
+}
+
+/// A simulated controller of the dialect behind a cable, with a line (from 1) that fails with the failure of the dialect
+/// ([`Dialect::failing_code`]) when one is asked for.
+pub fn simulated_with(
+    d: Dialect,
+    impair: Impair,
+    numbering: bool,
+    fail_at: Option<usize>,
+) -> BoxedController {
+    match d {
+        Dialect::Grbl | Dialect::GrblHal => {
+            let flavor = if d == Dialect::Grbl {
+                Flavor::Grbl
+            } else {
+                Flavor::GrblHal
+            };
+            let mut dev = GrblDevice::new(flavor);
+            if let Some(n) = fail_at {
+                dev.fail.insert(n, d.failing_code());
+            }
+            Box::new(GrblController::new(WireLink::new(dev, impair)).as_family(d.family()))
+        }
+        Dialect::Marlin => {
+            let mut dev = MarlinDevice::new();
+            if let Some(n) = fail_at {
+                dev.fail.insert(n, "Error:Homing Failed".to_string());
+            }
+            Box::new(MarlinController::new(WireLink::new(dev, impair)).with_numbering(numbering))
+        }
+    }
+}
+
+/// A simulated controller of the dialect with the cable of the settings.
+pub fn simulated(d: Dialect, wire: &WireCfg) -> BoxedController {
+    simulated_with(d, impair_of(wire), wire.marlin_numbering, None)
+}
 
 /// Splits `PORT[@BAUD]` into the port and the baud rate.
 pub fn parse_port(text: &str) -> Result<(String, u32), String> {
@@ -38,11 +144,29 @@ pub fn controller_for(o: &Options) -> Result<BoxedController, String> {
 /// The controller the options ask for. `busy` is the most a line waits for its answer while the machine says it is working (the setting
 /// `busy_wait` of the settings file).
 pub fn controller_for_with(o: &Options, busy: Duration) -> Result<BoxedController, String> {
-    let Some(text) = &o.grbl else {
-        return Ok(Box::new(SimController::new()));
-    };
-    let (port, baud) = parse_port(text)?;
-    open_grbl(&port, baud, busy)
+    controller_for_cfg(o, busy, &WireCfg::default())
+}
+
+/// As [`controller_for_with`] with the cable and the numbering of Marlin of the motion file.
+pub fn controller_for_cfg(
+    o: &Options,
+    busy: Duration,
+    wire: &WireCfg,
+) -> Result<BoxedController, String> {
+    if let Some((dialect, text)) = o.real_link() {
+        let (port, baud) = parse_port(text)?;
+        let baud = if text.contains('@') {
+            baud
+        } else {
+            dialect.default_baud()
+        };
+        return open_real(dialect, &port, baud, busy, wire.marlin_numbering);
+    }
+    if let Some(name) = o.sim.as_deref() {
+        let d = Dialect::from_key(name).ok_or_else(|| format!("unknown dialect '{name}'"))?;
+        return Ok(simulated(d, wire));
+    }
+    Ok(Box::new(SimController::new()))
 }
 
 /// The controller of the window and, when the guard is on, the handle the window keeps to feed it the time and to read why it stopped.
@@ -57,7 +181,17 @@ pub struct Linked {
 /// simulator is wrapped too, but it jumps to its target in one step, so the check of the position that jumps is off for it.
 pub fn guarded_for_with(o: &Options, busy: Duration, cfg: &GuardCfg) -> Result<Linked, String> {
     let controller = controller_for_with(o, busy)?;
-    Ok(wrap(controller, o.grbl.is_none(), cfg))
+    Ok(wrap(controller, o.real_link().is_none(), cfg))
+}
+
+/// As [`guarded_for_with`] with everything the motion file says: the guard, the simulated cable and the numbering of Marlin.
+pub fn guarded_for_motion(
+    o: &Options,
+    busy: Duration,
+    motion: &MotionCfg,
+) -> Result<Linked, String> {
+    let controller = controller_for_cfg(o, busy, &motion.wire)?;
+    Ok(wrap(controller, o.real_link().is_none(), &motion.guard))
 }
 
 /// Puts a controller in the guard (or leaves it as it is when the guard is off).
@@ -80,18 +214,39 @@ pub fn wrap(controller: BoxedController, simulated: bool, cfg: &GuardCfg) -> Lin
 }
 
 #[cfg(feature = "serial")]
-fn open_grbl(port: &str, baud: u32, busy: Duration) -> Result<BoxedController, String> {
-    use eh3d_controller::grbl::GrblController;
+fn open_real(
+    dialect: Dialect,
+    port: &str,
+    baud: u32,
+    busy: Duration,
+    numbering: bool,
+) -> Result<BoxedController, String> {
     use eh3d_controller::serial::SerialTransport;
 
     let transport = SerialTransport::open(port, baud).map_err(|e| format!("{port}: {e}"))?;
-    Ok(Box::new(
-        GrblController::new(transport).with_busy_limit(busy),
-    ))
+    Ok(match dialect {
+        Dialect::Grbl => Box::new(GrblController::new(transport).with_busy_limit(busy)),
+        Dialect::GrblHal => Box::new(
+            GrblController::new(transport)
+                .with_busy_limit(busy)
+                .as_family(Family::GrblHal),
+        ),
+        Dialect::Marlin => Box::new(
+            MarlinController::new(transport)
+                .with_busy_limit(busy)
+                .with_numbering(numbering),
+        ),
+    })
 }
 
 #[cfg(not(feature = "serial"))]
-fn open_grbl(_port: &str, _baud: u32, _busy: Duration) -> Result<BoxedController, String> {
+fn open_real(
+    _dialect: Dialect,
+    _port: &str,
+    _baud: u32,
+    _busy: Duration,
+    _numbering: bool,
+) -> Result<BoxedController, String> {
     Err("this build has no serial port support (build with --features serial)".to_string())
 }
 
@@ -126,6 +281,71 @@ mod tests {
         assert!(parse_port("COM3@10").is_err());
         assert!(parse_port("@115200").is_err());
         assert!(parse_port("").is_err());
+    }
+
+    #[test]
+    fn the_dialects_have_keys_families_and_bauds_of_their_own() {
+        for d in Dialect::ALL {
+            assert_eq!(Dialect::from_key(d.key()), Some(d));
+            assert_eq!(Dialect::from_key(&d.key().to_uppercase()), Some(d));
+        }
+        assert_eq!(Dialect::from_key("smoothie"), None);
+        assert_eq!(Dialect::GrblHal.family(), Family::GrblHal);
+        assert_eq!(Dialect::Marlin.family(), Family::Marlin);
+        assert_eq!(Dialect::Marlin.default_baud(), 250_000);
+        assert_eq!(Dialect::Grbl.default_baud(), GRBL_BAUD);
+    }
+
+    #[test]
+    fn a_simulated_dialect_is_chosen_with_sim_and_a_real_port_with_its_own_option() {
+        for (args, family) in [
+            ("--sim grbl", Family::Grbl),
+            ("--sim grblhal", Family::GrblHal),
+            ("--sim MARLIN", Family::Marlin),
+        ] {
+            let o = Options::parse(args.split_whitespace().map(String::from)).unwrap();
+            let c = controller_for(&o).unwrap();
+            assert_eq!(c.family(), family, "{args}");
+        }
+        // in the guard, and the guard does not take the jump of a simulator for a fault
+        let o = Options::parse(["--sim".to_string(), "marlin".to_string()]).unwrap();
+        let mut l =
+            guarded_for_motion(&o, Duration::from_millis(10), &MotionCfg::default()).unwrap();
+        assert!(l.guard.is_some());
+        assert!(l.controller.status().is_ok());
+        #[cfg(not(feature = "serial"))]
+        for opt in ["--grblhal", "--marlin"] {
+            let o = Options::parse([opt.to_string(), "COM3".to_string()]).unwrap();
+            match controller_for(&o) {
+                Err(e) => assert!(e.contains("serial"), "{opt}: {e}"),
+                Ok(_) => panic!("a build without serial opened a port"),
+            }
+        }
+    }
+
+    #[test]
+    fn the_cable_of_the_motion_file_reaches_the_simulator() {
+        let (cfg, problems) = MotionCfg::parse(
+            "wire_chunk_max = 2\nwire_noise = 300\nwire_seed = 9\nmarlin_numbering = on\n",
+        );
+        assert!(problems.is_empty());
+        let i = impair_of(&cfg.wire);
+        assert_eq!(
+            (i.seed, i.chunk_max, i.noise_per_mille, i.flip_per_mille),
+            (9, 2, 300, 0)
+        );
+        let mut c = simulated(Dialect::Marlin, &cfg.wire);
+        c.send_line("G1 X3 F100").unwrap();
+        assert_eq!(c.status().unwrap().machine_mm[0], 3.0);
+    }
+
+    #[test]
+    fn a_simulated_line_that_fails_gives_the_failure_of_its_dialect() {
+        for d in Dialect::ALL {
+            let mut c = simulated_with(d, Impair::clean(), false, Some(1));
+            let e = c.send_line("G1 X1 F100").unwrap_err();
+            assert_eq!(e.code(), Some(d.failing_code()), "{d:?}: {e:?}");
+        }
     }
 
     #[test]

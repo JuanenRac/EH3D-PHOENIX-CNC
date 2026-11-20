@@ -21,15 +21,33 @@ pub enum Note {
     UnitsPlotter,
     /// A transformation of the drawing was not applied.
     TransformIgnored,
+    /// Something of the layer of the board was not drawn (a shape the reader cannot draw), so the cut leaves it out.
+    PcbNotDrawn,
+    /// The file does not say which layer it is and copper was taken.
+    PcbAssumedCopper,
+    /// The outline is not closed: the open runs are cut along the line.
+    PcbOutlineOpen,
+    /// The path of the outline could not be moved by the radius of the tool: it follows the line.
+    PcbNoCompensation,
+    /// The layer was mirrored about the Y axis.
+    PcbMirrored,
+    /// A hole whose tool is not in the file, or that has no width, was left out.
+    PcbHoleSkipped,
 }
 
 impl Note {
-    pub const ALL: [Note; 5] = [
+    pub const ALL: [Note; 11] = [
         Note::UnsupportedCommand,
         Note::UnitsAssumedMm,
         Note::UnitsAssumedPixels,
         Note::UnitsPlotter,
         Note::TransformIgnored,
+        Note::PcbNotDrawn,
+        Note::PcbAssumedCopper,
+        Note::PcbOutlineOpen,
+        Note::PcbNoCompensation,
+        Note::PcbMirrored,
+        Note::PcbHoleSkipped,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -84,6 +102,66 @@ impl Note {
                 "图形的某个变换没有被应用。",
                 "Uma transformação do desenho não foi aplicada.",
             ],
+            Note::PcbNotDrawn => [
+                "Some shapes of the layer cannot be drawn and are left out of the cut.",
+                "Algunas formas de la capa no se pueden dibujar y quedan fuera del corte.",
+                "Einige Formen der Lage lassen sich nicht zeichnen und fehlen im Schnitt.",
+                "Certaines formes de la couche ne peuvent pas être dessinées et sont absentes de la coupe.",
+                "Alcune forme dello strato non si possono disegnare e restano fuori dal taglio.",
+                "レイヤーの一部の図形は描画できないため、加工から除外されます。",
+                "图层中的某些形状无法绘制，已从切削中排除。",
+                "Algumas formas da camada não podem ser desenhadas e ficam fora do corte.",
+            ],
+            Note::PcbAssumedCopper => [
+                "The file does not say which layer it is: copper was taken.",
+                "El archivo no dice qué capa es: se tomó cobre.",
+                "Die Datei nennt ihre Lage nicht: Es wurde Kupfer angenommen.",
+                "Le fichier n'indique pas de quelle couche il s'agit : le cuivre a été pris.",
+                "Il file non indica di quale strato si tratta: è stato preso il rame.",
+                "ファイルにレイヤーの種類の記載がないため、銅箔層とみなしました。",
+                "文件未说明是哪一层：按铜层处理。",
+                "O ficheiro não diz que camada é: foi tomado o cobre.",
+            ],
+            Note::PcbOutlineOpen => [
+                "The outline is not closed: the open runs are cut along the line.",
+                "El contorno no está cerrado: los tramos abiertos se cortan sobre la línea.",
+                "Die Kontur ist nicht geschlossen: Die offenen Stücke werden auf der Linie geschnitten.",
+                "Le contour n'est pas fermé : les tronçons ouverts sont coupés sur la ligne.",
+                "Il contorno non è chiuso: i tratti aperti vengono tagliati sulla linea.",
+                "外形が閉じていません。開いた部分は線上で加工されます。",
+                "轮廓未闭合：开放的部分沿线切割。",
+                "O contorno não está fechado: os troços abertos são cortados sobre a linha.",
+            ],
+            Note::PcbNoCompensation => [
+                "The outline could not be moved by the radius of the tool: it is cut along the line.",
+                "El contorno no se pudo desplazar el radio de la herramienta: se corta sobre la línea.",
+                "Die Kontur ließ sich nicht um den Werkzeugradius versetzen: Sie wird auf der Linie geschnitten.",
+                "Le contour n'a pas pu être décalé du rayon de l'outil : il est coupé sur la ligne.",
+                "Il contorno non si è potuto spostare del raggio dell'utensile: viene tagliato sulla linea.",
+                "外形を工具半径分オフセットできませんでした。線上で加工されます。",
+                "无法将轮廓偏移一个刀具半径：将沿线切割。",
+                "O contorno não pôde ser deslocado pelo raio da ferramenta: é cortado sobre a linha.",
+            ],
+            Note::PcbMirrored => [
+                "The layer was mirrored about the Y axis.",
+                "La capa se reflejó respecto al eje Y.",
+                "Die Lage wurde an der Y-Achse gespiegelt.",
+                "La couche a été inversée par rapport à l'axe Y.",
+                "Lo strato è stato specchiato rispetto all'asse Y.",
+                "レイヤーを Y 軸で反転しました。",
+                "该图层已沿 Y 轴镜像。",
+                "A camada foi espelhada em relação ao eixo Y.",
+            ],
+            Note::PcbHoleSkipped => [
+                "A hole whose tool is not in the file, or that has no width, was left out.",
+                "Se omitió un agujero cuya herramienta no está en el archivo o que no tiene diámetro.",
+                "Ein Loch, dessen Werkzeug nicht in der Datei steht oder das keinen Durchmesser hat, wurde ausgelassen.",
+                "Un trou dont l'outil n'est pas dans le fichier, ou qui n'a pas de diamètre, a été omis.",
+                "Un foro il cui utensile non è nel file, o che non ha diametro, è stato omesso.",
+                "工具がファイルにない、または径のない穴は除外されました。",
+                "刀具不在文件中或没有直径的孔已被略去。",
+                "Um furo cuja ferramenta não está no ficheiro, ou que não tem diâmetro, foi omitido.",
+            ],
         };
         row[column(lang)]
     }
@@ -104,16 +182,25 @@ pub enum Fail {
     NotRecognised,
     /// The file could not be opened.
     Unreadable,
+    /// The layer of the board needs a grid bigger than the setting allows (or the CAM could not make it).
+    GridTooBig,
+    /// The file is a layer of a board that is not cut (the mask, the legend, the paste), or not of the kind asked for.
+    NotACutLayer,
+    /// A `pcb_` setting of the motion file is out of what the CAM can use.
+    BadPcbSetting,
 }
 
 impl Fail {
-    pub const ALL: [Fail; 6] = [
+    pub const ALL: [Fail; 9] = [
         Fail::TooBig,
         Fail::TooManyPoints,
         Fail::Syntax,
         Fail::Empty,
         Fail::NotRecognised,
         Fail::Unreadable,
+        Fail::GridTooBig,
+        Fail::NotACutLayer,
+        Fail::BadPcbSetting,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -178,6 +265,36 @@ impl Fail {
                 "无法打开文件。",
                 "Não foi possível abrir o ficheiro.",
             ],
+            Fail::GridTooBig => [
+                "The layer needs a grid bigger than the setting allows: raise pcb_res or pcb_max_cells.",
+                "La capa necesita una malla mayor de la que permite el ajuste: suba pcb_res o pcb_max_cells.",
+                "Die Lage braucht ein größeres Raster als die Einstellung erlaubt: pcb_res oder pcb_max_cells erhöhen.",
+                "La couche demande une grille plus grande que le réglage ne le permet : augmentez pcb_res ou pcb_max_cells.",
+                "Lo strato richiede una griglia più grande di quella consentita: aumentare pcb_res o pcb_max_cells.",
+                "このレイヤーには設定が許す以上のグリッドが必要です。pcb_res か pcb_max_cells を上げてください。",
+                "该图层所需的网格超出设置允许的大小：请提高 pcb_res 或 pcb_max_cells。",
+                "A camada precisa de uma grelha maior do que a definição permite: aumente pcb_res ou pcb_max_cells.",
+            ],
+            Fail::NotACutLayer => [
+                "This file is not a layer that is cut (or not of the kind asked for): choose the layer by hand.",
+                "Este archivo no es una capa que se corte (o no es del tipo pedido): elija la capa a mano.",
+                "Diese Datei ist keine Lage, die geschnitten wird (oder nicht von der gewünschten Art): Lage von Hand wählen.",
+                "Ce fichier n'est pas une couche qui se coupe (ou pas du type demandé) : choisissez la couche à la main.",
+                "Questo file non è uno strato che si taglia (o non è del tipo richiesto): scegliere lo strato a mano.",
+                "このファイルは加工するレイヤーではありません（または指定の種類ではありません）。手動でレイヤーを選んでください。",
+                "此文件不是需要切削的图层（或不是所要求的类型）：请手动选择图层。",
+                "Este ficheiro não é uma camada que se corte (ou não é do tipo pedido): escolha a camada à mão.",
+            ],
+            Fail::BadPcbSetting => [
+                "A pcb_ setting of the motion file is out of what the CAM can use (the cell must be at most half of the tool).",
+                "Un ajuste pcb_ del archivo de movimiento está fuera de lo que el CAM puede usar (la celda debe ser como mucho la mitad de la herramienta).",
+                "Eine pcb_-Einstellung der Bewegungsdatei liegt außerhalb dessen, was das CAM nutzen kann (die Zelle darf höchstens die Hälfte des Werkzeugs sein).",
+                "Un réglage pcb_ du fichier de mouvement est hors de ce que la FAO peut utiliser (la cellule doit valoir au plus la moitié de l'outil).",
+                "Un'impostazione pcb_ del file di movimento è fuori da ciò che il CAM può usare (la cella deve essere al massimo metà dell'utensile).",
+                "動作ファイルの pcb_ 設定が CAM の使える範囲外です（セルは工具の半分以下にしてください）。",
+                "运动文件中的某个 pcb_ 设置超出 CAM 可用的范围（单元格最多为刀具的一半）。",
+                "Uma definição pcb_ do ficheiro de movimento está fora do que o CAM pode usar (a célula deve ser no máximo metade da ferramenta).",
+            ],
         };
         row[column(lang)]
     }
@@ -204,10 +321,17 @@ pub enum Label {
     ScriptsOff,
     /// Scripts are on but this build has no script engine yet.
     NoEngine,
+    /// The check of a dialect passed, or did not.
+    CheckPassed,
+    CheckNotPassed,
+    /// The layer of a board that was cut, the holes and slots drilled and the sizes of drill.
+    Layer,
+    Holes,
+    DrillSizes,
 }
 
 impl Label {
-    pub const ALL: [Label; 11] = [
+    pub const ALL: [Label; 16] = [
         Label::Time,
         Label::TimeStopToStop,
         Label::Blocks,
@@ -219,6 +343,11 @@ impl Label {
         Label::NoPost,
         Label::ScriptsOff,
         Label::NoEngine,
+        Label::CheckPassed,
+        Label::CheckNotPassed,
+        Label::Layer,
+        Label::Holes,
+        Label::DrillSizes,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -332,6 +461,56 @@ impl Label {
                 "このビルドにはまだスクリプトエンジンがないため、ポストプロセッサーは実行されません。",
                 "此版本尚无脚本引擎：不运行后处理器。",
                 "Esta versão ainda não tem motor de scripts: o pós-processador não é executado.",
+            ],
+            Label::CheckPassed => [
+                "Dialect check passed",
+                "Prueba del dialecto superada",
+                "Dialektprüfung bestanden",
+                "Vérification du dialecte réussie",
+                "Verifica del dialetto superata",
+                "ダイアレクトの検査に合格",
+                "协议方言检查通过",
+                "Verificação do dialeto aprovada",
+            ],
+            Label::CheckNotPassed => [
+                "Dialect check not passed",
+                "Prueba del dialecto no superada",
+                "Dialektprüfung nicht bestanden",
+                "Vérification du dialecte non réussie",
+                "Verifica del dialetto non superata",
+                "ダイアレクトの検査に不合格",
+                "协议方言检查未通过",
+                "Verificação do dialeto não aprovada",
+            ],
+            Label::Layer => [
+                "Layer",
+                "Capa",
+                "Lage",
+                "Couche",
+                "Strato",
+                "レイヤー",
+                "图层",
+                "Camada",
+            ],
+            Label::Holes => [
+                "Holes and slots",
+                "Agujeros y ranuras",
+                "Löcher und Langlöcher",
+                "Trous et rainures",
+                "Fori e asole",
+                "穴とスロット",
+                "孔和槽",
+                "Furos e ranhuras",
+            ],
+            Label::DrillSizes => [
+                "Drill sizes",
+                "Diámetros de broca",
+                "Bohrergrößen",
+                "Diamètres de foret",
+                "Diametri delle punte",
+                "ドリル径",
+                "钻头直径",
+                "Diâmetros de broca",
             ],
         };
         row[column(lang)]

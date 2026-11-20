@@ -38,6 +38,19 @@ pub struct Options {
     pub select: Option<usize>,
     /// Drives GRBL on a serial port instead of the simulator (`--grbl PORT[@BAUD]`).
     pub grbl: Option<String>,
+    /// The same for grblHAL (`--grblhal PORT[@BAUD]`) and for Marlin (`--marlin PORT[@BAUD]`).
+    pub grblhal: Option<String>,
+    pub marlin: Option<String>,
+    /// Drives the dialect of a controller (`grbl`, `grblhal` or `marlin`) on a simulated cable instead of the plain simulator (`--sim NAME`):
+    /// no port is opened, nothing is real.
+    pub sim: Option<String>,
+    /// Tries the dialect against its simulator with a battery of steps and leaves (`--dialect-check NAME`): exit code 0 when every step
+    /// passes, 2 when one does not; no window, nothing moves.
+    pub dialect_check: Option<String>,
+    /// With `--import` of a board file: what the layer is cut as (`--layer isolation|profile|drill`; `auto` is what the file says) and
+    /// whether it is mirrored about the Y axis (`--mirror`).
+    pub layer: Option<String>,
+    pub mirror: bool,
     /// Lists the serial ports and leaves (`--ports`).
     pub ports: bool,
     /// Prints the report of the program (statistics, time, what looks wrong) and leaves (`--report FILE`); no window, nothing moves.
@@ -81,6 +94,18 @@ pub struct Options {
     /// Prints the version and leaves (`--version`, `-V`), or the help and leaves (`--help`, `-h`); no window, nothing moves.
     pub version: bool,
     pub help: bool,
+}
+
+impl Options {
+    /// The controller on a real serial port that the options name: its dialect and the `PORT[@BAUD]`.
+    pub fn real_link(&self) -> Option<(crate::link::Dialect, &str)> {
+        use crate::link::Dialect;
+        self.grbl
+            .as_deref()
+            .map(|p| (Dialect::Grbl, p))
+            .or_else(|| self.grblhal.as_deref().map(|p| (Dialect::GrblHal, p)))
+            .or_else(|| self.marlin.as_deref().map(|p| (Dialect::Marlin, p)))
+    }
 }
 
 /// The windows that `--window` opens, in the order of the help.
@@ -134,7 +159,10 @@ pub fn help_text() -> String {
          \x20 --template NAME    print the settings of a kind of machine (small-mill, router, engraver, pcb-mill) to start from, and leave\n\
          \x20 --templates        list the machine templates, and leave\n\
          \x20 --lookahead        print the time of the program with the look-ahead of the planner (corners, acceleration of each axis), and leave\n\
-         \x20 --import           read the file as a drawing (HPGL, DXF or SVG) and print the G-code that cuts along it, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --import           read the file as a drawing (HPGL, DXF or SVG) or as a board (Gerber or Excellon) and print the G-code that cuts along it, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
+         \x20 --layer KIND       with --import of a board file: cut it as isolation, profile or drill (auto: what the file says)\n\
+         \x20 --mirror           with --import of a board file: mirror the layer about the Y axis\n\
+         \x20 --dialect-check D  try the dialect D (grbl, grblhal or marlin) against its simulator with a battery of steps, and leave (exit code 0 every step passed, 2 one did not)\n\
          \x20 --post NAME        pass the program (or the one --import makes) through the post-processor NAME (a file beside the settings, or its path), and leave\n\
          \x20 --out FILE         write what the tool prints to FILE and never over a file that is there (exit code 2 if it is)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
@@ -147,8 +175,11 @@ pub fn help_text() -> String {
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
          \x20 --start            start the program as soon as the window is open\n\
-         \x20 --start-real       also needed to --start with a real controller (--grbl)\n\
+         \x20 --start-real       also needed to --start with a real controller (--grbl, --grblhal, --marlin)\n\
          \x20 --grbl PORT[@BAUD] drive a GRBL controller on a serial port (a build with --features serial)\n\
+         \x20 --grblhal PORT[@BAUD] drive a grblHAL controller on a serial port (a build with --features serial)\n\
+         \x20 --marlin PORT[@BAUD]  drive a Marlin controller on a serial port (a build with --features serial; 250000 baud when none is given)\n\
+         \x20 --sim NAME         drive the dialect NAME (grbl, grblhal or marlin) on a simulated cable instead of the plain simulator; nothing is real\n\
          \x20 --ports            list the serial ports and leave\n\
          \x20 --version, -V      print the version and leave\n\
          \x20 --help, -h         print this text and leave\n",
@@ -226,6 +257,35 @@ impl Options {
                     };
                 }
                 "--grbl" => o.grbl = Some(value("--grbl")?),
+                "--grblhal" => o.grblhal = Some(value("--grblhal")?),
+                "--marlin" => o.marlin = Some(value("--marlin")?),
+                "--sim" => {
+                    let v = value("--sim")?;
+                    let d = crate::link::Dialect::from_key(&v).ok_or(format!(
+                        "unknown dialect '{v}' ({})",
+                        crate::link::Dialect::ALL.map(|d| d.key()).join(", ")
+                    ))?;
+                    o.sim = Some(d.key().to_string());
+                }
+                "--dialect-check" => {
+                    let v = value("--dialect-check")?;
+                    let d = crate::link::Dialect::from_key(&v).ok_or(format!(
+                        "unknown dialect '{v}' ({})",
+                        crate::link::Dialect::ALL.map(|d| d.key()).join(", ")
+                    ))?;
+                    o.dialect_check = Some(d.key().to_string());
+                }
+                "--layer" => {
+                    let v = value("--layer")?;
+                    let k = v.trim().to_ascii_lowercase();
+                    if k != "auto" && crate::pcb::Kind::from_key(&k).is_none() {
+                        return Err(format!(
+                            "unknown layer '{v}' (auto, isolation, profile or drill)"
+                        ));
+                    }
+                    o.layer = Some(k);
+                }
+                "--mirror" => o.mirror = true,
                 "--ports" => o.ports = true,
                 "--report" => o.report = true,
                 "--html" => o.html = Some(PathBuf::from(value("--html")?)),
@@ -349,11 +409,21 @@ impl Options {
         if o.start_real && !o.start {
             return Err("--start-real only goes with --start".to_string());
         }
-        if o.start && o.grbl.is_some() && !o.start_real {
+        let real = [o.grbl.is_some(), o.grblhal.is_some(), o.marlin.is_some()];
+        if real.iter().filter(|r| **r).count() > 1 {
+            return Err("only one of --grbl, --grblhal and --marlin can be given".to_string());
+        }
+        if o.sim.is_some() && real.iter().any(|r| *r) {
+            return Err("--sim is a simulated cable: it does not go with a real port".to_string());
+        }
+        if o.start && o.real_link().is_some() && !o.start_real {
             return Err(
-                "--start with --grbl would move a real machine as soon as the window opens: add --start-real if that is what is wanted"
+                "--start with a real controller (--grbl, --grblhal or --marlin) would move a real machine as soon as the window opens: add --start-real if that is what is wanted"
                     .to_string(),
             );
+        }
+        if (o.layer.is_some() || o.mirror) && !o.import {
+            return Err("--layer and --mirror only go with --import".to_string());
         }
         Ok(o)
     }
@@ -723,5 +793,68 @@ mod tests {
         }
         // the help lines still start where they did
         assert!(h.lines().filter(|l| l.starts_with("  --")).count() >= 28);
+    }
+
+    #[test]
+    fn the_dialects_and_the_board_options_are_read_and_the_wrong_ones_are_named() {
+        let o = parse("--grblhal COM4@250000 --ports").unwrap();
+        assert_eq!(o.grblhal.as_deref(), Some("COM4@250000"));
+        assert_eq!(
+            o.real_link().map(|(d, p)| (d.key(), p)),
+            Some(("grblhal", "COM4@250000"))
+        );
+        let m = parse("--marlin /dev/ttyACM0").unwrap();
+        assert_eq!(m.real_link().map(|(d, _)| d.key()), Some("marlin"));
+        assert_eq!(
+            parse("--grbl A").unwrap().real_link().map(|(d, _)| d.key()),
+            Some("grbl")
+        );
+        assert!(parse("--grbl A --marlin B")
+            .unwrap_err()
+            .contains("only one"));
+        assert!(parse("--sim marlin --grblhal A")
+            .unwrap_err()
+            .contains("simulated"));
+        assert_eq!(
+            parse("--sim GrblHal").unwrap().sim.as_deref(),
+            Some("grblhal")
+        );
+        assert!(parse("--sim smoothie")
+            .unwrap_err()
+            .contains("unknown dialect"));
+        assert!(
+            parse("--sim").is_err() && parse("--marlin").is_err() && parse("--grblhal").is_err()
+        );
+        assert!(parse("--dialect-check nothing").is_err());
+        let c = parse("--dialect-check marlin").unwrap();
+        assert_eq!(c.dialect_check.as_deref(), Some("marlin"));
+        assert!(crate::cli_tools::wanted(&c));
+        // a real machine does not start by itself, whichever dialect it speaks; a simulated one may
+        assert!(parse("--marlin COM3 --start job.nc").is_err());
+        assert!(parse("--grblhal COM3 --start job.nc").is_err());
+        assert!(parse("--marlin COM3 --start --start-real job.nc").is_ok());
+        assert!(parse("--sim marlin --start job.nc").is_ok());
+        let b = parse("--import --layer Drill --mirror board.drl").unwrap();
+        assert_eq!(b.layer.as_deref(), Some("drill"));
+        assert!(b.mirror);
+        assert!(parse("--layer drill board.drl")
+            .unwrap_err()
+            .contains("--import"));
+        assert!(parse("--import --layer copper a.gbr")
+            .unwrap_err()
+            .contains("unknown layer"));
+        assert!(parse("--mirror a.gbr").is_err());
+        assert!(parse("--import --layer auto a.gbr").is_ok());
+        let h = help_text();
+        for w in [
+            "--grblhal",
+            "--marlin",
+            "--sim NAME",
+            "--dialect-check",
+            "--layer KIND",
+            "--mirror",
+        ] {
+            assert!(h.contains(w), "{w}");
+        }
     }
 }

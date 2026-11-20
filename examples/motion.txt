@@ -1,4 +1,4 @@
-# The motion layer of phoenix-cnc: the planner, the guard of the controller, the importers and the tool setter.
+# The motion layer of phoenix-cnc: the planner, the guard of the controller, the importers (drawings and boards), the cable of the simulators and the tool setter.
 # One key = value per line; what is missing or wrong keeps its default.
 accel_x = 50
 accel_y = 50
@@ -36,3 +36,29 @@ setter_feed = 60
 setter_retract = 5
 setter_height = 0
 setter_confirm = on
+pcb_tool = 0.2
+pcb_passes = 2
+pcb_stepover = 0.1
+pcb_res = 0.05
+pcb_depth = 0.05
+pcb_feed = 200
+pcb_plunge = 60
+pcb_drill_depth = 1.8
+pcb_peck = 0.6
+pcb_drill_feed = 60
+pcb_retract = 1
+pcb_profile_tool = 1
+pcb_profile_depth = 1.7
+pcb_profile_pass = 0.6
+pcb_profile_feed = 150
+pcb_join = 0.01
+pcb_rpm = 0
+pcb_mirror_bottom = on
+pcb_zero_origin = off
+pcb_tool_change_m6 = off
+pcb_max_cells = 16000000
+wire_seed = 1
+wire_chunk_max = 0
+wire_noise = 0
+wire_flip = 0
+marlin_numbering = off

@@ -54,6 +54,7 @@ pub fn wanted(o: &Options) -> bool {
         || o.post.is_some()
         || o.template.is_some()
         || o.templates
+        || o.dialect_check.is_some()
 }
 
 /// The lines of a program file: every byte is a character, so a file in any code page is read (as the report reads it).
@@ -309,7 +310,86 @@ pub fn import(
     post: Option<&(crate::post::Post, String)>,
     lang: &str,
 ) -> Outcome {
+    import_with(path, cfg, post, lang, &crate::pcb::Ask::default())
+}
+
+/// `--dialect-check`: the dialect against its simulator, on the cable of the motion file; exit code 0 when every step passed and 2 when one
+/// did not (the check was not passed).
+pub fn dialect_check(name: &str, settings_file: Option<&Path>, lang: &str) -> Outcome {
+    let Some(d) = crate::link::Dialect::from_key(name) else {
+        return Outcome::failed(format!("unknown dialect '{name}'"));
+    };
+    let wire = settings_file
+        .map(crate::motioncfg::motion_path)
+        .map(|p| crate::motioncfg::MotionCfg::read(&p).0.wire)
+        .unwrap_or_default();
+    let report = crate::dialcheck::run(d, &wire);
+    Outcome {
+        out: report.text(lang),
+        err: String::new(),
+        code: if report.passed() { 0 } else { 2 },
+    }
+}
+
+/// `--import` of a board file (Gerber or Excellon): the layer as the program that cuts it, and what was said about it.
+fn board(
+    path: &Path,
+    cfg: &crate::motioncfg::MotionCfg,
+    post: Option<&(crate::post::Post, String)>,
+    lang: &str,
+    ask: &crate::pcb::Ask,
+) -> Outcome {
     use crate::notes::Label;
+    let job = match crate::pcb::import_file(path, &cfg.import, &cfg.pcb, ask) {
+        Ok(j) => j,
+        Err(why) => return Outcome::failed(why.text(lang).to_string()),
+    };
+    let mut lines = job.lines.clone();
+    let mut err = String::new();
+    for n in &job.notes {
+        err.push_str(&format!("{}\n", n.text(lang)));
+    }
+    if let Some(p) = post {
+        let (l, said) = post_apply(p, cfg, &lines, lang);
+        lines = l;
+        err.push_str(&said);
+    }
+    err.push_str(&format!(
+        "{}: {}\n",
+        Label::Layer.text(lang),
+        job.kind.key()
+    ));
+    if job.kind == crate::pcb::Kind::Drill {
+        err.push_str(&format!(
+            "{}: {}\n{}: {}\n",
+            Label::Holes.text(lang),
+            job.cuts,
+            Label::DrillSizes.text(lang),
+            job.tools
+        ));
+    } else {
+        err.push_str(&format!("{}: {}\n", Label::Paths.text(lang), job.cuts));
+    }
+    err.push_str(&format!("{}: {}\n", Label::Lines.text(lang), lines.len()));
+    Outcome {
+        out: joined(&lines),
+        err,
+        code: i32::from(!job.notes.is_empty()),
+    }
+}
+
+/// As [`import`], asked which layer a board file is cut as and whether it is mirrored (`--layer` and `--mirror`).
+pub fn import_with(
+    path: &Path,
+    cfg: &crate::motioncfg::MotionCfg,
+    post: Option<&(crate::post::Post, String)>,
+    lang: &str,
+    ask: &crate::pcb::Ask,
+) -> Outcome {
+    use crate::notes::Label;
+    if crate::pcb::detect_path(path).is_some() {
+        return board(path, cfg, post, lang, ask);
+    }
     let mut drawing = match crate::import::read_file(path, &cfg.import) {
         Ok(d) => d,
         Err(why) => return Outcome::failed(why.text(lang).to_string()),
@@ -438,6 +518,9 @@ pub fn run_with(o: &Options, s: &Settings, settings_file: Option<&Path>) -> Outc
 }
 
 fn run_tool(o: &Options, s: &Settings, settings_file: Option<&Path>, lang: &str) -> Outcome {
+    if let Some(name) = o.dialect_check.as_deref() {
+        return dialect_check(name, settings_file, lang);
+    }
     if o.templates {
         return template(None, lang);
     }
@@ -476,7 +559,11 @@ fn run_on_file(
         Err(e) => return e,
     };
     if o.import {
-        return import(path, cfg, post.as_ref(), lang);
+        let ask = crate::pcb::Ask {
+            kind: o.layer.as_deref().and_then(crate::pcb::Kind::from_key),
+            mirror: o.mirror,
+        };
+        return import_with(path, cfg, post.as_ref(), lang, &ask);
     }
     let lines = match read_lines(path) {
         Ok(l) => l,
@@ -1160,5 +1247,94 @@ mod tests {
         for w in ["--lookahead", "--import", "--post NAME"] {
             assert!(help.contains(w), "{w}");
         }
+    }
+
+    const BOARD_COPPER: &str = "%FSLAX34Y34*%\n%MOMM*%\n%TF.FileFunction,Copper,L1,Top*%\n%ADD10C,0.500*%\nD10*\nX0Y0D02*\nX100000Y0D01*\nM02*\n";
+    const BOARD_DRILL: &str =
+        "M48\nMETRIC,TZ\nT1C0.800\nT2C1.000\n%\nT1\nX5.0Y5.0\nX10.0Y5.0\nT2\nX20.0Y10.0\nM30\n";
+
+    #[test]
+    fn the_dialect_check_passes_for_every_dialect_and_says_so_in_the_language() {
+        let s = Settings::default();
+        for d in ["grbl", "grblhal", "marlin"] {
+            let r = run_in(&options(&["--dialect-check", d]), &s);
+            assert_eq!(r.code, 0, "{d}: {}{}", r.out, r.err);
+            assert!(r.out.contains("Dialect check passed"), "{}", r.out);
+            assert_eq!(r.out.lines().filter(|l| l.starts_with("ok ")).count(), 4);
+        }
+        let es = run_in(&options(&["--dialect-check", "marlin", "--lang", "es"]), &s);
+        assert!(
+            es.out.contains("Prueba del dialecto superada"),
+            "{}",
+            es.out
+        );
+        // a name that is no dialect is an error of the program
+        let r = dialect_check("nothing", None, "en");
+        assert_eq!(r.code, 2);
+        assert!(r.err.contains("unknown dialect"));
+    }
+
+    #[test]
+    fn a_board_is_imported_as_isolation_profile_or_drill_and_the_failures_are_told() {
+        let s = Settings::default();
+        let copper = Temp::new("top.gbr", BOARD_COPPER);
+        let r = run_in(&options(&["--import", &copper.arg()]), &s);
+        assert_eq!(r.code, 0, "{}", r.err);
+        assert!(r.out.starts_with("G21 G90 G17\n"));
+        assert!(
+            r.err.contains("Layer: isolation") && r.err.contains("Paths read:"),
+            "{}",
+            r.err
+        );
+        // the program written is read back by the path of the program
+        let lines: Vec<String> = r.out.lines().map(str::to_string).collect();
+        assert!(crate::gcode::toolpath(&lines).len() > 4);
+        // the operator says what to cut: the same strokes as a profile (open, so it says so)
+        let p = run_in(
+            &options(&["--import", "--layer", "profile", &copper.arg()]),
+            &s,
+        );
+        assert_eq!(p.code, 1, "{}", p.err);
+        assert!(
+            p.err.contains("Layer: profile") && p.err.contains("outline is not closed"),
+            "{}",
+            p.err
+        );
+        let m = run_in(&options(&["--import", "--mirror", &copper.arg()]), &s);
+        assert_eq!(m.code, 1);
+        assert!(m.err.contains("mirrored"), "{}", m.err);
+        let drill = Temp::new("holes.drl", BOARD_DRILL);
+        let d = run_in(&options(&["--import", &drill.arg()]), &s);
+        assert_eq!(d.code, 0, "{}", d.err);
+        assert!(
+            d.err.contains("Holes and slots: 3") && d.err.contains("Drill sizes: 2"),
+            "{}",
+            d.err
+        );
+        assert!(d.out.contains("M0 (change to drill 0.8 mm)"));
+        // a layer that is not cut, in German, and a layer that is not a drill file
+        let mask = Temp::new(
+            "mask.gts",
+            &BOARD_COPPER.replace("Copper,L1,Top", "Soldermask,Top"),
+        );
+        let w = run_in(&options(&["--import", "--lang", "de", &mask.arg()]), &s);
+        assert_eq!(w.code, 2);
+        assert!(w.err.contains("keine Lage"), "{}", w.err);
+        let wrong = run_in(
+            &options(&["--import", "--layer", "drill", &copper.arg()]),
+            &s,
+        );
+        assert_eq!(wrong.code, 2, "{}", wrong.err);
+        // the post-processor works on a board too
+        let post = Temp::new("board-post.txt", "header = (board)\nreplace = G0 -> G00\n");
+        let with = run_in(
+            &options(&["--import", "--post", &post.arg(), &drill.arg()]),
+            &s,
+        );
+        assert!(
+            with.out.starts_with("(board)\n") && with.out.contains("G00 X5 Y5"),
+            "{}",
+            with.out
+        );
     }
 }

@@ -9,12 +9,32 @@ use crate::progcheck::Level;
 use crate::words::Msg;
 use crate::workflow::{self, Imported};
 
+/// The words of the choice of the layer of a board, in the order of `ImportUi::layer`.
+const LAYER_WORDS: [Pt; 4] = [
+    Pt::ImportLayerAuto,
+    Pt::ImportLayerIsolation,
+    Pt::ImportLayerProfile,
+    Pt::ImportLayerDrill,
+];
+
+/// The word of a kind of layer.
+fn layer_word(kind: crate::pcb::Kind) -> Pt {
+    match kind {
+        crate::pcb::Kind::Isolation => Pt::ImportLayerIsolation,
+        crate::pcb::Kind::Profile => Pt::ImportLayerProfile,
+        crate::pcb::Kind::Drill => Pt::ImportLayerDrill,
+    }
+}
+
 /// What the panel of the import holds between frames.
 #[derive(Default)]
 pub(super) struct ImportUi {
     /// The path of the drawing and the name (or path) of the post-processor, as typed.
     pub(super) path: String,
     pub(super) post: String,
+    /// The layer a board file is cut as (0: what the file says, 1: isolation, 2: profile, 3: drill) and whether it is mirrored.
+    pub(super) layer: usize,
+    pub(super) mirror: bool,
     /// What reading the drawing gave: the program that cuts along it, or why it could not be read.
     pub(super) result: Option<Result<Imported, String>>,
 }
@@ -543,6 +563,18 @@ impl App {
                         .desired_width(room)
                         .hint_text("shop"),
                 );
+                ui.label(self.pt(Pt::ImportLayer));
+                let layers = LAYER_WORDS.map(|w| self.pt(w));
+                let chosen = layers[self.import_ui.layer.min(layers.len() - 1)];
+                egui::ComboBox::from_id_salt("importlayer")
+                    .selected_text(chosen)
+                    .show_ui(ui, |ui| {
+                        for (i, name) in layers.iter().enumerate() {
+                            ui.selectable_value(&mut self.import_ui.layer, i, *name);
+                        }
+                    });
+                let mirror = self.pt(Pt::ImportMirror);
+                ui.checkbox(&mut self.import_ui.mirror, mirror);
                 ui.label(RichText::new(self.pt(Pt::ImportCfgNote)).color(col(self.theme.dim)));
                 if ui.button(self.pt(Pt::ImportRead)).clicked() {
                     self.read_drawing();
@@ -571,6 +603,14 @@ impl App {
                             Label::Lines.text(self.lang.code()),
                             got.lines.len()
                         ));
+                        if let Some(b) = &got.board {
+                            let kind = self.pt(layer_word(b.kind));
+                            ui.label(fill(
+                                self.lang.code(),
+                                Pt::ImportBoard,
+                                &[kind.to_string(), b.cuts.to_string(), b.tools.to_string()],
+                            ));
+                        }
                         for n in &got.notes {
                             ui.label(RichText::new(n).color(col(self.theme.warn)));
                         }
@@ -608,11 +648,21 @@ impl App {
                 }
             }
         };
-        self.import_ui.result = Some(workflow::import_file(
+        let ask = crate::pcb::Ask {
+            kind: [
+                None,
+                Some(crate::pcb::Kind::Isolation),
+                Some(crate::pcb::Kind::Profile),
+                Some(crate::pcb::Kind::Drill),
+            ][self.import_ui.layer.min(3)],
+            mirror: self.import_ui.mirror,
+        };
+        self.import_ui.result = Some(workflow::import_file_with(
             Path::new(&path),
             &self.motion,
             post.as_ref(),
             lang,
+            &ask,
         ));
     }
 

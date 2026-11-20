@@ -1135,7 +1135,7 @@ pub fn run(o: &Options) -> eframe::Result {
     }
     let busy = std::time::Duration::from_secs_f64(Settings::load(&settings_path()).busy_wait_s);
     let (motion, _) = MotionCfg::read(&motion_path(&settings_path()));
-    let linked = match crate::link::guarded_for_with(o, busy, &motion.guard) {
+    let linked = match crate::link::guarded_for_motion(o, busy, &motion) {
         Ok(l) => l,
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");

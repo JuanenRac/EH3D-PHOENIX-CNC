@@ -1,5 +1,6 @@
 //! The values of the motion layer that the operator tunes: how the planner accelerates and takes the corners, whether arcs are rebuilt, how
-//! the guard of the controller behaves, what the importers read and cut, and where the tool setter is. None of them is in the code: they
+//! the guard of the controller behaves, what the importers read and cut (a drawing, and a board from its Gerber and Excellon files), how
+//! the simulated cable of a controller misbehaves, and where the tool setter is. None of them is in the code: they
 //! are `key = value` lines of a text file, `phoenix-cnc-motion.txt` next to the settings file (`examples/motion.txt` is a model, and it
 //! is the defaults). With no file every value is its default; a line that cannot be used is named, with its number and the reason, and
 //! the default stays. Every option that makes the machine safer has a switch and starts on.
@@ -112,6 +113,96 @@ impl Default for ImportCfg {
     }
 }
 
+/// How a board is cut from its Gerber and Excellon files.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PcbCfg {
+    /// The isolation: the width of the tool at the depth of the cut, how many passes, how far apart they are and the cell of the grid
+    /// the copper is drawn on (mm); the depth and the feeds.
+    pub tool_mm: f64,
+    pub passes: usize,
+    pub stepover_mm: f64,
+    pub res_mm: f64,
+    pub depth_mm: f64,
+    pub feed_mm_min: f64,
+    pub plunge_mm_min: f64,
+    /// The drilling: the depth, the depth of one peck, the feed and the height the drill is lifted to between pecks (mm).
+    pub drill_depth_mm: f64,
+    pub peck_mm: f64,
+    pub drill_feed_mm_min: f64,
+    pub retract_mm: f64,
+    /// The profile: the tool, the depth, the depth of one pass and the feed.
+    pub profile_tool_mm: f64,
+    pub profile_depth_mm: f64,
+    pub profile_pass_mm: f64,
+    pub profile_feed_mm_min: f64,
+    /// Two ends of the outline closer than this are one point (mm).
+    pub join_mm: f64,
+    /// The speed of the spindle the program starts with (0: the program does not start it).
+    pub rpm: f64,
+    /// The layers of the bottom are mirrored about the Y axis.
+    pub mirror_bottom: bool,
+    /// The lower left corner of each file is the zero of the work (off: the zero of the file is kept, so that the layers stay aligned).
+    pub zero_origin: bool,
+    /// A change of drill is `T1 M6` (off: a pause with the diameter in its comment, `M0`).
+    pub tool_change_m6: bool,
+    /// The most cells of the grid of the isolation.
+    pub max_cells: u64,
+}
+
+impl Default for PcbCfg {
+    fn default() -> Self {
+        PcbCfg {
+            tool_mm: 0.2,
+            passes: 2,
+            stepover_mm: 0.1,
+            res_mm: 0.05,
+            depth_mm: 0.05,
+            feed_mm_min: 200.0,
+            plunge_mm_min: 60.0,
+            drill_depth_mm: 1.8,
+            peck_mm: 0.6,
+            drill_feed_mm_min: 60.0,
+            retract_mm: 1.0,
+            profile_tool_mm: 1.0,
+            profile_depth_mm: 1.7,
+            profile_pass_mm: 0.6,
+            profile_feed_mm_min: 150.0,
+            join_mm: 0.01,
+            rpm: 0.0,
+            mirror_bottom: true,
+            zero_origin: false,
+            tool_change_m6: false,
+            max_cells: 16_000_000,
+        }
+    }
+}
+
+/// How the cable to a simulated controller misbehaves (`--sim`), and how Marlin is driven.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WireCfg {
+    /// The seed of the schedule: the same seed is the same cable.
+    pub seed: u64,
+    /// The most bytes of an answer that arrive in one piece (0: whole).
+    pub chunk_max: usize,
+    /// Per thousand pieces, the chance of a line of noise in front of one; per thousand lines, the chance that a bit of one goes wrong.
+    pub noise_per_mille: u32,
+    pub flip_per_mille: u32,
+    /// Marlin is sent numbered lines with a checksum, so that a line spoiled on the way is asked for again (off: plain lines).
+    pub marlin_numbering: bool,
+}
+
+impl Default for WireCfg {
+    fn default() -> Self {
+        WireCfg {
+            seed: 1,
+            chunk_max: 0,
+            noise_per_mille: 0,
+            flip_per_mille: 0,
+            marlin_numbering: false,
+        }
+    }
+}
+
 /// Where the tool setter is and how it is touched.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SetterCfg {
@@ -159,6 +250,8 @@ pub struct MotionCfg {
     pub planner: PlannerCfg,
     pub guard: GuardCfg,
     pub import: ImportCfg,
+    pub pcb: PcbCfg,
+    pub wire: WireCfg,
     pub setter: SetterCfg,
 }
 
@@ -232,11 +325,13 @@ impl MotionCfg {
         fn flag(v: &str) -> Result<bool, (Why, String)> {
             switch(v).ok_or((Why::OnOff, String::new()))
         }
-        let (p, g, i, s) = (
+        let (p, g, i, s, b, w) = (
             &mut self.planner,
             &mut self.guard,
             &mut self.import,
             &mut self.setter,
+            &mut self.pcb,
+            &mut self.wire,
         );
         match key {
             "accel_x" => p.accel_mm_s2[0] = ranged(v, 1.0, 100_000.0)?,
@@ -267,6 +362,32 @@ impl MotionCfg {
             "import_safe_z" => i.safe_z_mm = ranged(v, 0.1, 1000.0)?,
             "post_scripts" => i.post_scripts = flag(v)?,
             "import_curve_tolerance" => i.curve_tolerance_mm = ranged(v, 0.0005, 5.0)?,
+            "pcb_tool" => b.tool_mm = ranged(v, 0.02, 10.0)?,
+            "pcb_passes" => b.passes = ranged(v, 1.0, 10.0)? as usize,
+            "pcb_stepover" => b.stepover_mm = ranged(v, 0.01, 10.0)?,
+            "pcb_res" => b.res_mm = ranged(v, 0.002, 1.0)?,
+            "pcb_depth" => b.depth_mm = ranged(v, 0.001, 10.0)?,
+            "pcb_feed" => b.feed_mm_min = ranged(v, 1.0, 100_000.0)?,
+            "pcb_plunge" => b.plunge_mm_min = ranged(v, 1.0, 100_000.0)?,
+            "pcb_drill_depth" => b.drill_depth_mm = ranged(v, 0.01, 100.0)?,
+            "pcb_peck" => b.peck_mm = ranged(v, 0.01, 100.0)?,
+            "pcb_drill_feed" => b.drill_feed_mm_min = ranged(v, 1.0, 100_000.0)?,
+            "pcb_retract" => b.retract_mm = ranged(v, 0.1, 100.0)?,
+            "pcb_profile_tool" => b.profile_tool_mm = ranged(v, 0.1, 20.0)?,
+            "pcb_profile_depth" => b.profile_depth_mm = ranged(v, 0.01, 100.0)?,
+            "pcb_profile_pass" => b.profile_pass_mm = ranged(v, 0.01, 100.0)?,
+            "pcb_profile_feed" => b.profile_feed_mm_min = ranged(v, 1.0, 100_000.0)?,
+            "pcb_join" => b.join_mm = ranged(v, 0.0001, 1.0)?,
+            "pcb_rpm" => b.rpm = ranged(v, 0.0, 1_000_000.0)?,
+            "pcb_mirror_bottom" => b.mirror_bottom = flag(v)?,
+            "pcb_zero_origin" => b.zero_origin = flag(v)?,
+            "pcb_tool_change_m6" => b.tool_change_m6 = flag(v)?,
+            "pcb_max_cells" => b.max_cells = ranged(v, 1000.0, 1_000_000_000.0)? as u64,
+            "wire_seed" => w.seed = ranged(v, 0.0, 9_007_199_254_740_991.0)? as u64,
+            "wire_chunk_max" => w.chunk_max = ranged(v, 0.0, 512.0)? as usize,
+            "wire_noise" => w.noise_per_mille = ranged(v, 0.0, 1000.0)? as u32,
+            "wire_flip" => w.flip_per_mille = ranged(v, 0.0, 1000.0)? as u32,
+            "marlin_numbering" => w.marlin_numbering = flag(v)?,
             "setter_x" => s.x_mm = ranged(v, -100_000.0, 100_000.0)?,
             "setter_y" => s.y_mm = ranged(v, -100_000.0, 100_000.0)?,
             "setter_start_z" => s.start_z_mm = ranged(v, -100_000.0, 100_000.0)?,
@@ -283,9 +404,10 @@ impl MotionCfg {
     /// The text of a file with every value (the defaults when nothing was read): the model the example file is made from.
     pub fn to_text(&self) -> String {
         let (p, g, i, s) = (&self.planner, &self.guard, &self.import, &self.setter);
+        let (b, w) = (&self.pcb, &self.wire);
         let f = |b: bool| if b { "on" } else { "off" };
         let mut t = String::from(
-            "# The motion layer of phoenix-cnc: the planner, the guard of the controller, the importers and the tool setter.\n\
+            "# The motion layer of phoenix-cnc: the planner, the guard of the controller, the importers (drawings and boards), the cable of the simulators and the tool setter.\n\
              # One key = value per line; what is missing or wrong keeps its default.\n",
         );
         for (k, v) in [
@@ -338,6 +460,37 @@ impl MotionCfg {
             t.push_str(&format!("{k} = {v}\n"));
         }
         t.push_str(&format!("setter_confirm = {}\n", f(s.confirm)));
+        // the boards: the isolation, the drilling and the profile, then what is switched
+        for (k, v) in [
+            ("pcb_tool", b.tool_mm),
+            ("pcb_passes", b.passes as f64),
+            ("pcb_stepover", b.stepover_mm),
+            ("pcb_res", b.res_mm),
+            ("pcb_depth", b.depth_mm),
+            ("pcb_feed", b.feed_mm_min),
+            ("pcb_plunge", b.plunge_mm_min),
+            ("pcb_drill_depth", b.drill_depth_mm),
+            ("pcb_peck", b.peck_mm),
+            ("pcb_drill_feed", b.drill_feed_mm_min),
+            ("pcb_retract", b.retract_mm),
+            ("pcb_profile_tool", b.profile_tool_mm),
+            ("pcb_profile_depth", b.profile_depth_mm),
+            ("pcb_profile_pass", b.profile_pass_mm),
+            ("pcb_profile_feed", b.profile_feed_mm_min),
+            ("pcb_join", b.join_mm),
+            ("pcb_rpm", b.rpm),
+        ] {
+            t.push_str(&format!("{k} = {v}\n"));
+        }
+        t.push_str(&format!("pcb_mirror_bottom = {}\n", f(b.mirror_bottom)));
+        t.push_str(&format!("pcb_zero_origin = {}\n", f(b.zero_origin)));
+        t.push_str(&format!("pcb_tool_change_m6 = {}\n", f(b.tool_change_m6)));
+        t.push_str(&format!("pcb_max_cells = {}\n", b.max_cells));
+        t.push_str(&format!("wire_seed = {}\n", w.seed));
+        t.push_str(&format!("wire_chunk_max = {}\n", w.chunk_max));
+        t.push_str(&format!("wire_noise = {}\n", w.noise_per_mille));
+        t.push_str(&format!("wire_flip = {}\n", w.flip_per_mille));
+        t.push_str(&format!("marlin_numbering = {}\n", f(w.marlin_numbering)));
         t
     }
 }
@@ -412,6 +565,55 @@ mod tests {
         off.guard.enabled = false;
         assert!(off.to_text().contains("guard = off\n"));
         assert_eq!(MotionCfg::parse(&off.to_text()).0, off);
+    }
+
+    #[test]
+    fn the_board_and_the_cable_settings_are_read_ranged_and_written_back() {
+        let (c, p) = MotionCfg::parse(
+            "pcb_tool = 0.1\npcb_passes = 4\npcb_mirror_bottom = off\npcb_peck = 0.3\nwire_seed = 77\nwire_chunk_max = 5\nwire_noise = 250\nwire_flip = 100\nmarlin_numbering = on\npcb_res = 5\npcb_passes = 99\nwire_noise = 2000\nwire_seed = -1\n",
+        );
+        assert_eq!((c.pcb.tool_mm, c.pcb.passes, c.pcb.peck_mm), (0.1, 4, 0.3));
+        assert!(!c.pcb.mirror_bottom);
+        assert_eq!(
+            (
+                c.wire.seed,
+                c.wire.chunk_max,
+                c.wire.noise_per_mille,
+                c.wire.flip_per_mille
+            ),
+            (77, 5, 250, 100)
+        );
+        assert!(c.wire.marlin_numbering);
+        // a value out of its range keeps the one before it, and so does a key given twice
+        let lines: Vec<usize> = p.iter().map(|p| p.line).collect();
+        assert_eq!(lines, vec![10, 11, 12, 13], "{p:?}");
+        assert_eq!(c.pcb.res_mm, 0.05);
+        // the defaults are the ones of a clean cable and of a board of 0.2 mm tools
+        let d = MotionCfg::default();
+        assert_eq!(
+            (
+                d.wire.flip_per_mille,
+                d.wire.noise_per_mille,
+                d.wire.chunk_max
+            ),
+            (0, 0, 0)
+        );
+        assert!(!d.wire.marlin_numbering && !d.pcb.zero_origin && d.pcb.mirror_bottom);
+        // written and read back
+        let (back, problems) = MotionCfg::parse(&c.to_text());
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(back, c);
+    }
+
+    #[test]
+    fn the_model_file_fits_in_the_limits_it_has_to_respect() {
+        let text = MotionCfg::default().to_text();
+        assert!(
+            (text.len() as u64) < MAX_FILE_BYTES / 2,
+            "{} bytes",
+            text.len()
+        );
+        assert!(text.lines().count() < MAX_LINES / 2);
     }
 
     #[test]

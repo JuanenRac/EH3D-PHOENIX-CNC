@@ -125,7 +125,17 @@ pub fn load_post(name: &str, settings_file: &Path, lang: &str) -> Result<LoadedP
     }
 }
 
-/// A drawing read and turned into a program.
+/// What a board file was cut as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BoardInfo {
+    pub kind: crate::pcb::Kind,
+    /// The paths the tool cuts along, or the holes and slots it drills.
+    pub cuts: usize,
+    /// The different drills (0 when it is not a drill file).
+    pub tools: usize,
+}
+
+/// A drawing or a board layer read and turned into a program.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Imported {
     /// The G-code that cuts along the paths (moved to the zero of the work, and written by the post-processor when there is one).
@@ -135,16 +145,54 @@ pub struct Imported {
     pub size_mm: (f64, f64),
     /// What the reader did not understand or assumed, and what the post-processor had to say (a script that is not run), in the language.
     pub notes: Vec<String>,
+    /// What the file was cut as, when it is a board layer (Gerber or Excellon).
+    pub board: Option<BoardInfo>,
 }
 
-/// Reads a drawing (HPGL, DXF or SVG) within the limits of the motion file and turns it into the program that cuts along it. The post-processor,
-/// when one is given, writes the lines last; a script it asks for is not run unless `post_scripts` is on (and there is no engine yet).
+/// Reads a drawing (HPGL, DXF or SVG) or a board layer (Gerber or Excellon) within the limits of the motion file and turns it into the program
+/// that cuts along it. The post-processor, when one is given, writes the lines last; a script it asks for is not run unless `post_scripts` is on
+/// (and there is no engine yet).
 pub fn import_file(
     path: &Path,
     cfg: &MotionCfg,
     post: Option<&LoadedPost>,
     lang: &str,
 ) -> Result<Imported, String> {
+    import_file_with(path, cfg, post, lang, &crate::pcb::Ask::default())
+}
+
+/// As [`import_file`], asked which layer a board file is cut as and whether it is mirrored.
+pub fn import_file_with(
+    path: &Path,
+    cfg: &MotionCfg,
+    post: Option<&LoadedPost>,
+    lang: &str,
+    ask: &crate::pcb::Ask,
+) -> Result<Imported, String> {
+    if crate::pcb::detect_path(path).is_some() {
+        let job = crate::pcb::import_file(path, &cfg.import, &cfg.pcb, ask)
+            .map_err(|e| e.text(lang).to_string())?;
+        let mut notes: Vec<String> = job.notes.iter().map(|n| n.text(lang).to_string()).collect();
+        let mut lines = job.lines;
+        if let Some(p) = post {
+            notes.extend(p.problems.iter().cloned());
+            if let Err(label) = p.post.script_state(cfg.import.post_scripts) {
+                notes.push(label.text(lang).to_string());
+            }
+            lines = p.post.apply(&lines);
+        }
+        return Ok(Imported {
+            lines,
+            paths: job.cuts,
+            size_mm: job.size_mm,
+            notes,
+            board: Some(BoardInfo {
+                kind: job.kind,
+                cuts: job.cuts,
+                tools: job.tools,
+            }),
+        });
+    }
     let mut drawing =
         crate::import::read_file(path, &cfg.import).map_err(|e| e.text(lang).to_string())?;
     let size_mm =
@@ -168,6 +216,7 @@ pub fn import_file(
         paths: drawing.paths.len(),
         size_mm,
         notes,
+        board: None,
     })
 }
 
@@ -507,6 +556,67 @@ mod tests {
             !table.with_extension("tmp").exists(),
             "no half table is left"
         );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    const EDGE: &str = "%FSLAX34Y34*%\n%MOMM*%\n%TF.FileFunction,Profile,NP*%\n%ADD10C,0.100*%\nD10*\nX0Y0D02*\nX400000Y0D01*\nX400000Y300000D01*\nX0Y300000D01*\nX0Y0D01*\nM02*\n";
+    const HOLES: &str =
+        "M48\nMETRIC,TZ\nT1C0.800\nT2C1.000\n%\nT1\nX5.0Y5.0\nX10.0Y5.0\nT2\nX20.0Y10.0\nM30\n";
+
+    #[test]
+    fn a_board_layer_is_read_into_a_program_with_what_it_was_cut_as_and_a_drawing_is_not_a_board() {
+        use crate::pcb::{Ask, Kind};
+        let d = dir("board");
+        let cfg = MotionCfg::default();
+        let edge = d.join("edge.gko");
+        std::fs::write(&edge, EDGE).unwrap();
+        let got = import_file(&edge, &cfg, None, "en").unwrap();
+        let b = got.board.unwrap();
+        assert_eq!((b.kind, b.cuts, b.tools), (Kind::Profile, 1, 0));
+        assert!(got.lines.iter().any(|l| l.starts_with("G1 Z-")));
+        assert!((got.size_mm.0 - 41.0).abs() < 0.1, "{:?}", got.size_mm);
+        // asked for something else, and mirrored: the words are those of the language
+        let holes = d.join("holes.drl");
+        std::fs::write(&holes, HOLES).unwrap();
+        let ask = Ask {
+            kind: Some(Kind::Drill),
+            mirror: true,
+        };
+        let got = import_file_with(&holes, &cfg, None, "es", &ask).unwrap();
+        let b = got.board.unwrap();
+        assert_eq!((b.kind, b.cuts, b.tools), (Kind::Drill, 3, 2));
+        assert!(
+            got.notes.iter().any(|n| n.contains("reflej")),
+            "{:?}",
+            got.notes
+        );
+        assert!(
+            got.lines.iter().any(|l| l.starts_with("G0 X-5 Y5")),
+            "{:?}",
+            got.lines
+        );
+        // a post-processor writes the lines of a board last, as it does for a drawing
+        let settings = d.join("phoenix-cnc.cfg");
+        std::fs::write(
+            crate::post::post_path(&settings, "shop").unwrap(),
+            "header = (job for the shop)\n",
+        )
+        .unwrap();
+        let post = load_post("shop", &settings, "en").unwrap();
+        let with = import_file(&holes, &cfg, Some(&post), "en").unwrap();
+        assert_eq!(with.lines[0], "(job for the shop)");
+        // a drawing is not a board
+        let svg = d.join("a.svg");
+        std::fs::write(&svg, SQUARE_SVG).unwrap();
+        assert_eq!(import_file(&svg, &cfg, None, "en").unwrap().board, None);
+        // the limits of the motion file hold for a board, and a layer that is not cut is refused in words
+        let mut small = MotionCfg::default();
+        small.import.max_bytes = 32;
+        assert!(import_file(&edge, &small, None, "en").is_err());
+        let mask = d.join("mask.gts");
+        std::fs::write(&mask, EDGE.replace("Profile,NP", "Soldermask,Top")).unwrap();
+        let e = import_file(&mask, &cfg, None, "pt").unwrap_err();
+        assert!(e.contains("não é uma camada"), "{e}");
         let _ = std::fs::remove_dir_all(&d);
     }
 }
