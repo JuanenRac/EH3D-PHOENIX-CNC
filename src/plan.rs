@@ -398,12 +398,11 @@ mod tests {
         // the facts come first and the warnings last, as the window expects
         let all = r.lines(Lang::En);
         assert_eq!(&all[all.len() - text.len()..], text.as_slice(), "{all:?}");
-        // said in Spanish, and in English for a language outside the eight
+        // said in Spanish
         assert!(r
             .warnings(Lang::Es)
             .iter()
             .any(|l| l.contains("husillo parado")));
-        assert_eq!(r.warnings(Lang::Ru).len(), text.len());
         // a good program says nothing, and the checks can be turned off
         let good = "M3 S1000\nG1 X10 F100\nM30";
         assert!(!analyse(&lines(good), &c).has_warnings());
@@ -471,7 +470,7 @@ mod tests {
                 "{l:?}: {text:?}"
             );
         }
-        for l in [Lang::Es, Lang::De, Lang::Ja, Lang::Ru, Lang::Uk] {
+        for l in [Lang::Es, Lang::De, Lang::Ja, Lang::Zh, Lang::Pt] {
             assert_ne!(en, r.lines(l), "{l:?} says it in English");
         }
     }

@@ -265,8 +265,6 @@ mod tests {
                     assert_eq!(en.contains(mark), t.contains(mark), "{w:?} {l:?} {mark}");
                 }
             }
-            // a language outside the eight reads English
-            assert_eq!(word(Lang::Ru, w), en);
         }
     }
 
