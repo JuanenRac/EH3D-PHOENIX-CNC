@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-986-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1040-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上以平面或 3D 画出程序路径并标出已完成的行，并在控制器拒绝处停下。此外它还检查、测量和准备程序（圆弧、固定循环、刀具半径补偿、禁入框、探针、高度图、换刀器、刀具表和材料表），导入图纸以及电路板的 Gerber 和 Excellon 文件，并把程序发送到 EH3D 服务器。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）已针对 GRBL、grblHAL、Marlin 和 Klipper 在模拟线路上对照其方言的模拟器进行驱动；它列出的其他系列尚未驱动。986 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**：仅在使用 GRBL、grblHAL 或 Marlin 时打开串口，仅在向服务器发送程序或用 `--klipper` 连接 Klipper 时建立网络连接。模拟机床只接受直线移动，会拒绝圆弧、固定循环和探测，因此这些内容只在纸面上测量、检查和计时，绘制的路径把圆弧显示为其弦，包含它们的程序会在模拟器中停在那一行。窗口提供 EH3D-COMMON 共享视图的 37 种语言和十一种主题，但本程序只承诺八种语言：其自身面板和工具的文字有英语、西班牙语、德语、法语、意大利语、日语、中文和欧洲葡萄牙语。
+**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上以平面或 3D 画出程序路径并标出已完成的行，并在控制器拒绝处停下。此外它还检查、测量和准备程序（圆弧、固定循环、刀具半径补偿、禁入框、探针、高度图、换刀器、刀具表和材料表），导入图纸以及电路板的 Gerber 和 Excellon 文件，并把程序发送到 EH3D 服务器。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）已针对 GRBL、grblHAL、Marlin 和 Klipper 在模拟线路上对照其方言的模拟器进行驱动；它列出的其他系列尚未驱动。1040 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**：仅在使用 GRBL、grblHAL 或 Marlin 时打开串口，仅在向服务器发送程序或用 `--klipper` 连接 Klipper 时建立网络连接。模拟机床只接受直线移动，会拒绝圆弧、固定循环和探测，因此这些内容只在纸面上测量、检查和计时，绘制的路径把圆弧显示为其弦，包含它们的程序会在模拟器中停在那一行。窗口提供 EH3D-COMMON 共享视图的 37 种语言和十一种主题，但本程序只承诺八种语言：其自身面板和工具的文字有英语、西班牙语、德语、法语、意大利语、日语、中文和欧洲葡萄牙语。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.2.3` |
 | 成熟度 | 可用 |
-| 测试 | 986 |
+| 测试 | 1040 |
 | 技术栈 | Rust |
 | 真实硬件 | 否：默认驱动模拟机床；真实的 GRBL 控制器（`--grbl`）从未试过 |
 
@@ -47,7 +47,7 @@
 | 基础库 | 🟡 | 一个 Rust crate，以本程序的名称重新导出 `eh3d-view` 的 `scene`、`texts` 和 `theme`；需要旁边有 EH3D-COMMON 文件夹。 |
 | 场景与视图 | 🟡 | 在 EH3D-COMMON 中编写并测试；本程序的窗口在工作台上绘制程序路径和刀具位置（已在电脑上看过）。 |
 | 主题与文本 | 🟡 | 十一种主题和界面文字：窗口提供共享视图的 37 种语言，本程序自身面板和工具的文字有八种；已在本程序的窗口中看过。 |
-| 测试 | 🟡 | 电脑上通过 986 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
+| 测试 | 🟡 | 电脑上通过 1040 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
 | 窗口与点动 | 🟡 | 在电脑上配合模拟控制器运行：位置、点动面板、步长、进给、回零、清零、解锁、命令行和日志；没有真实机床。 |
 | 机床控制 | 🟠 | 只有模拟器：程序在模拟机床或模拟的 GRBL、grblHAL、Marlin、Klipper 上逐行运行，可暂停、停止和急停；GRBL、grblHAL 和 Marlin 的串口位于构建功能之后，Klipper 的 HTTP 连接只遇到过替身 Moonraker，尚未连接任何真实控制器。 |
 | 文档 | 🟡 | 八种语言的 README、两张图片、三个示例程序和更新日志。 |
@@ -174,7 +174,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 测试
 
-`cargo test --features gui` 运行 986 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
+`cargo test --features gui` 运行 1040 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
 
 ## 🏗️ 构建与发布
 
