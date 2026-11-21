@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-986-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-995-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 986 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
+**Comprobación de honestidad - lo que se ejecuta hoy:** un programa en Rust con una ventana (`phoenix-cnc`) que maneja una máquina **simulada**: muestra la posición de la máquina (pieza y máquina), la mueve a mano con un teclado de jog, pone el cero, hace la referencia, toma las órdenes que escribe el operador, ejecuta un programa G-code línea a línea (con pausa, parada y parada de emergencia), dibuja la trayectoria del programa en la mesa con las líneas hechas marcadas y se detiene en lo que el controlador rechaza. La ventana habla 37 idiomas y lleva once temas. La interfaz de controladores (`eh3d-controller`, en EH3D-COMMON) tiene GRBL escrito contra una línea simulada y lista las demás familias como aún sin controlador. 995 pruebas se ejecutan en un ordenador. **Nada de aquí se ha ejecutado en una máquina real**, solo se abre un puerto serie para GRBL y una conexión de red solo al enviar un programa al servidor, y los arcos y los demás códigos ni se dibujan ni los ejecuta el simulador.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versión | `0.2.2` |
 | Madurez | Funcional |
-| Pruebas | 986 |
+| Pruebas | 995 |
 | Pila tecnológica | Rust |
 | En hardware real | No: por defecto maneja una máquina simulada; un controlador GRBL real (`--grbl`) nunca se ha probado |
 
@@ -47,7 +47,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 | Biblioteca base | 🟡 | Un crate de Rust que reexporta `scene`, `texts` y `theme` de `eh3d-view` con el nombre de este programa; necesita la carpeta de EH3D-COMMON al lado. |
 | Escena y vistas | 🟡 | Escrita y probada en EH3D-COMMON; la ventana de este programa dibuja la trayectoria de un programa en la mesa y la posición de la herramienta (vista en un ordenador). |
 | Temas y textos | 🟡 | Once temas y las palabras de la interfaz en 37 idiomas, vistos en la ventana de este programa. |
-| Pruebas | 🟡 | Pasan 986 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
+| Pruebas | 🟡 | Pasan 995 pruebas en un ordenador (`cargo test --features gui`): la sesión (jog, cero, referencia, un programa, pausa, alarma, parada de emergencia), la trayectoria de un programa y la línea de comandos; el controlador simulado se prueba en EH3D-COMMON. |
 | Ventana y jog | 🟡 | Funciona en un ordenador con el controlador simulado: posición, teclado de jog, pasos, avance, referencia, cero, desbloqueo, una línea de órdenes y un registro; sin máquina real. |
 | Control de máquina | 🟠 | Solo el simulador: un programa se ejecuta línea a línea con pausa, parada y parada de emergencia; aún no se conecta ningún controlador real desde aquí. |
 | Documentación | 🟡 | README en ocho idiomas, las dos imágenes, tres programas de ejemplo y el changelog. |
@@ -173,7 +173,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Pruebas
 
-`cargo test --features gui` ejecuta 986 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
+`cargo test --features gui` ejecuta 995 pruebas: la sesión (jog y cero, un programa línea a línea, pausa y continuar, una línea rechazada, la parada de emergencia y la alarma, el registro de las órdenes, la referencia), la trayectoria de un programa y la línea de comandos; la vista y el controlador simulado se prueban en EH3D-COMMON. El CI también ejecuta `cargo fmt --check` y `cargo clippy` con avisos como errores, y `python -I tools/ci_validate.py` comprueba el manifiesto, las versiones, el changelog y los ocho README.
 
 ## 🏗️ Compilación y publicación
 
@@ -291,9 +291,9 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/files.rs                             el mapa de alturas y el registro de la sesión como archivos, con las ventanas de archivos
 │   └── gui/icons.rs                             los dibujos de los botones, trazados con líneas, y el botón de la barra de herramientas
 ├── examples/                                    tres programas G-code de ejemplo, de un cuadrado a una espiral larga
-├── tests/                                       más pruebas del G-code y los ajustes
+├── tests/                                       la prueba que mantiene verdadero el registro de requisitos
 ├── tools/                                       comprobación de CI, del README y las herramientas de imágenes
-├── docs/                                        las fuentes de las dos imágenes y la decisión sobre el motor de scripts
+├── docs/                                        alcance, requisitos, estado, ideas aparcadas y los datos de las imágenes
 ├── .github/                                     flujo de CI, plantillas de issues y pull requests
 ├── images/                                      banner, las dos imágenes y las capturas de pantalla
 ├── build.sh build.bat                           compilan la biblioteca
@@ -302,6 +302,7 @@ EH3D-PHOENIX-CNC/
 ├── Cargo.toml Cargo.lock                        el paquete de Rust y sus dependencias fijadas
 ├── rust-toolchain.toml                          la toolchain de Rust fijada
 ├── CHANGELOG.md                                 qué cambió en cada versión
+├── AGENTS.md                                    las reglas para quien cambie el repositorio
 ├── SECURITY.md SUPPORT.md                       cómo informar de una vulnerabilidad y dónde preguntar
 └── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   cómo contribuir, el código de conducta y la licencia
 ```
@@ -337,6 +338,11 @@ README y textos existen en inglés, español, francés, italiano, alemán, chino
 ## 📚 Documentación
 
 * [Registro de cambios](CHANGELOG.md)
+* [Alcance](docs/SCOPE.md): para qué sirve el programa, qué no hará y qué no decide nunca.
+* [Requisitos](docs/REQUIREMENTS.md): el registro de capacidades, el estado de cada una y la prueba que la muestra.
+* [Estado](docs/STATUS.md): qué existe, qué falta y qué sigue abierto.
+* [Todavía no](docs/NOT_YET.md): buenas ideas que quedan fuera de esta versión.
+* [Reglas para cambiar el repositorio](AGENTS.md): las reglas para quien cambie el repositorio.
 * [Política de seguridad](SECURITY.md) y [soporte](SUPPORT.md)
 * La vista de un trabajo está documentada en EH3D-COMMON, donde vive.
 

@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-986-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-995-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。986 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
+**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上画出程序路径并标出已完成的行，并在控制器拒绝处停下。窗口支持 37 种语言和十一种主题。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）针对脚本化的线路编写了 GRBL，其余系列列为尚未支持。995 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**，仅在使用 GRBL 时打开串口，仅在向服务器发送程序时建立网络连接，模拟器既不绘制也不执行圆弧和其他代码。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.2.2` |
 | 成熟度 | 可用 |
-| 测试 | 986 |
+| 测试 | 995 |
 | 技术栈 | Rust |
 | 真实硬件 | 否：默认驱动模拟机床；真实的 GRBL 控制器（`--grbl`）从未试过 |
 
@@ -47,7 +47,7 @@
 | 基础库 | 🟡 | 一个 Rust crate，以本程序的名称重新导出 `eh3d-view` 的 `scene`、`texts` 和 `theme`；需要旁边有 EH3D-COMMON 文件夹。 |
 | 场景与视图 | 🟡 | 在 EH3D-COMMON 中编写并测试；本程序的窗口在工作台上绘制程序路径和刀具位置（已在电脑上看过）。 |
 | 主题与文本 | 🟡 | 十一种主题和 37 种语言的界面文字，已在本程序的窗口中看过。 |
-| 测试 | 🟡 | 电脑上通过 986 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
+| 测试 | 🟡 | 电脑上通过 995 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
 | 窗口与点动 | 🟡 | 在电脑上配合模拟控制器运行：位置、点动面板、步长、进给、回零、清零、解锁、命令行和日志；没有真实机床。 |
 | 机床控制 | 🟠 | 只有模拟器：程序逐行运行，可暂停、停止和急停；这里还没有连接任何真实控制器。 |
 | 文档 | 🟡 | 八种语言的 README、两张图片、三个示例程序和更新日志。 |
@@ -173,7 +173,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 测试
 
-`cargo test --features gui` 运行 986 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
+`cargo test --features gui` 运行 995 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
 
 ## 🏗️ 构建与发布
 
@@ -291,9 +291,9 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/files.rs                             高度图和会话日志作为文件，通过文件窗口读写
 │   └── gui/icons.rs                             用线条绘制的按钮图标和工具栏按钮
 ├── examples/                                    三个示例 G 代码程序，从正方形到长螺旋
-├── tests/                                       更多 G 代码与设置测试
+├── tests/                                       保持需求登记表真实的测试
 ├── tools/                                       CI 检查、README 检查和图片工具
-├── docs/                                        两张图的源文件和脚本引擎的决定
+├── docs/                                        范围、需求、状态、暂缓的想法和图片数据
 ├── .github/                                     CI 工作流、Issue 和 PR 模板
 ├── images/                                      横幅图、两张图片和屏幕截图
 ├── build.sh build.bat                           构建库
@@ -302,6 +302,7 @@ EH3D-PHOENIX-CNC/
 ├── Cargo.toml Cargo.lock                        Rust 包及其锁定的依赖
 ├── rust-toolchain.toml                          固定的 Rust 工具链
 ├── CHANGELOG.md                                 每个版本的变更
+├── AGENTS.md                                    修改本仓库的人需要遵守的规则
 ├── SECURITY.md SUPPORT.md                       如何报告漏洞及在哪里提问
 └── CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE   参与贡献、行为准则和许可证
 ```
@@ -337,6 +338,11 @@ README 和文本提供英语、西班牙语、法语、意大利语、德语、�
 ## 📚 文档
 
 * [变更日志](CHANGELOG.md)
+* [范围](docs/SCOPE.md)： 程序的用途、不做什么，以及永远不由它决定的事。
+* [需求](docs/REQUIREMENTS.md)： 功能登记表、每项的状态以及证明它的测试。
+* [状态](docs/STATUS.md)： 已有的、缺少的和仍未决定的。
+* [暂不包含](docs/NOT_YET.md)： 本版本暂不包含的好想法。
+* [修改仓库的规则](AGENTS.md)： 修改本仓库的人需要遵守的规则。
 * [安全政策](SECURITY.md)和[支持](SUPPORT.md)
 * 作业视图的文档在它所在的 EH3D-COMMON 中。
 

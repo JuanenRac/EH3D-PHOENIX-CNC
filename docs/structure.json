@@ -1352,14 +1352,14 @@
         {
           "name": "tests/",
           "desc": {
-            "en": "more tests of the G-code and the settings",
-            "es": "más pruebas del G-code y los ajustes",
-            "de": "weitere Tests zu G-Code und Einstellungen",
-            "fr": "d'autres tests du G-code et des réglages",
-            "it": "altri test del G-code e delle impostazioni",
-            "ja": "G コードと設定の追加テスト",
-            "zh": "更多 G 代码与设置测试",
-            "pt": "mais testes do G-code e das definições"
+            "en": "the check that keeps the register of requirements true",
+            "es": "la prueba que mantiene verdadero el registro de requisitos",
+            "de": "der Test, der das Anforderungsregister wahr hält",
+            "fr": "le test qui garde vrai le registre des exigences",
+            "it": "il test che mantiene vero il registro dei requisiti",
+            "ja": "要件一覧を正しく保つテスト",
+            "zh": "保持需求登记表真实的测试",
+            "pt": "o teste que mantém verdadeiro o registo de requisitos"
           }
         },
         {
@@ -1378,14 +1378,14 @@
         {
           "name": "docs/",
           "desc": {
-            "en": "the sources of the two pictures and the decision on the script engine",
-            "es": "las fuentes de las dos imágenes y la decisión sobre el motor de scripts",
-            "de": "die Quellen der beiden Bilder und die Entscheidung zur Skript-Engine",
-            "fr": "les sources des deux images et la décision sur le moteur de scripts",
-            "it": "le fonti delle due immagini e la decisione sul motore di script",
-            "ja": "2 枚の図のソースと、スクリプトエンジンについての決定",
-            "zh": "两张图的源文件和脚本引擎的决定",
-            "pt": "as fontes das duas imagens e a decisão sobre o motor de scripts"
+            "en": "scope, requirements, status, ideas left out and the data of the pictures",
+            "es": "alcance, requisitos, estado, ideas aparcadas y los datos de las imágenes",
+            "de": "Umfang, Anforderungen, Stand, zurückgestellte Ideen und die Bilddaten",
+            "fr": "périmètre, exigences, état, idées écartées et données des images",
+            "it": "ambito, requisiti, stato, idee rimandate e i dati delle immagini",
+            "ja": "範囲、要件、状況、見送った案、図のデータ",
+            "zh": "范围、需求、状态、暂缓的想法和图片数据",
+            "pt": "âmbito, requisitos, estado, ideias adiadas e os dados das imagens"
           }
         },
         {
@@ -1493,6 +1493,19 @@
             "ja": "各バージョンの変更点",
             "zh": "每个版本的变更",
             "pt": "o que mudou em cada versão"
+          }
+        },
+        {
+          "name": "AGENTS.md",
+          "desc": {
+            "en": "the rules for anyone who changes the repository",
+            "es": "las reglas para quien cambie el repositorio",
+            "de": "die Regeln für alle, die das Repository ändern",
+            "fr": "les règles pour qui modifie le dépôt",
+            "it": "le regole per chi modifica il repository",
+            "ja": "リポジトリを変更する人のための規則",
+            "zh": "修改本仓库的人需要遵守的规则",
+            "pt": "as regras para quem altera o repositório"
           }
         },
         {
