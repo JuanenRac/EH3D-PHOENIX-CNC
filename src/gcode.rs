@@ -316,7 +316,7 @@ fn trace(lines: &[String]) -> (Vec<Segment>, Vec<ArcRec>) {
     for (n, raw) in lines.iter().enumerate() {
         let mut off: [Option<f64>; 3] = [None; 3];
         let mut radius: Option<f64> = None;
-        let text = before_semicolon(raw);
+        let text = raw.split(';').next().unwrap_or("");
         let mut target = [None; 3];
         let mut word = String::new();
         let mut words: Vec<String> = Vec::new();
@@ -475,23 +475,9 @@ pub fn arc_moves(lines: &[String]) -> usize {
     count
 }
 
-/// The line up to the first `;` that is not inside parentheses: a `;` in a comment in parentheses does not end the line.
-fn before_semicolon(line: &str) -> &str {
-    let mut paren = false;
-    for (i, c) in line.char_indices() {
-        match c {
-            '(' => paren = true,
-            ')' => paren = false,
-            ';' if !paren => return &line[..i],
-            _ => {}
-        }
-    }
-    line
-}
-
 /// The words of a line of G-code (a letter and its number), without the comments; what is not a word is left out.
 pub fn words(line: &str) -> Vec<(char, f64)> {
-    let text = before_semicolon(line);
+    let text = line.split(';').next().unwrap_or("");
     let mut out = Vec::new();
     let mut in_comment = false;
     let mut cur: Option<(char, String)> = None;

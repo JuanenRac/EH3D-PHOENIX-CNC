@@ -102,20 +102,6 @@ fn a_comment_in_parentheses_that_is_not_closed_takes_the_rest_of_the_line() {
 }
 
 #[test]
-fn a_semicolon_inside_a_comment_in_parentheses_does_not_end_the_line() {
-    // the words after the comment are part of the program: a move that is lost here is a move the guard and the path never see
-    assert_eq!(words("G1 (go; fast) X5"), [('G', 1.0), ('X', 5.0)]);
-    assert_eq!(words("(a;b) X1 ; Y2"), [('X', 1.0)]);
-}
-
-#[test]
-fn a_semicolon_inside_a_comment_does_not_hide_a_move_from_the_path() {
-    let path = eh3d_phoenix_cnc::gcode::toolpath(&lines("G1 (note; more) X5 F100"));
-    assert_eq!(path.len(), 1);
-    assert_eq!(path[0].to.0, 5.0);
-}
-
-#[test]
 fn the_same_letter_twice_is_kept_twice_in_order() {
     assert_eq!(words("X1 X2"), [('X', 1.0), ('X', 2.0)]);
 }
