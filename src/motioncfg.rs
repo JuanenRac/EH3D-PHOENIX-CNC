@@ -6,7 +6,10 @@
 //! the default stays. Every option that makes the machine safer has a switch and starts on.
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
+
+use eh3d_controller::httprpc::{self, HttpConfig};
 
 /// The biggest file read and the most lines looked at.
 pub const MAX_FILE_BYTES: u64 = 16 * 1024;
@@ -203,6 +206,143 @@ impl Default for WireCfg {
     }
 }
 
+/// How the program reaches Moonraker, the HTTP side of Klipper (`--klipper HOST[:PORT]`): the `klipper.*` keys of the file. Only the keys that
+/// were written are kept apart; the others are the defaults of `eh3d_controller::httprpc`. The credential, when there is one, is never
+/// shown: not by `Debug`, not by a fault of a line, not by the text of the file the program writes.
+#[derive(Clone, PartialEq)]
+pub struct KlipperCfg {
+    /// An IP address or `localhost`; a name only with `allow_non_local` on.
+    pub host: String,
+    /// Accepts an address outside the local network (and a name). Off by default.
+    pub allow_non_local: bool,
+    api_key: Option<String>,
+    numbers: BTreeMap<String, u64>,
+}
+
+impl Default for KlipperCfg {
+    fn default() -> Self {
+        let d = HttpConfig::default();
+        KlipperCfg {
+            host: d.host,
+            allow_non_local: d.allow_non_local,
+            api_key: None,
+            numbers: BTreeMap::new(),
+        }
+    }
+}
+
+impl fmt::Debug for KlipperCfg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KlipperCfg")
+            .field("host", &self.host)
+            .field("allow_non_local", &self.allow_non_local)
+            .field("api_key", &self.api_key.as_ref().map(|_| "<set>"))
+            .field("numbers", &self.numbers)
+            .finish()
+    }
+}
+
+impl KlipperCfg {
+    /// Whether the file gives a credential.
+    pub fn has_api_key(&self) -> bool {
+        self.api_key.is_some()
+    }
+
+    /// The value of a numeric key: the one the file gave, or the default of the shared crate.
+    pub fn number(&self, key: &str) -> u64 {
+        self.numbers
+            .get(key)
+            .copied()
+            .or_else(|| HttpConfig::default().number(key))
+            .unwrap_or(0)
+    }
+
+    fn set(&mut self, key: &str, v: &str) -> Result<(), (Why, String)> {
+        match key {
+            "klipper.host" => {
+                if v.is_empty() || v.len() > 253 {
+                    return Err((Why::HostRefused, String::new()));
+                }
+                self.host = v.to_string();
+            }
+            "klipper.allow_non_local" => {
+                self.allow_non_local = switch(v).ok_or((Why::OnOff, String::new()))?;
+            }
+            "klipper.api_key" => {
+                // the value is tried and dropped: nothing of it goes in the fault
+                HttpConfig::default()
+                    .with_api_key(v)
+                    .map_err(|_| (Why::SecretRefused, String::new()))?;
+                self.api_key = Some(v.to_string());
+            }
+            _ => {
+                let Some(s) = httprpc::SETTINGS.iter().find(|s| s.key == key) else {
+                    return Err((Why::UnknownKey, String::new()));
+                };
+                let Ok(n) = v.parse::<u64>() else {
+                    return Err((Why::NotANumber, String::new()));
+                };
+                if n < s.min || n > s.max {
+                    return Err((Why::OutOfRange, format!("{} - {}", s.min, s.max)));
+                }
+                // only what differs from the default is kept, so the text of the defaults reads back as the defaults
+                if n == HttpConfig::default().number(key).unwrap_or(0) {
+                    self.numbers.remove(key);
+                } else {
+                    self.numbers.insert(key.to_string(), n);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The settings of the transport and of the controller. `over` is what `--klipper HOST[:PORT]` says: it takes the place of the host (and of
+    /// the port when it names one). What cannot hold together is refused here: an address the program may not reach, a script that would be
+    /// cut off before the controller gives up on it.
+    pub fn http(&self, over: Option<(&str, Option<u16>)>) -> Result<HttpConfig, Problem> {
+        let mut c = HttpConfig::new(&self.host, HttpConfig::default().port);
+        c.allow_non_local = self.allow_non_local;
+        for (k, n) in &self.numbers {
+            // each number was checked against its range when it was read
+            c.set_number(k, *n)
+                .map_err(|_| Problem::new(0, Why::OutOfRange, ""))?;
+        }
+        if let Some((host, port)) = over {
+            c.host = host.to_string();
+            if let Some(p) = port {
+                c.port = p;
+            }
+        }
+        if let Some(key) = &self.api_key {
+            c = c
+                .with_api_key(key)
+                .map_err(|_| Problem::new(0, Why::SecretRefused, ""))?;
+        }
+        if c.response_wait < c.busy_limit {
+            return Err(Problem::new(0, Why::WaitShorter, ""));
+        }
+        c.check()
+            .map_err(|_| Problem::new(0, Why::HostRefused, ""))?;
+        Ok(c)
+    }
+
+    /// The lines of the text of the file. The credential is never one of them.
+    fn lines(&self) -> String {
+        let mut t = format!("klipper.host = {}\n", self.host);
+        t.push_str(&format!(
+            "klipper.allow_non_local = {}\n",
+            if self.allow_non_local { "on" } else { "off" }
+        ));
+        for s in httprpc::SETTINGS {
+            t.push_str(&format!("{} = {}\n", s.key, self.number(s.key)));
+        }
+        t.push_str(
+            "# klipper.api_key = the credential of Moonraker, when it asks for one (written by hand; this program never prints it)\n",
+        );
+        t
+    }
+}
+
 /// Where the tool setter is and how it is touched.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SetterCfg {
@@ -253,6 +393,7 @@ pub struct MotionCfg {
     pub pcb: PcbCfg,
     pub wire: WireCfg,
     pub setter: SetterCfg,
+    pub klipper: KlipperCfg,
 }
 
 pub use crate::problem::{Problem, Why};
@@ -294,6 +435,26 @@ impl MotionCfg {
                 problems.push(Problem::new(n, why, detail));
             }
         }
+        // what no single key can say: the address, and that a script is not cut off before the controller gives up on it
+        if let Err(p) = c.klipper.http(None) {
+            let line = |key: &str| seen.get(key).copied().unwrap_or(0);
+            match p.why {
+                Why::WaitShorter => {
+                    let at = line("klipper.response_wait_ms").max(line("klipper.busy_limit_s"));
+                    problems.push(Problem::new(at, p.why, ""));
+                    c.klipper.numbers.remove("klipper.response_wait_ms");
+                    c.klipper.numbers.remove("klipper.busy_limit_s");
+                }
+                _ => {
+                    problems.push(Problem::new(
+                        line("klipper.host").max(line("klipper.allow_non_local")),
+                        Why::HostRefused,
+                        "",
+                    ));
+                    c.klipper.host = KlipperCfg::default().host;
+                }
+            }
+        }
         (c, problems)
     }
 
@@ -333,6 +494,9 @@ impl MotionCfg {
             &mut self.pcb,
             &mut self.wire,
         );
+        if key.starts_with("klipper.") {
+            return self.klipper.set(key, v);
+        }
         match key {
             "accel_x" => p.accel_mm_s2[0] = ranged(v, 1.0, 100_000.0)?,
             "accel_y" => p.accel_mm_s2[1] = ranged(v, 1.0, 100_000.0)?,
@@ -491,6 +655,7 @@ impl MotionCfg {
         t.push_str(&format!("wire_noise = {}\n", w.noise_per_mille));
         t.push_str(&format!("wire_flip = {}\n", w.flip_per_mille));
         t.push_str(&format!("marlin_numbering = {}\n", f(w.marlin_numbering)));
+        t.push_str(&self.klipper.lines());
         t
     }
 }
@@ -524,6 +689,107 @@ mod tests {
         .unwrap()
         .replace("\r\n", "\n");
         assert_eq!(example, c.to_text());
+    }
+
+    const CRED_SAMPLE: &str = "k7Q-sample-0123456789";
+
+    #[test]
+    fn the_klipper_keys_are_read_checked_and_the_credential_is_never_shown() {
+        let text = format!(
+            "klipper.host = 192.168.0.50\nklipper.port = 7126\nklipper.allow_non_local = off\nklipper.line_timeout_ms = 2500\nklipper.api_key = {CRED_SAMPLE}\n"
+        );
+        let (c, p) = MotionCfg::parse(&text);
+        assert!(p.is_empty(), "{p:?}");
+        assert!(c.klipper.has_api_key());
+        assert_eq!(c.klipper.number("klipper.port"), 7126);
+        assert_eq!(c.klipper.number("klipper.busy_limit_s"), 14_400);
+        let http = c.klipper.http(None).unwrap();
+        assert_eq!(
+            (http.host.as_str(), http.port, http.has_api_key()),
+            ("192.168.0.50", 7126, true)
+        );
+        assert_eq!(http.timeouts.line.as_millis(), 2500);
+        // --klipper takes the place of the host, and of the port when it names one
+        let over = c.klipper.http(Some(("10.0.0.7", None))).unwrap();
+        assert_eq!((over.host.as_str(), over.port), ("10.0.0.7", 7126));
+        let over = c.klipper.http(Some(("10.0.0.7", Some(80)))).unwrap();
+        assert_eq!(over.port, 80);
+        // nothing of the credential comes out: not in Debug, not in the text the program writes, not in a fault
+        assert!(!format!("{c:?}").contains(CRED_SAMPLE));
+        assert!(!format!("{http:?}").contains(CRED_SAMPLE));
+        assert!(!c.to_text().contains(CRED_SAMPLE));
+        let (back, _) = MotionCfg::parse(&c.to_text());
+        assert!(!back.klipper.has_api_key(), "the text keeps no credential");
+        let long = "x".repeat(257);
+        for bad in ["a b", "", long.as_str()] {
+            let (c, p) = MotionCfg::parse(&format!("klipper.api_key = {bad}\n"));
+            assert!(!c.klipper.has_api_key());
+            assert_eq!(p.len(), 1);
+            assert_eq!(p[0].why, Why::SecretRefused);
+            for l in crate::ctltext::LANGS {
+                assert!(!p[0].text(l).contains(bad) || bad.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn the_wrong_klipper_keys_are_named_and_keep_their_default() {
+        let (c, p) = MotionCfg::parse(
+            "klipper.port = 70000\nklipper.max_in_flight = many\nklipper.allow_non_local = maybe\nklipper.speed = 3\nklipper.port = 7126\nklipper.jog_timeout_ms = 90000\n",
+        );
+        let whys: Vec<(usize, Why)> = p.iter().map(|p| (p.line, p.why)).collect();
+        assert_eq!(
+            whys,
+            vec![
+                (1, Why::OutOfRange),
+                (2, Why::NotANumber),
+                (3, Why::OnOff),
+                (4, Why::UnknownKey),
+                (5, Why::Repeated),
+            ]
+        );
+        assert_eq!(p[0].detail, "1 - 65535");
+        assert_eq!(c.klipper.number("klipper.port"), 7125);
+        assert_eq!(c.klipper.number("klipper.max_in_flight"), 4);
+        assert_eq!(c.klipper.number("klipper.jog_timeout_ms"), 90_000);
+        assert!(!c.klipper.allow_non_local);
+    }
+
+    #[test]
+    fn an_address_outside_the_local_network_is_refused_unless_the_switch_is_on() {
+        for host in ["8.8.8.8", "example.org", "0.0.0.0", "239.1.2.3"] {
+            let (c, p) = MotionCfg::parse(&format!("klipper.host = {host}\n"));
+            assert_eq!(p.len(), 1, "{host}");
+            assert_eq!((p[0].line, p[0].why), (1, Why::HostRefused), "{host}");
+            assert_eq!(c.klipper.host, "127.0.0.1", "the default stays");
+        }
+        // with the switch (whichever line it is on) a public address is taken, an unspecified one never is
+        for host in ["8.8.8.8", "93.184.216.34"] {
+            let (c, p) = MotionCfg::parse(&format!(
+                "klipper.host = {host}\nklipper.allow_non_local = on\n"
+            ));
+            assert!(p.is_empty(), "{host}: {p:?}");
+            assert_eq!(c.klipper.host, host);
+        }
+        let (_, p) = MotionCfg::parse("klipper.host = 0.0.0.0\nklipper.allow_non_local = on\n");
+        assert_eq!(p.len(), 1);
+        for l in crate::ctltext::LANGS {
+            assert!(!p[0].text(l).is_empty());
+        }
+    }
+
+    #[test]
+    fn a_script_that_would_be_cut_off_before_the_controller_gives_up_is_refused() {
+        let (c, p) =
+            MotionCfg::parse("klipper.busy_limit_s = 3600\nklipper.response_wait_ms = 60000\n");
+        assert_eq!(p.len(), 1);
+        assert_eq!((p[0].line, p[0].why), (2, Why::WaitShorter));
+        assert_eq!(c.klipper.number("klipper.busy_limit_s"), 14_400);
+        assert_eq!(c.klipper.number("klipper.response_wait_ms"), 14_460_000);
+        // both moved together are fine
+        let (_, p) =
+            MotionCfg::parse("klipper.busy_limit_s = 60\nklipper.response_wait_ms = 61000\n");
+        assert!(p.is_empty(), "{p:?}");
     }
 
     #[test]

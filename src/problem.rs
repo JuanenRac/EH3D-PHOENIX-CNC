@@ -27,10 +27,16 @@ pub enum Why {
     /// One of a few words is needed (the detail lists them).
     Choice,
     NeedsName,
+    /// The address of Moonraker is not one the program may reach.
+    HostRefused,
+    /// The credential of Moonraker is not accepted (the text never says it).
+    SecretRefused,
+    /// A script of G-code would be cut off before the controller gives up on it.
+    WaitShorter,
 }
 
 impl Why {
-    pub const ALL: [Why; 13] = [
+    pub const ALL: [Why; 16] = [
         Why::NotKeyValue,
         Why::UnknownKey,
         Why::NotANumber,
@@ -44,6 +50,9 @@ impl Why {
         Why::DropForm,
         Why::Choice,
         Why::NeedsName,
+        Why::HostRefused,
+        Why::SecretRefused,
+        Why::WaitShorter,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -177,6 +186,36 @@ impl Why {
                 "ファイル名が必要です",
                 "需要文件名",
                 "é preciso um nome de ficheiro",
+            ],
+            Why::HostRefused => [
+                "not an address this program may reach: the local network, or any address with klipper.allow_non_local on",
+                "no es una dirección a la que este programa pueda llegar: la red local, o cualquiera con klipper.allow_non_local activado",
+                "keine Adresse, die dieses Programm erreichen darf: das lokale Netz, oder jede mit eingeschaltetem klipper.allow_non_local",
+                "ce n'est pas une adresse que ce programme peut joindre : le réseau local, ou toute adresse avec klipper.allow_non_local activé",
+                "non è un indirizzo raggiungibile da questo programma: la rete locale, o qualsiasi indirizzo con klipper.allow_non_local attivo",
+                "このプログラムが接続できるアドレスではありません。ローカルネットワークか、klipper.allow_non_local を有効にした場合の他のアドレスのみです",
+                "不是本程序可以连接的地址：只能是本地网络，或在开启 klipper.allow_non_local 后的其他地址",
+                "não é um endereço que este programa possa alcançar: a rede local, ou qualquer endereço com klipper.allow_non_local ativado",
+            ],
+            Why::SecretRefused => [
+                "the credential is not accepted: 1 to 256 printable characters without spaces (it is not repeated here)",
+                "la credencial no se acepta: de 1 a 256 caracteres imprimibles sin espacios (no se repite aquí)",
+                "die Zugangsdaten werden nicht akzeptiert: 1 bis 256 druckbare Zeichen ohne Leerzeichen (sie werden hier nicht wiederholt)",
+                "l'identifiant n'est pas accepté : de 1 à 256 caractères imprimables sans espace (il n'est pas répété ici)",
+                "la credenziale non è accettata: da 1 a 256 caratteri stampabili senza spazi (non viene ripetuta qui)",
+                "認証情報は受け付けられません。空白を含まない表示可能な文字で1〜256文字です（ここには繰り返しません）",
+                "凭据不被接受：1 到 256 个不含空格的可打印字符（此处不会重复显示）",
+                "a credencial não é aceite: de 1 a 256 carateres imprimíveis sem espaços (não é repetida aqui)",
+            ],
+            Why::WaitShorter => [
+                "klipper.response_wait_ms is shorter than klipper.busy_limit_s: a move would be cut off",
+                "klipper.response_wait_ms es más corto que klipper.busy_limit_s: se cortaría un movimiento",
+                "klipper.response_wait_ms ist kürzer als klipper.busy_limit_s: eine Bewegung würde abgebrochen",
+                "klipper.response_wait_ms est plus court que klipper.busy_limit_s : un mouvement serait coupé",
+                "klipper.response_wait_ms è più breve di klipper.busy_limit_s: un movimento verrebbe interrotto",
+                "klipper.response_wait_ms が klipper.busy_limit_s より短いため、移動が途中で打ち切られます",
+                "klipper.response_wait_ms 短于 klipper.busy_limit_s：运动会被中途切断",
+                "klipper.response_wait_ms é mais curto do que klipper.busy_limit_s: um movimento seria cortado",
             ],
         };
         row[column(lang)]
