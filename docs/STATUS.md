@@ -26,7 +26,7 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 
 ## Known technical debt and omitted tests
 
-* 986 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
+* 1040 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
 * No test has driven a real controller: the serial port is built behind a feature and has never been opened on a machine.
 * The look of the window has been seen on a computer by its pictures only; no operator has used it at a machine.
 * The look-ahead and the time estimates are checked for consistency, never against the time a real machine takes.
