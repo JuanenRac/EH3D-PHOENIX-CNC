@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 126 requirements: 118 implemented, 2 prototype, 6 planned and 0 validated. By progress: 118 done, 2 partial, 1 pending and 5 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 133 requirements: 124 implemented, 2 prototype, 7 planned and 0 validated. By progress: 124 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -185,3 +185,15 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-124 | The README and both scripts show the same sample, and the arguments of the README are accepted. | implemented | done | host-test | `tests/readme::the_readme_and_both_scripts_show_the_same_sample` | - |
 | PCNC-125 | A person looks at the window on a screen at a machine and finds it usable. | planned | blocked | none | `planned:operator::an_operator_runs_a_job_with_the_window_at_a_machine` | Needs a person at a screen, at a machine. |
 | PCNC-126 | The controller of HYDRA-UMC drives a machine from this program. | planned | blocked | none | `planned:hydra::the_controller_of_hydra_umc_runs_a_program` | Needs the contract with HYDRA-UMC and its controller. |
+
+## Klipper through Moonraker
+
+| ID | Requirement | State | Progress | Evidence | Test | Limits |
+|---|---|---|---|---|---|---|
+| PCNC-127 | Klipper is driven through Moonraker over HTTP from `--klipper`, behind the guard, and the credential goes in one header and nowhere else. | implemented | done | simulator | `tests/klipper::klipper_is_driven_over_http_from_the_option_in_the_guard_and_the_credential_goes_in_one_header` | - |
+| PCNC-128 | A failure of the HTTP link of Klipper has a number and is told in the eight languages. | implemented | done | simulator | `tests/klipper::nothing_listening_is_a_failure_of_the_link_with_a_number_and_words_in_each_language` | - |
+| PCNC-129 | An address outside the local network, and a name, are refused unless the switch of the motion file is on, before any connection. | implemented | done | simulator | `tests/klipper::an_address_outside_the_local_network_needs_the_switch_and_a_name_needs_it_too` | - |
+| PCNC-130 | The `klipper.*` keys of the motion file are ranged, a fault names its line and the credential is never shown. | implemented | done | host-test | `src/motioncfg::the_klipper_keys_are_read_checked_and_the_credential_is_never_shown` | - |
+| PCNC-131 | A simulated Klipper is chosen with `--sim klipper` and sits in the guard like the other dialects. | implemented | done | simulator | `src/link::klipper_is_simulated_with_sim_and_sits_in_the_guard_like_the_others` | - |
+| PCNC-132 | A refusal of Klipper is logged in the language of the window. | implemented | done | simulator | `src/session::a_refusal_of_klipper_is_logged_in_the_language_of_the_window` | - |
+| PCNC-133 | Drive a real Klipper through a real Moonraker. | planned | blocked | none | `planned:real_machine::a_real_klipper_runs_a_program_and_stops_on_the_emergency_stop` | The HTTP link has only met a stand-in Moonraker in the tests; it needs a machine with Klipper and a person at it with the emergency stop in reach. |

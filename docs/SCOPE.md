@@ -8,7 +8,7 @@ One program to drill, to route and to do 2D and 3D CNC work on the machine of a 
 
 ## What it does
 
-* Drives a controller through the interface of `eh3d-controller`: a simulator by default, and GRBL, grblHAL or Marlin on a serial port only when the person names the port (`--grbl`, `--grblhal`, `--marlin`), always behind the guard.
+* Drives a controller through the interface of `eh3d-controller`: a simulator by default, and GRBL, grblHAL or Marlin on a serial port, or Klipper through Moonraker over HTTP, only when the person names the port or the address (`--grbl`, `--grblhal`, `--marlin`, `--klipper`), always behind the guard.
 * Runs a G-code program line by line with pause, stop, the emergency stop and the alarms of the controller, jogs by the step inside the travel, sets the zero, homes and unlocks, and resumes a program that was left in the middle only after the operator answers.
 * Checks a program before it starts and says what looks wrong with its line: the travel, the keep-out boxes, a rapid below the surface, a cut with the spindle off, a feed or a speed above the limits of the material, canned cycles, cutter compensation, work systems, tool length offsets, the reach of a holder and the wear of the tools.
 * Draws the path in the plan and in 3D, times the program with and without a look-ahead, and writes a work report as one page of HTML.
