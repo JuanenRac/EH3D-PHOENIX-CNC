@@ -18,6 +18,8 @@ eh3d-view = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/view" }
 # the frame of the window: panels that dock, float and fold, workspaces, the menu bar; the model has no window, the drawing is the feature `gui`
 eh3d-dock = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/dock", default-features = false }
 eh3d-controller = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/controller" }
+# the materials a router works, with their starting points (feed, speed, depth), in the eight languages
+eh3d-materials = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/materials" }
 eh3d-filedialog = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/filedialog" }
 eh3d-serverclient = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/serverclient" }
 eh3d-summary = { version = ">=0.0.1", path = "../EH3D-COMMON/crates/summary" }

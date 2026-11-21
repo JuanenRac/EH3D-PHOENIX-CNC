@@ -540,13 +540,16 @@ impl Settings {
             .collect();
     }
 
-    /// Gives the checker the ranges of the material in use (the name in `material`, looked for in the library), or none when there is no
-    /// such material.
+    /// Gives the checker the ranges of the material in use (the name in `material`, looked for in the library and then in the shared database of
+    /// materials), or none when there is no such material.
     pub fn resolve_material(&mut self, library: &[crate::materials::Material]) {
         self.lint.material_feed = None;
         self.lint.material_rpm = None;
         self.tuning.material = self.material.clone();
         if let Some(m) = crate::materials::find(library, &self.material) {
+            m.apply(&mut self.lint);
+        } else if let Some(m) = crate::sharedmat::shared_material(&self.material) {
+            // no material of the library has this name: the shared database may (`wood/mdf`, or the name in any of the eight languages)
             m.apply(&mut self.lint);
         }
     }

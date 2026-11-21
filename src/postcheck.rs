@@ -1,6 +1,6 @@
 //! The check of the format of a program for the controller it is made for, as the output of a post-processor is held to: the length of a line, the
 //! number of decimals, the `%` lines, the codes the controller lists, two codes of the same group on one line, a word given twice in a line and the
-//! end of the program. A profile is a short list of what a kind of controller takes (`grbl`, `full`, `generic`); the lists are in this file
+//! end of the program. A profile is a short list of what a kind of controller takes (`grbl`, `full`, `generic`, `marlin`, `klipper`); the lists are in this file
 //! and say what the documentation of GRBL lists and what a controller with canned cycles, cutter compensation and tool changes takes, so a code a profile
 //! does not list is a reason to read the line, not a proof that the
 //! controller refuses it. Only a reading: nothing is sent and nothing is changed.
@@ -54,10 +54,34 @@ enum Dialect {
     Grbl,
     Full,
     Generic,
+    Marlin,
+    Klipper,
 }
 
 /// The names of the profiles, in the order they are listed.
-pub const NAMES: [&str; 3] = ["grbl", "full", "generic"];
+pub const NAMES: [&str; 5] = ["grbl", "full", "generic", "marlin", "klipper"];
+
+/// The G codes the documentation of Marlin lists for a machine that moves, probes and has work spaces, in tenths (`G38.2` is 382, `G425` is 4250).
+const MARLIN_G: &[i32] = &[
+    0, 10, 20, 30, 40, 50, 60, 100, 110, 120, 170, 180, 190, 200, 210, 260, 270, 280, 290, 300,
+    310, 320, 330, 340, 350, 382, 383, 384, 385, 420, 530, 540, 550, 560, 570, 580, 590, 600, 610,
+    760, 800, 900, 910, 920, 4250,
+];
+/// The M codes of Marlin that a program for a machine uses (`M30` is not one of them: in Marlin it deletes a file of the card, it does not end a program).
+const MARLIN_M: &[i32] = &[
+    0, 1, 3, 4, 5, 7, 8, 9, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 42, 73, 80,
+    81, 82, 83, 84, 85, 92, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 117, 118,
+    119, 120, 121, 140, 190, 200, 201, 203, 204, 205, 220, 221, 400, 410, 500, 501, 502, 503,
+];
+/// The G codes of Klipper that move or set the frame: Klipper takes millimetres only (`G21` does nothing and `G20` is refused).
+const KLIPPER_G: &[i32] = &[
+    0, 10, 20, 30, 40, 100, 110, 170, 180, 190, 210, 280, 900, 910, 920,
+];
+/// The M codes the base of Klipper gives (heaters, fans, the stop, the position): no spindle and no coolant.
+const KLIPPER_M: &[i32] = &[
+    82, 83, 84, 104, 105, 106, 107, 109, 112, 114, 115, 117, 118, 140, 141, 190, 191, 204, 220,
+    221, 400,
+];
 
 /// The G codes the GRBL documentation lists, in tenths (`G38.2` is 382).
 const GRBL_G: &[i32] = &[
@@ -112,6 +136,30 @@ impl Profile {
                 extra_m: Vec::new(),
                 deny_m: Vec::new(),
             }),
+            "marlin" => Some(Profile {
+                name: "marlin".to_string(),
+                max_line: 96,
+                max_decimals: 0,
+                percent: false,
+                needs_end: false,
+                dialect: Dialect::Marlin,
+                extra_g: Vec::new(),
+                deny_g: Vec::new(),
+                extra_m: Vec::new(),
+                deny_m: Vec::new(),
+            }),
+            "klipper" => Some(Profile {
+                name: "klipper".to_string(),
+                max_line: 0,
+                max_decimals: 0,
+                percent: false,
+                needs_end: false,
+                dialect: Dialect::Klipper,
+                extra_g: Vec::new(),
+                deny_g: Vec::new(),
+                extra_m: Vec::new(),
+                deny_m: Vec::new(),
+            }),
             _ => None,
         }
     }
@@ -127,6 +175,8 @@ impl Profile {
             Dialect::Generic => true,
             Dialect::Grbl => GRBL_G.contains(&tenths),
             Dialect::Full => GRBL_G.contains(&tenths) || FULL_EXTRA_G.contains(&tenths),
+            Dialect::Marlin => MARLIN_G.contains(&tenths),
+            Dialect::Klipper => KLIPPER_G.contains(&tenths),
         }
     }
 
@@ -140,6 +190,8 @@ impl Profile {
         match self.dialect {
             Dialect::Generic => true,
             Dialect::Grbl => GRBL_M.contains(&code),
+            Dialect::Marlin => MARLIN_M.contains(&code),
+            Dialect::Klipper => KLIPPER_M.contains(&code),
             Dialect::Full => {
                 (0..=9).contains(&code)
                     || code == 30
@@ -615,7 +667,8 @@ mod tests {
         let p = lines(
             "G21 G90 G17\nM3 S12000\nG0 X10.5 Y10\nG1 Z-1.25 F200\nG1 X50 F600\nG0 Z5\nM5\nM30",
         );
-        for name in NAMES {
+        // the program ends with M30 and spins a spindle: what a milling controller takes (Marlin and Klipper read it as something else, see below)
+        for name in &NAMES[..3] {
             assert!(
                 check(&p, &Profile::named(name).unwrap()).is_empty(),
                 "{name}"

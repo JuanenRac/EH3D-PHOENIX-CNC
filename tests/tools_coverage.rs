@@ -169,7 +169,7 @@ fn the_parts_of_the_time_add_up_for_every_example_and_every_change_time() {
 fn the_examples_are_in_the_format_of_the_controllers_they_are_for() {
     // the three samples are written for the simulator, which takes what GRBL takes: nothing to read for the profile that lists less
     for (path, lines) in examples() {
-        for name in NAMES {
+        for name in &NAMES[..3] {
             let p = Profile::named(name).unwrap();
             let found = check(&lines, &p);
             assert!(

@@ -49,6 +49,11 @@ pub struct Options {
     /// Tries the dialect against its simulator with a battery of steps and leaves (`--dialect-check NAME`): exit code 0 when every step
     /// passes, 2 when one does not; no window, nothing moves.
     pub dialect_check: Option<String>,
+    /// Prints the starting point of a material of the shared database for an operation and a cutter of a diameter, or the points of the
+    /// material, and leaves (`--feeds MATERIAL[,OPERATION[,DIAMETER[,CUTTER]]]`); nothing moves.
+    pub feeds: Option<String>,
+    /// Lists the materials of the shared database that have starting points for a router, of a family or of all, and leaves (`--materials FAMILY|all`).
+    pub materials: Option<String>,
     /// With `--import` of a board file: what the layer is cut as (`--layer isolation|profile|drill`; `auto` is what the file says) and
     /// whether it is mirrored about the Y axis (`--mirror`).
     pub layer: Option<String>,
@@ -170,6 +175,8 @@ pub fn help_text() -> String {
          \x20 --layer KIND       with --import of a board file: cut it as isolation, profile or drill (auto: what the file says)\n\
          \x20 --mirror           with --import of a board file: mirror the layer about the Y axis\n\
          \x20 --dialect-check D  try the dialect D (grbl, grblhal, marlin or klipper) against its simulator with a battery of steps, and leave (exit code 0 every step passed, 2 one did not)\n\
+         \x20 --feeds SPEC       print the starting point of a material of the shared database (SPEC is MATERIAL[,OPERATION[,DIAMETER[,CUTTER]]]) with its chip load and cutting speed, or the points of the material, and leave\n\
+         \x20 --materials FAMILY list the materials of the shared database that have starting points for a router (a family or all) and leave\n\
          \x20 --post NAME        pass the program (or the one --import makes) through the post-processor NAME (a file beside the settings, or its path), and leave\n\
          \x20 --out FILE         write what the tool prints to FILE and never over a file that is there (exit code 2 if it is)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
@@ -369,6 +376,22 @@ impl Options {
                     }
                     o.template = Some(v.trim().to_ascii_lowercase());
                 }
+                "--feeds" => {
+                    let v = value("--feeds")?;
+                    if let Err(bad) = crate::sharedmat::parse_request(&v) {
+                        return Err(format!(
+                            "--feeds needs MATERIAL[,OPERATION[,DIAMETER[,CUTTER]]], not '{bad}'"
+                        ));
+                    }
+                    o.feeds = Some(v.trim().to_string());
+                }
+                "--materials" => {
+                    let v = value("--materials")?;
+                    if v.trim().is_empty() {
+                        return Err("--materials needs a family or all".to_string());
+                    }
+                    o.materials = Some(v.trim().to_ascii_lowercase());
+                }
                 "--templates" => o.templates = true,
                 "--out" => o.out = Some(PathBuf::from(value("--out")?)),
                 "--version" | "-V" => o.version = true,
@@ -409,7 +432,7 @@ impl Options {
         }
         if o.out.is_some() && !crate::cli_tools::wanted(&o) {
             return Err(
-                "--out only goes with a tool that prints (--convert, --compare, --times, --offsets, --format, --holder, --life, --restart, --lookahead, --import, --post, --template, --templates)"
+                "--out only goes with a tool that prints (--convert, --compare, --times, --offsets, --format, --holder, --life, --restart, --lookahead, --import, --post, --template, --templates, --feeds, --materials)"
                     .to_string(),
             );
         }

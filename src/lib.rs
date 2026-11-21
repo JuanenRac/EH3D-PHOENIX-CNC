@@ -60,6 +60,7 @@ pub mod server;
 pub mod serverlink;
 pub mod session;
 pub mod settings;
+pub mod sharedmat;
 pub mod sim;
 pub mod startline;
 pub mod stats;

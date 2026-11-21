@@ -55,6 +55,8 @@ pub fn wanted(o: &Options) -> bool {
         || o.template.is_some()
         || o.templates
         || o.dialect_check.is_some()
+        || o.feeds.is_some()
+        || o.materials.is_some()
 }
 
 /// The lines of a program file: every byte is a character, so a file in any code page is read (as the report reads it).
@@ -313,6 +315,15 @@ pub fn import(
     import_with(path, cfg, post, lang, &crate::pcb::Ask::default())
 }
 
+/// What `--feeds` and `--materials` say, as the outcome of a tool.
+fn said(s: crate::sharedmat::Said) -> Outcome {
+    Outcome {
+        out: s.out,
+        err: s.err,
+        code: s.code,
+    }
+}
+
 /// `--dialect-check`: the dialect against its simulator, on the cable of the motion file; exit code 0 when every step passed and 2 when one
 /// did not (the check was not passed).
 pub fn dialect_check(name: &str, settings_file: Option<&Path>, lang: &str) -> Outcome {
@@ -520,6 +531,12 @@ pub fn run_with(o: &Options, s: &Settings, settings_file: Option<&Path>) -> Outc
 fn run_tool(o: &Options, s: &Settings, settings_file: Option<&Path>, lang: &str) -> Outcome {
     if let Some(name) = o.dialect_check.as_deref() {
         return dialect_check(name, settings_file, lang);
+    }
+    if let Some(spec) = o.feeds.as_deref() {
+        return said(crate::sharedmat::feeds(spec, lang));
+    }
+    if let Some(family) = o.materials.as_deref() {
+        return said(crate::sharedmat::materials(family, lang));
     }
     if o.templates {
         return template(None, lang);

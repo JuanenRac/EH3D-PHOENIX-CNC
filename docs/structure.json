@@ -606,6 +606,19 @@
           }
         },
         {
+          "name": "sharedmat.rs",
+          "desc": {
+            "en": "the materials of the shared database: starting points, chip load and cutting speed",
+            "es": "los materiales de la base de datos común: puntos de partida, carga de viruta y velocidad de corte",
+            "de": "die Materialien der gemeinsamen Datenbank: Startwerte, Spanlast und Schnittgeschwindigkeit",
+            "fr": "les matériaux de la base commune : points de départ, charge par dent et vitesse de coupe",
+            "it": "i materiali del database comune: punti di partenza, carico per dente e velocità di taglio",
+            "ja": "共有データベースの材料：開始点、1刃あたりの切込み、切削速度",
+            "zh": "共享数据库中的材料：起始点、每齿进给和切削速度",
+            "pt": "os materiais da base de dados comum: pontos de partida, carga por dente e velocidade de corte"
+          }
+        },
+        {
           "name": "fuzz.rs",
           "desc": {
             "en": "tests from a fixed seed: made-up programs through every analysis",
