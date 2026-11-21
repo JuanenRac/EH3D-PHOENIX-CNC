@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use eh3d_controller::urgent::{Urgent, UrgentChannel};
-use eh3d_controller::{Command, Controller, Error, State, Status, AXES};
+use eh3d_controller::{Command, Controller, Error, Family, State, Status, AXES};
 
 use crate::gcode::{toolpath, words, Modal};
 use crate::heightmap::HeightMap;
@@ -93,6 +93,9 @@ struct Descent {
 
 pub struct Session {
     controller: Arc<Mutex<BoxedController>>,
+    /// The family of the controller, and the language its errors are told in (the numbers of Klipper have words of their own).
+    family: Family,
+    lang: String,
     /// The way in for the bytes that cannot wait (see `eh3d_controller::urgent`); `None` when the controller has none.
     urgent: Option<UrgentChannel>,
     /// The emitter stops before its next step while this is set (a pause, a stop).
@@ -238,8 +241,11 @@ fn run_steps(
 impl Session {
     pub fn new(controller: BoxedController) -> Self {
         let urgent = controller.urgent_channel();
+        let family = controller.family();
         let mut s = Session {
             controller: Arc::new(Mutex::new(controller)),
+            family,
+            lang: "en".to_string(),
             urgent,
             halt: Arc::new(AtomicBool::new(false)),
             progress: Arc::new(AtomicUsize::new(0)),
@@ -292,9 +298,21 @@ impl Session {
 
     /// What went wrong stops a program that is running, and is written in the log.
     fn failed(&mut self, what: &str, e: Error) {
-        self.say(format!("{what}: {e}"));
+        let text = if self.family == Family::Klipper {
+            crate::ctltext::explain_error(self.family, &e, &self.lang)
+        } else {
+            e.to_string()
+        };
+        self.say(format!("{what}: {text}"));
         self.running = false;
         self.paused = false;
+    }
+
+    /// The language the errors of Klipper are told in (the code of the window; English for one the tables do not have).
+    pub fn set_lang(&mut self, code: &str) {
+        if self.lang != code {
+            self.lang = code.to_string();
+        }
     }
 
     /// The emitter is sending lines: the controller is not free for anything else but the urgent bytes.
@@ -1246,6 +1264,30 @@ impl Session {
 mod tests {
     use super::*;
     use eh3d_controller::sim::SimController;
+
+    #[test]
+    fn a_refusal_of_klipper_is_logged_in_the_language_of_the_window() {
+        use crate::link::{simulated_with, Dialect};
+        use eh3d_controller::wire::Impair;
+        let mut texts = Vec::new();
+        for lang in crate::ctltext::LANGS {
+            let mut s = Session::new(simulated_with(
+                Dialect::Klipper,
+                Impair::clean(),
+                false,
+                Some(1),
+            ));
+            s.set_lang(lang);
+            s.mdi("G1 X1 F100");
+            let last = s.log.last().cloned().unwrap_or_default();
+            assert!(last.starts_with("mdi: "), "{last}");
+            assert!(!last.contains("Must home"), "{lang}: {last}");
+            texts.push(last);
+        }
+        texts.sort_unstable();
+        texts.dedup();
+        assert_eq!(texts.len(), 8, "eight languages, eight texts");
+    }
 
     #[test]
     fn a_program_left_in_the_middle_goes_on_paused_with_its_codes_rebuilt() {

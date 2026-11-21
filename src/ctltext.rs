@@ -4,9 +4,22 @@
 //! program shows the text of the controller as it came.
 
 pub use eh3d_controller::dialtext::{alarm, error, explain_grbl as explain, LANGS};
+use eh3d_controller::{Error, Family};
 
 fn column(lang: &str) -> usize {
     LANGS.iter().position(|l| *l == lang).unwrap_or(0)
+}
+
+/// What a controller of the family said, in the language: the words of the table of the family for the number the error carries (the kinds
+/// of Marlin, the kinds of Klipper, the errors that only grblHAL has, the ones of GRBL), and the text of the controller as it came when no
+/// table has the number.
+pub fn explain_error(family: Family, e: &Error, lang: &str) -> String {
+    let kind = if matches!(e, Error::Alarm(_)) {
+        "alarm"
+    } else {
+        "error"
+    };
+    eh3d_controller::dialtext::explain(family, kind, e.code(), &e.to_string(), lang)
 }
 
 /// A message of the guard that keeps the machine safe.
@@ -189,6 +202,30 @@ mod tests {
         ] {
             assert!(!text.contains(brazilian), "{brazilian}");
         }
+    }
+
+    #[test]
+    fn a_klipper_error_is_told_by_its_number_in_every_language_and_keeps_its_words_without_one() {
+        use crate::link::{simulated_with, Dialect};
+        use eh3d_controller::wire::Impair;
+        // the refusal of a simulated Klipper that was asked to move before it was homed
+        let home_first = simulated_with(Dialect::Klipper, Impair::clean(), false, Some(1))
+            .send_line("G1 X1 F100")
+            .unwrap_err();
+        assert_eq!(home_first.code(), Some(202));
+        let mut seen = Vec::new();
+        for l in LANGS {
+            seen.push(explain_error(Family::Klipper, &home_first, l));
+        }
+        assert!(seen.iter().all(|t| !t.contains("Must home")), "{seen:?}");
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), 8);
+        // a failure of the HTTP link has its own number, and a text with none is shown as it came
+        let cut = Error::Link("error 218: the connection closed".into());
+        assert!(!explain_error(Family::Klipper, &cut, "es").contains("closed"));
+        let odd = Error::Refused("something odd".into());
+        assert_eq!(explain_error(Family::Klipper, &odd, "de"), odd.to_string());
     }
 
     #[test]

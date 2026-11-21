@@ -1040,6 +1040,7 @@ impl App {
         let ctx = ctx.clone();
         self.frame += 1;
         clipmenu::start_frame(&ctx, self.lang);
+        self.session.set_lang(self.lang.code());
         // the window follows its size: from 720p to 1080p and on to the large and the wide screens everything grows or shrinks with it
         let native = ctx.content_rect().size() * ctx.zoom_factor();
         let zoom = (native.x / 1400.0).min(native.y / 800.0).clamp(0.75, 3.0);

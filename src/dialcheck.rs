@@ -1,4 +1,4 @@
-//! The check of a dialect (`--dialect-check NAME`): a controller of the suite, GRBL, grblHAL or Marlin, is put against its simulator and
+//! The check of a dialect (`--dialect-check NAME`): a controller of the suite, GRBL, grblHAL, Marlin or Klipper, is put against its simulator and
 //! made to do what the program asks of every controller, and the answer of each step is judged. The steps are the status, a move, a jog,
 //! the homing, a refusal by number (told in the language), a silent controller under the guard (it must be stopped and the machine
 //! refused afterwards), and the same steps on cables that cut the answers in pieces and add noise, from a row of seeds. A step that does not
@@ -6,7 +6,7 @@
 
 use eh3d_controller::dialtext;
 use eh3d_controller::wire::Impair;
-use eh3d_controller::{Command, Error, State};
+use eh3d_controller::{Command, Error, Family, State};
 
 use crate::guard::Trip;
 use crate::link::{self, Dialect};
@@ -77,6 +77,11 @@ fn basic(c: &mut BoxedController) -> Result<(), String> {
     let st = c.status().map_err(|e| format!("status: {e}"))?;
     if !matches!(st.state, State::Idle | State::Run) {
         return fail(format!("the state at the start is {:?}", st.state));
+    }
+    if c.family() == Family::Klipper {
+        // Klipper refuses a move of a machine that is not homed
+        c.command(Command::Home(vec![]))
+            .map_err(|e| format!("homing first: {e}"))?;
     }
     c.send_line("G90").map_err(|e| format!("G90: {e}"))?;
     c.send_line("G1 X10 Y5 F600")

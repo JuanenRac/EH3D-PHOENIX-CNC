@@ -41,7 +41,9 @@ pub struct Options {
     /// The same for grblHAL (`--grblhal PORT[@BAUD]`) and for Marlin (`--marlin PORT[@BAUD]`).
     pub grblhal: Option<String>,
     pub marlin: Option<String>,
-    /// Drives the dialect of a controller (`grbl`, `grblhal` or `marlin`) on a simulated cable instead of the plain simulator (`--sim NAME`):
+    /// Drives Klipper through Moonraker over HTTP (`--klipper HOST[:PORT]`); the other settings are the `klipper.*` keys of the motion file.
+    pub klipper: Option<String>,
+    /// Drives the dialect of a controller (`grbl`, `grblhal`, `marlin` or `klipper`) on a simulated cable instead of the plain simulator (`--sim NAME`):
     /// no port is opened, nothing is real.
     pub sim: Option<String>,
     /// Tries the dialect against its simulator with a battery of steps and leaves (`--dialect-check NAME`): exit code 0 when every step
@@ -106,6 +108,11 @@ impl Options {
             .or_else(|| self.grblhal.as_deref().map(|p| (Dialect::GrblHal, p)))
             .or_else(|| self.marlin.as_deref().map(|p| (Dialect::Marlin, p)))
     }
+
+    /// Whether the options name a real machine (a serial port or Klipper's address) and not a simulator.
+    pub fn is_real(&self) -> bool {
+        self.real_link().is_some() || self.klipper.is_some()
+    }
 }
 
 /// The windows that `--window` opens, in the order of the help.
@@ -162,7 +169,7 @@ pub fn help_text() -> String {
          \x20 --import           read the file as a drawing (HPGL, DXF or SVG) or as a board (Gerber or Excellon) and print the G-code that cuts along it, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
          \x20 --layer KIND       with --import of a board file: cut it as isolation, profile or drill (auto: what the file says)\n\
          \x20 --mirror           with --import of a board file: mirror the layer about the Y axis\n\
-         \x20 --dialect-check D  try the dialect D (grbl, grblhal or marlin) against its simulator with a battery of steps, and leave (exit code 0 every step passed, 2 one did not)\n\
+         \x20 --dialect-check D  try the dialect D (grbl, grblhal, marlin or klipper) against its simulator with a battery of steps, and leave (exit code 0 every step passed, 2 one did not)\n\
          \x20 --post NAME        pass the program (or the one --import makes) through the post-processor NAME (a file beside the settings, or its path), and leave\n\
          \x20 --out FILE         write what the tool prints to FILE and never over a file that is there (exit code 2 if it is)\n\
          \x20 --lang CODE        the language (en, es, de, fr, it, ja, zh, pt and the others of the window)\n\
@@ -175,11 +182,12 @@ pub fn help_text() -> String {
          \x20 --shot FILE        save a picture of the window and leave (after --wait frames)\n\
          \x20 --wait FRAMES      the frames --shot waits for\n\
          \x20 --start            start the program as soon as the window is open\n\
-         \x20 --start-real       also needed to --start with a real controller (--grbl, --grblhal, --marlin)\n\
+         \x20 --start-real       also needed to --start with a real controller (--grbl, --grblhal, --marlin, --klipper)\n\
          \x20 --grbl PORT[@BAUD] drive a GRBL controller on a serial port (a build with --features serial)\n\
          \x20 --grblhal PORT[@BAUD] drive a grblHAL controller on a serial port (a build with --features serial)\n\
          \x20 --marlin PORT[@BAUD]  drive a Marlin controller on a serial port (a build with --features serial; 250000 baud when none is given)\n\
-         \x20 --sim NAME         drive the dialect NAME (grbl, grblhal or marlin) on a simulated cable instead of the plain simulator; nothing is real\n\
+         \x20 --klipper HOST[:PORT]  drive Klipper through Moonraker over HTTP (port 7125 when none is given; the local network only, unless klipper.allow_non_local is on in the motion file, where klipper.api_key holds the credential, if there is one)\n\
+         \x20 --sim NAME         drive the dialect NAME (grbl, grblhal, marlin or klipper) on a simulated cable instead of the plain simulator; nothing is real\n\
          \x20 --ports            list the serial ports and leave\n\
          \x20 --version, -V      print the version and leave\n\
          \x20 --help, -h         print this text and leave\n",
@@ -259,6 +267,11 @@ impl Options {
                 "--grbl" => o.grbl = Some(value("--grbl")?),
                 "--grblhal" => o.grblhal = Some(value("--grblhal")?),
                 "--marlin" => o.marlin = Some(value("--marlin")?),
+                "--klipper" => {
+                    let v = value("--klipper")?;
+                    crate::link::parse_endpoint(&v).map_err(|e| format!("--klipper: {e}"))?;
+                    o.klipper = Some(v);
+                }
                 "--sim" => {
                     let v = value("--sim")?;
                     let d = crate::link::Dialect::from_key(&v).ok_or(format!(
@@ -409,16 +422,23 @@ impl Options {
         if o.start_real && !o.start {
             return Err("--start-real only goes with --start".to_string());
         }
-        let real = [o.grbl.is_some(), o.grblhal.is_some(), o.marlin.is_some()];
+        let real = [
+            o.grbl.is_some(),
+            o.grblhal.is_some(),
+            o.marlin.is_some(),
+            o.klipper.is_some(),
+        ];
         if real.iter().filter(|r| **r).count() > 1 {
-            return Err("only one of --grbl, --grblhal and --marlin can be given".to_string());
+            return Err(
+                "only one of --grbl, --grblhal, --marlin and --klipper can be given".to_string(),
+            );
         }
         if o.sim.is_some() && real.iter().any(|r| *r) {
             return Err("--sim is a simulated cable: it does not go with a real port".to_string());
         }
-        if o.start && o.real_link().is_some() && !o.start_real {
+        if o.start && o.is_real() && !o.start_real {
             return Err(
-                "--start with a real controller (--grbl, --grblhal or --marlin) would move a real machine as soon as the window opens: add --start-real if that is what is wanted"
+                "--start with a real controller (--grbl, --grblhal, --marlin or --klipper) would move a real machine as soon as the window opens: add --start-real if that is what is wanted"
                     .to_string(),
             );
         }
@@ -796,6 +816,43 @@ mod tests {
     }
 
     #[test]
+    fn klipper_is_named_by_its_address_and_the_wrong_ones_are_refused() {
+        let o = parse("--klipper 192.168.0.50:7126").unwrap();
+        assert_eq!(o.klipper.as_deref(), Some("192.168.0.50:7126"));
+        assert!(o.is_real() && o.real_link().is_none());
+        assert!(!parse("--sim klipper").unwrap().is_real());
+        assert_eq!(
+            parse("--sim klipper").unwrap().sim.as_deref(),
+            Some("klipper")
+        );
+        for bad in [
+            "--klipper",
+            "--klipper a:0",
+            "--klipper :80",
+            "--klipper a:99999",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+        assert!(parse("--klipper A --marlin B")
+            .unwrap_err()
+            .contains("only one"));
+        assert!(parse("--sim marlin --klipper A")
+            .unwrap_err()
+            .contains("simulated"));
+        assert!(parse("--klipper A --start job.nc")
+            .unwrap_err()
+            .contains("--start-real"));
+        assert_eq!(
+            parse("--dialect-check klipper")
+                .unwrap()
+                .dialect_check
+                .as_deref(),
+            Some("klipper")
+        );
+        assert!(help_text().contains("--klipper HOST[:PORT]"));
+    }
+
+    #[test]
     fn the_dialects_and_the_board_options_are_read_and_the_wrong_ones_are_named() {
         let o = parse("--grblhal COM4@250000 --ports").unwrap();
         assert_eq!(o.grblhal.as_deref(), Some("COM4@250000"));
@@ -833,6 +890,8 @@ mod tests {
         assert!(parse("--marlin COM3 --start job.nc").is_err());
         assert!(parse("--grblhal COM3 --start job.nc").is_err());
         assert!(parse("--marlin COM3 --start --start-real job.nc").is_ok());
+        assert!(parse("--klipper 192.168.0.50 --start job.nc").is_err());
+        assert!(parse("--klipper 192.168.0.50 --start --start-real job.nc").is_ok());
         assert!(parse("--sim marlin --start job.nc").is_ok());
         let b = parse("--import --layer Drill --mirror board.drl").unwrap();
         assert_eq!(b.layer.as_deref(), Some("drill"));
