@@ -1352,14 +1352,14 @@
         {
           "name": "tests/",
           "desc": {
-            "en": "the check that keeps the register of requirements true",
-            "es": "la prueba que mantiene verdadero el registro de requisitos",
-            "de": "der Test, der das Anforderungsregister wahr hält",
-            "fr": "le test qui garde vrai le registre des exigences",
-            "it": "il test che mantiene vero il registro dei requisiti",
-            "ja": "要件一覧を正しく保つテスト",
-            "zh": "保持需求登记表真实的测试",
-            "pt": "o teste que mantém verdadeiro o registo de requisitos"
+            "en": "tests of the register, the README and the tools",
+            "es": "pruebas del registro, del README y de las herramientas",
+            "de": "Tests des Registers, des READMEs und der Werkzeuge",
+            "fr": "tests du registre, du README et des outils",
+            "it": "test del registro, del README e degli strumenti",
+            "ja": "要件一覧、README、ツールのテスト",
+            "zh": "需求登记表、README 和工具的测试",
+            "pt": "testes do registo, do README e das ferramentas"
           }
         },
         {
@@ -1418,28 +1418,28 @@
           "name": "build.sh  build.bat",
           "tree_name": "build.sh build.bat",
           "desc": {
-            "en": "build the library",
-            "es": "compilan la biblioteca",
-            "de": "bauen die Bibliothek",
-            "fr": "compilent la bibliothèque",
-            "it": "compilano la libreria",
-            "ja": "ライブラリをビルド",
-            "zh": "构建库",
-            "pt": "compilam a biblioteca"
+            "en": "build the program",
+            "es": "compilan el programa",
+            "de": "bauen das Programm",
+            "fr": "compilent le programme",
+            "it": "compilano il programma",
+            "ja": "プログラムをビルド",
+            "zh": "构建程序",
+            "pt": "compilam o programa"
           }
         },
         {
           "name": "run.sh  run.bat",
           "tree_name": "run.sh run.bat",
           "desc": {
-            "en": "say that there is no program yet and run the tests",
-            "es": "avisan de que aún no hay programa y ejecutan las pruebas",
-            "de": "melden, dass es noch kein Programm gibt, und führen die Tests aus",
-            "fr": "indiquent qu'il n'y a pas encore de programme et lancent les tests",
-            "it": "avvisano che non c'è ancora un programma ed eseguono i test",
-            "ja": "まだプログラムがないことを表示し、テストを実行",
-            "zh": "提示尚无程序并运行测试",
-            "pt": "avisam de que ainda não há programa e executam os testes"
+            "en": "open the window on a sample program",
+            "es": "abren la ventana con un programa de ejemplo",
+            "de": "öffnen das Fenster mit einem Beispielprogramm",
+            "fr": "ouvrent la fenêtre sur un programme d'exemple",
+            "it": "aprono la finestra su un programma di esempio",
+            "ja": "サンプルプログラムでウィンドウを開く",
+            "zh": "用示例程序打开窗口",
+            "pt": "abrem a janela com um programa de exemplo"
           }
         },
         {

@@ -18,7 +18,7 @@
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table with the lines done marked, and stops at what the controller refuses. The window speaks 37 languages and wears eleven themes. The controller interface (`eh3d-controller`, in EH3D-COMMON) has GRBL written against a scripted line and lists the other families as not driven yet. 995 tests run on a computer. **Nothing here has run on a real machine**, a serial port is opened only for GRBL and a network connection only when a program is sent to the server, and arcs and the other codes are neither drawn nor run by the simulator.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table, in plan or in 3D, with the lines done marked, and stops at what the controller refuses. Around that it checks, times and prepares programs (arcs, canned cycles, cutter compensation, keep-out boxes, a probe, a height map, a tool changer, a table of tools and one of materials), imports drawings and the Gerber and Excellon files of boards, and sends a program to the EH3D server. The controller interface (`eh3d-controller`, in EH3D-COMMON) is driven for GRBL, grblHAL and Marlin against simulators of their dialects on simulated cables; the other families it lists are not driven. 995 tests run on a computer. **Nothing here has run on a real machine**: a serial port is opened only for GRBL, grblHAL or Marlin and a network connection only when a program is sent to the server. The simulated machines take straight moves only and refuse arcs, canned cycles and probing, so those are measured, checked and timed on paper, the drawn path shows an arc as its chord, and a program that contains them stops at that line on the simulator. The window offers the 37 languages of the shared view of EH3D-COMMON and wears eleven themes, but this program promises eight languages: the words of its own panels and tools exist in English, Spanish, German, French, Italian, Japanese, Chinese and European Portuguese.
 
 ---
 
@@ -46,10 +46,10 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
-| Themes and texts | 🟡 | Eleven themes and the words of the interface in 37 languages, seen in the window of this program. |
+| Themes and texts | 🟡 | Eleven themes and the words of the interface: the window offers the 37 languages of the shared view, and the words of this program's own panels and tools are in eight; seen in the window of this program. |
 | Tests | 🟡 | 995 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
-| Machine control | 🟠 | Only the simulator: a program runs line by line with pause, stop and the emergency stop; no real controller is connected from here yet. |
+| Machine control | 🟠 | Only simulators: a program runs line by line with pause, stop and the emergency stop on the simulated machine or on a simulated GRBL, grblHAL or Marlin; the serial port for the three is built behind a feature and no real controller has been connected. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
 
 ## 🎯 Overview
@@ -57,8 +57,8 @@ Each line is one part of this repository and the light says how far it is today.
 * The **window** (`src/gui.rs`, `phoenix-cnc`): the position of the machine (work and machine), a jog pad with its steps and feed, home, zero and unlock, the emergency stop, a line of commands with its log, and the program with its path on the table.
 * The **docking window** (`src/gui/shell.rs`, `src/panels.rs` and the frame `eh3d-dock` of EH3D-COMMON): twelve panels that can be taken away, put back, moved, put in tabs, floated and folded into an edge (the path, the hand control, the state of the machine, the program, the files, the table of tools, the tool setter, the probe and the height map, the import, the planning and time, the report and the console), four workspaces for the task (Prepare, Run, Review and Compact), the menu bar and an arrangement that is kept in the settings file (`dock.*` lines), with its words in eight languages. The controller is wrapped in the guard (`guard = off` in the motion file takes it away): the window gives it the time at every frame, shows why it stopped the machine and offers the all clear, and a jog that crosses another one cancels the move in progress first, so the rule of one move order at a time does not fire on a normal pair of jogs. The planning panel shows the time with and without the look-ahead, the import panel reads HPGL, DXF or SVG through a post-processor of your choice, and the tool setter panel sends the machine to the setter only after the operator confirms that it is there and clear, and writes the length into the table of tools only when asked. Drawn and tested without a window (frames of egui in the tests); not yet seen on a real screen or on a real machine.
 * The **session** (`src/session.rs`): what the program does with any controller of `eh3d-controller`: jog, zero, home, send a line, run a program line by line, pause, stop and the alarms; it is tested on the simulated controller.
-* The **path of a program** (`src/gcode.rs`): the straight moves (`G0`, `G1`, absolute or relative, in mm or inches) drawn before the program runs; arcs are not drawn.
-* The **simulated controller** (`eh3d_controller::sim`, in EH3D-COMMON): a machine in memory with travel limits that raise an alarm; the controller families of the market are listed in `eh3d-controller`, GRBL is the first one written and the others show as not driven yet.
+* The **path of a program** (`src/gcode.rs`): the moves (`G0`, `G1`, `G2`, `G3`, absolute or relative, in mm or inches) drawn before the program runs, in plan and in 3D; the drawn path takes an arc as its chord, while the length, the time, the keep-out boxes and the look-ahead follow the curve.
+* The **simulated controller** (`eh3d_controller::sim`, in EH3D-COMMON): a machine in memory with travel limits that raise an alarm; it takes the basic G-code only (straight moves, units, distance mode, the work zero, spindle and coolant) and refuses arcs, canned cycles and probing. `eh3d-controller` lists the controller families of the market: this program drives GRBL, grblHAL and Marlin (against simulators of their dialects) and the others show as not driven yet.
 * The **themes and the words** of `eh3d-view`: Forge (the default), Neon Arcade, Glass Pro, the classic Windows grey and one that follows Windows, and the interface in English, Spanish, Italian, German, French, Portuguese, Chinese and Japanese. What it will be: one program to drill, to route and to do 2D and 3D CNC work on the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO; that part does not exist yet.
 * The **menus, the settings and the files**: the menus File, Edit, View, Program, Machine, Window and Help with the usual entries (open, recent files, save, edit, the zeros, the stored positions, the spindle and the coolant); a settings window (units, language, eleven themes, travel limits, jog) that is kept between runs; and the Open and Save windows of the suite (`eh3d-filedialog`: places, sorting, filters, the extension of a saved file and the question before a file is replaced).
 * **GRBL on a serial port:** built with `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` drives a GRBL controller (115200 baud by default) instead of the simulator and `phoenix-cnc --ports` lists the serial ports; a build without the feature, or a port that does not open, says so and leaves. It has been tried only against a scripted controller, never against a real one. With a real controller, `--start` (open the file and start it as the window opens) is refused unless `--start-real` is also given, and `--start-real` alone is an error; `busy_wait` in the settings file (4 hours by default) is the most a line waits for its answer while the machine says it is working, and the stop is heard meanwhile.
@@ -154,7 +154,7 @@ How the parts fit together: who will use it, what this repository holds and what
 
 ## 🔒 Security & Safety
 
-This program opens a serial port only when it is started for GRBL (`--grbl`, a build with `--features serial`) and a network connection only to the EH3D server whose address is in its settings, when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file and the height map the operator chooses (read as text, never run by itself) and its own files next to the settings (the macros, the queue kept between runs, the line a program had reached); it writes a file only where the operator says (the program, the height map, the exported log) and never writes the log over a file. The table of slots of the tool changer, the table of tools, the library of materials and the bookmarks are read from where the settings (or the program) are and written only by their own buttons: the example table and the example library never over a file that is there, the library and the bookmarks after a question when the file is there already (the question about the bookmarks can be turned off in the settings), and every one of these files has a size limit. The macros it runs are lines of G-code that it asks about first, and the queue that comes back never starts by itself. It is not a safety system. See [SECURITY.md](SECURITY.md).
+This program opens a serial port only when it is started for GRBL, grblHAL or Marlin (`--grbl`, `--grblhal` or `--marlin`, a build with `--features serial`) and a network connection only to the EH3D server whose address is in its settings, when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file and the height map the operator chooses (read as text, never run by itself) and its own files next to the settings (the macros, the queue kept between runs, the line a program had reached); it writes a file only where the operator says (the program, the height map, the exported log) and never writes the log over a file. The table of slots of the tool changer, the table of tools, the library of materials and the bookmarks are read from where the settings (or the program) are and written only by their own buttons: the example table and the example library never over a file that is there, the library and the bookmarks after a question when the file is there already (the question about the bookmarks can be turned off in the settings), and every one of these files has a size limit. The macros it runs are lines of G-code that it asks about first, and the queue that comes back never starts by itself. It is not a safety system. See [SECURITY.md](SECURITY.md).
 
 ## 🚀 Quick start
 
@@ -177,7 +177,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🏗️ Build & Release
 
-The version lives in `Cargo.toml` and in `eh3d.project.json`, and each version has its entry in [CHANGELOG.md](CHANGELOG.md). There is no program to package yet, so there are no ready-made binaries.
+The version lives in `Cargo.toml` and in `eh3d.project.json`, and each version has its entry in [CHANGELOG.md](CHANGELOG.md). Releases are published on GitHub with ready-made programs for Windows (64 and 32 bits), Linux (64 bits) and macOS (Apple silicon and Intel): each package, `phoenix-cnc-<version>-<system>.zip` or `.tar.gz`, comes with its `.sha256` and `.sig` files. They are built by the manual workflow Release binaries and published from the maintainer's machine.
 
 ## 📂 Repository Structure
 
@@ -291,13 +291,13 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/files.rs                             the height map and the session log as files, through the file windows
 │   └── gui/icons.rs                             the pictures of the buttons, drawn with lines, and the toolbar button
 ├── examples/                                    three sample G-code programs, from a square to a long spiral
-├── tests/                                       the check that keeps the register of requirements true
+├── tests/                                       tests of the register, the README and the tools
 ├── tools/                                       CI check, README check and the picture tools
 ├── docs/                                        scope, requirements, status, ideas left out and the data of the pictures
 ├── .github/                                     CI workflow, issue and pull-request templates
 ├── images/                                      banner, the two pictures and the screenshots
-├── build.sh build.bat                           build the library
-├── run.sh run.bat                               say that there is no program yet and run the tests
+├── build.sh build.bat                           build the program
+├── run.sh run.bat                               open the window on a sample program
 ├── eh3d.project.json                            manifest: version, role, maturity and build command
 ├── Cargo.toml Cargo.lock                        the Rust package and its locked dependencies
 ├── rust-toolchain.toml                          the pinned Rust toolchain
@@ -313,21 +313,24 @@ EH3D-PHOENIX-CNC/
 
 **Known limits today**
 
-* Nothing here has run on a real machine: the controller is a simulator (or GRBL on a serial port, never tried) and the server is reached only by the tests.
-* The simulator takes only basic G-code (`G0`, `G1`, `G90`, `G91`, `G20`, `G21`, `G92`, `M3` to `M9`); arcs, canned cycles and probing are refused, and the path of a program does not draw arcs.
-* It needs the folder `EH3D-COMMON` next to it, because it depends on it by path.
+* Nothing here has run on a real machine: the controllers are simulators (or GRBL, grblHAL and Marlin on a serial port, never tried) and the server is reached only by the tests.
+* The simulated machines take straight moves only: they refuse arcs, canned cycles and probing, which the program measures, checks and times on paper; the drawn path shows an arc as its chord.
+* The probe, the height map and the tool changer have been tried against stand-ins only, and the scripts of the post-processors are not built (their rules are).
+* The window has been seen on a computer by its pictures only; no operator has used it at a machine.
+* It needs the folders `EH3D-COMMON` and `EH3D-CORE-LIBS` next to it, because it depends on them by path.
 
 **Next**
 
-* A real controller: GRBL over a serial port first, then the other families, then the controller of HYDRA-UMC.
-* Arcs and the rest of the G-code in the simulator and in the path.
-* A 3D view of the path with the height of the cuts.
-* Probing, the tool changer and the materials of the machine.
+* A first proof on a real machine (GRBL, grblHAL or Marlin), with a person at the machine and the emergency stop in reach; then a real probe, tool setter and changer.
+* The controller of HYDRA-UMC, once its contract is accepted.
+* Scripts for the post-processors in a sandbox, when the rules are not enough.
+* Decide how the 3D view shows the height of the cuts.
 * Join the engines of EH3D-DRILLPRO and EH3D-ROUTEPRO so that one program drills and routes.
+* The ideas left out on purpose are in [Not yet](docs/NOT_YET.md).
 
 ## 🌍 Languages
 
-README and texts exist in English, Spanish, French, Italian, German, Chinese, Japanese and European Portuguese.
+README and texts exist in English, Spanish, French, Italian, German, Chinese, Japanese and European Portuguese. The window lists the 37 languages of the shared view of EH3D-COMMON, but only these eight are promised; the words that this program adds to the shared ones appear in English in any other language.
 
 ## 🔗 Related Projects
 

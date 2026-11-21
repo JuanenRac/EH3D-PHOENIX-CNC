@@ -331,7 +331,7 @@
 <text x="631.76" y="3067" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">three sample G-code programs, from a square to a long spiral</text>
 <line x1="392" y1="3075" x2="1118" y2="3075" stroke="#1A2430" stroke-width="1"/>
 <text x="392" y="3094" font-family="'JetBrains Mono','Cascadia Code','SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14.5" font-weight="600" fill="#E6EDF3" text-anchor="start">tests/</text>
-<text x="631.76" y="3094" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">the check that keeps the register of requirements true</text>
+<text x="631.76" y="3094" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">tests of the register, the README and the tools</text>
 <line x1="392" y1="3102" x2="1118" y2="3102" stroke="#1A2430" stroke-width="1"/>
 <text x="392" y="3121" font-family="'JetBrains Mono','Cascadia Code','SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14.5" font-weight="600" fill="#E6EDF3" text-anchor="start">tools/</text>
 <text x="631.76" y="3121" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">CI check, README check and the picture tools</text>
@@ -346,10 +346,10 @@
 <text x="631.76" y="3202" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">banner, the two pictures and the screenshots</text>
 <line x1="392" y1="3210" x2="1118" y2="3210" stroke="#1A2430" stroke-width="1"/>
 <text x="392" y="3229" font-family="'JetBrains Mono','Cascadia Code','SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14.5" font-weight="600" fill="#E6EDF3" text-anchor="start">build.sh  build.bat</text>
-<text x="631.76" y="3229" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">build the library</text>
+<text x="631.76" y="3229" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">build the program</text>
 <line x1="392" y1="3237" x2="1118" y2="3237" stroke="#1A2430" stroke-width="1"/>
 <text x="392" y="3256" font-family="'JetBrains Mono','Cascadia Code','SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14.5" font-weight="600" fill="#E6EDF3" text-anchor="start">run.sh  run.bat</text>
-<text x="631.76" y="3256" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">say that there is no program yet and run the tests</text>
+<text x="631.76" y="3256" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">open the window on a sample program</text>
 <line x1="392" y1="3264" x2="1118" y2="3264" stroke="#1A2430" stroke-width="1"/>
 <text x="392" y="3283" font-family="'JetBrains Mono','Cascadia Code','SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14.5" font-weight="600" fill="#E6EDF3" text-anchor="start">eh3d.project.json</text>
 <text x="631.76" y="3283" font-family="'Segoe UI','Noto Sans','Noto Sans CJK SC','Microsoft YaHei','Yu Gothic','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.8" font-weight="400" fill="#8A97A6" text-anchor="start">manifest: version, role, maturity and build command</text>

@@ -18,7 +18,7 @@
 
 ---
 
-**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. La fenêtre parle 37 langues et porte onze thèmes. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) a GRBL écrit contre une ligne simulée et liste les autres familles comme pas encore pilotées. 995 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine**, un port série n'est ouvert que pour GRBL et une connexion réseau que pour envoyer un programme au serveur, et les arcs et les autres codes ne sont ni dessinés ni exécutés par le simulateur.
+**Vérification d'honnêteté - ce qui tourne aujourd'hui :** un programme Rust avec une fenêtre (`phoenix-cnc`) qui pilote une machine **simulée** : il montre la position de la machine (pièce et machine), la déplace à la main avec un pavé de jog, fixe le zéro, fait la prise d'origine, prend les commandes tapées par l'opérateur, exécute un programme G-code ligne par ligne (avec pause, arrêt et arrêt d'urgence), dessine la trajectoire du programme sur la table, en plan ou en 3D, avec les lignes faites marquées, et s'arrête sur ce que le contrôleur refuse. En plus, il vérifie, mesure et prépare des programmes (arcs, cycles fixes, compensation de rayon, boîtes interdites, un palpeur, une carte des hauteurs, un changeur d'outils, une table d'outils et une de matériaux), importe des dessins et les fichiers Gerber et Excellon de cartes, et envoie un programme au serveur EH3D. L'interface des contrôleurs (`eh3d-controller`, dans EH3D-COMMON) est pilotée pour GRBL, grblHAL et Marlin contre des simulateurs de leurs dialectes sur des câbles simulés ; les autres familles qu'elle liste ne sont pas pilotées. 995 tests tournent sur un ordinateur. **Rien ici n'a tourné sur une vraie machine** : un port série n'est ouvert que pour GRBL, grblHAL ou Marlin et une connexion réseau que pour envoyer un programme au serveur. Les machines simulées ne prennent que des déplacements droits et refusent arcs, cycles fixes et palpage ; ceux-ci sont donc mesurés, vérifiés et chronométrés sur le papier, la trajectoire dessinée montre un arc par sa corde, et un programme qui en contient s'arrête à cette ligne sur le simulateur. La fenêtre propose les 37 langues de la vue partagée d'EH3D-COMMON et porte onze thèmes, mais ce programme promet huit langues : les mots de ses propres panneaux et outils existent en anglais, espagnol, allemand, français, italien, japonais, chinois et portugais européen.
 
 ---
 
@@ -46,10 +46,10 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 |---|---|---|
 | Bibliothèque de base | 🟡 | Un crate Rust qui réexporte `scene`, `texts` et `theme` d'`eh3d-view` sous le nom de ce programme ; il a besoin du dossier d'EH3D-COMMON à côté. |
 | Scène et vues | 🟡 | Écrite et testée dans EH3D-COMMON ; la fenêtre de ce programme dessine la trajectoire d'un programme sur la table et la position de l'outil (vue sur un ordinateur). |
-| Thèmes et textes | 🟡 | Onze thèmes et les mots de l'interface en 37 langues, vus dans la fenêtre de ce programme. |
+| Thèmes et textes | 🟡 | Onze thèmes et les mots de l'interface : la fenêtre propose les 37 langues de la vue partagée, et les mots des panneaux et outils propres à ce programme sont en huit ; vu dans la fenêtre de ce programme. |
 | Tests | 🟡 | 995 tests réussissent sur un ordinateur (`cargo test --features gui`) : la session (jog, zéro, prise d'origine, un programme, pause, alarme, arrêt d'urgence), la trajectoire d'un programme et la ligne de commande ; le contrôleur simulé est testé dans EH3D-COMMON. |
 | Fenêtre et jog | 🟡 | Fonctionne sur un ordinateur avec le contrôleur simulé : position, pavé de jog, pas, avance, prise d'origine, zéro, déverrouillage, une ligne de commandes et un journal ; pas de vraie machine. |
-| Commande de machine | 🟠 | Seulement le simulateur : un programme s'exécute ligne par ligne avec pause, arrêt et arrêt d'urgence ; aucun vrai contrôleur n'est encore connecté d'ici. |
+| Commande de machine | 🟠 | Seulement des simulateurs : un programme s'exécute ligne par ligne avec pause, arrêt et arrêt d'urgence sur la machine simulée ou sur un GRBL, grblHAL ou Marlin simulé ; le port série des trois est derrière une option de compilation et aucun vrai contrôleur n'a été connecté. |
 | Documentation | 🟡 | README en huit langues, les deux images, trois programmes d'exemple et le changelog. |
 
 ## 🎯 Présentation
@@ -57,8 +57,8 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 * La **fenêtre** (`src/gui.rs`, `phoenix-cnc`) : la position de la machine (pièce et machine), un pavé de jog avec ses pas et son avance, prise d'origine, zéro et déverrouillage, l'arrêt d'urgence, une ligne de commandes avec son journal, et le programme avec sa trajectoire sur la table.
 * La **fenêtre à panneaux ancrables** (`src/gui/shell.rs`, `src/panels.rs` et le cadre `eh3d-dock` d'EH3D-COMMON) : douze panneaux que l'on peut retirer, remettre, déplacer, mettre en onglets, faire flotter et replier contre un bord (la trajectoire, la commande manuelle, l'état de la machine, le programme, les fichiers, la table d'outils, le capteur d'outil, la sonde et la carte des hauteurs, l'import, la planification et le temps, le rapport et la console), quatre espaces de travail selon la tâche (Préparer, Exécuter, Réviser et Compact), la barre de menus et une disposition conservée dans le fichier de réglages (lignes `dock.*`), avec ses textes en huit langues. Le contrôleur est enveloppé dans la garde (`guard = off` dans le fichier de mouvement l'enlève) : la fenêtre lui donne l'heure à chaque image, montre pourquoi elle a arrêté la machine et propose le feu vert, et un jog qui en croise un autre annule d'abord le mouvement en cours, de sorte que la règle d'un seul ordre de mouvement à la fois ne se déclenche pas sur une paire de jogs normale. Le panneau de planification montre le temps avec et sans anticipation, le panneau d'import lit HPGL, DXF ou SVG à travers un post-processeur au choix, et le panneau du capteur d'outil n'envoie la machine au capteur qu'après la confirmation de l'opérateur qu'il est en place et dégagé, et n'écrit la longueur dans la table d'outils que sur demande. Dessinée et testée sans fenêtre (images d'egui dans les tests) ; pas encore vue sur un écran réel ni sur une machine réelle.
 * La **session** (`src/session.rs`) : ce que le programme fait avec n'importe quel contrôleur de `eh3d-controller` : jog, zéro, prise d'origine, envoyer une ligne, exécuter un programme ligne par ligne, pause, arrêt et les alarmes ; elle est testée sur le contrôleur simulé.
-* La **trajectoire d'un programme** (`src/gcode.rs`) : les déplacements droits (`G0`, `G1`, absolus ou relatifs, en mm ou en pouces) dessinés avant l'exécution ; les arcs ne sont pas dessinés.
-* Le **contrôleur simulé** (`eh3d_controller::sim`, dans EH3D-COMMON) : une machine en mémoire avec des limites de course qui déclenchent une alarme ; les familles de contrôleurs du marché sont listées dans `eh3d-controller`, GRBL est la première écrite et les autres apparaissent comme pas encore pilotées.
+* La **trajectoire d'un programme** (`src/gcode.rs`) : les déplacements (`G0`, `G1`, `G2`, `G3`, absolus ou relatifs, en mm ou en pouces) dessinés avant l'exécution, en plan et en 3D ; la trajectoire dessinée prend un arc par sa corde, tandis que la longueur, le temps, les boîtes interdites et l'anticipation suivent la courbe.
+* Le **contrôleur simulé** (`eh3d_controller::sim`, dans EH3D-COMMON) : une machine en mémoire avec des limites de course qui déclenchent une alarme ; il ne prend que le G-code de base (déplacements droits, unités, mode de distance, le zéro pièce, broche et arrosage) et refuse arcs, cycles fixes et palpage. `eh3d-controller` liste les familles de contrôleurs du marché : ce programme pilote GRBL, grblHAL et Marlin (contre des simulateurs de leurs dialectes) et les autres apparaissent comme pas encore pilotées.
 * Les **thèmes et les mots** de `eh3d-view` : Forge (par défaut), Neon Arcade, Glass Pro, le gris classique de Windows et un qui suit Windows, et l'interface en anglais, espagnol, italien, allemand, français, portugais, chinois et japonais. Ce qu'il sera : un programme pour percer, fraiser et faire de la CNC 2D et 3D sur les moteurs d'EH3D-DRILLPRO et EH3D-ROUTEPRO ; cette partie n'existe pas encore.
 * Les **menus, les réglages et les fichiers** : les menus Fichier, Édition, Affichage, Programme, Machine, Fenêtre et Aide avec les entrées habituelles (ouvrir, récents, enregistrer, modifier, les zéros, les positions mémorisées, la broche et l'arrosage) ; une fenêtre de réglages (unités, langue, onze thèmes, limites de course, jog) mémorisée entre les exécutions ; et les fenêtres Ouvrir et Enregistrer de la suite (`eh3d-filedialog` : lieux, tri, filtres, l'extension d'un fichier enregistré et la question avant de remplacer).
 * **GRBL sur un port série :** compilé avec `--features serial`, `phoenix-cnc --grbl PORT[@BAUD]` pilote un contrôleur GRBL (115200 bauds par défaut) à la place du simulateur et `phoenix-cnc --ports` liste les ports série ; une version sans la fonctionnalité, ou un port qui ne s'ouvre pas, le dit et quitte. Essayé seulement contre un contrôleur scénarisé, jamais contre un vrai. Avec un vrai contrôleur, `--start` (ouvrir le fichier et le lancer à l'ouverture de la fenêtre) est refusé sauf si `--start-real` est aussi donné, et `--start-real` seul est une erreur ; `busy_wait` dans le fichier de réglages (4 heures par défaut) est le temps maximal qu'une ligne attend sa réponse tant que la machine dit qu'elle travaille, et l'arrêt est entendu pendant ce temps.
@@ -154,7 +154,7 @@ Comment les parties s'assemblent : qui l'utilisera, ce que contient ce dépôt e
 
 ## 🔒 Sécurité et protection
 
-Ce programme n'ouvre un port série que s'il est lancé pour GRBL (`--grbl`, une compilation avec `--features serial`) et une connexion réseau que vers le serveur EH3D dont l'adresse est dans les réglages, quand l'opérateur lui envoie un programme ; le jeton est gardé comme texte dans le fichier de réglages. Il n'ouvre aucun fichier d'autres personnes, sauf le fichier G-code et la carte des hauteurs que choisit l'opérateur (lus comme du texte, jamais exécutés d'eux-mêmes) et ses propres fichiers à côté des réglages (les macros, la file gardée entre deux exécutions, la ligne qu'un programme avait atteinte) ; il n'écrit un fichier que là où l'opérateur le dit (le programme, la carte des hauteurs, le journal exporté) et n'écrit jamais le journal par-dessus un fichier. La table des emplacements du changeur d'outils, la table d'outils, la bibliothèque de matériaux et les signets sont lus là où sont les réglages (ou le programme) et ne sont écrits que par leurs propres boutons : la table d'exemple et la bibliothèque d'exemple jamais sur un fichier existant, la bibliothèque et les signets après une question quand le fichier existe déjà (la question des signets peut être désactivée dans les réglages), et chacun de ces fichiers a une limite de taille. Les macros qu'il exécute sont des lignes de G-code sur lesquelles il demande d'abord, et la file qui revient ne démarre jamais seule. Ce n'est pas un système de sécurité. Voir [SECURITY.md](SECURITY.md).
+Ce programme n'ouvre un port série que s'il est lancé pour GRBL, grblHAL ou Marlin (`--grbl`, `--grblhal` ou `--marlin`, une compilation avec `--features serial`) et une connexion réseau que vers le serveur EH3D dont l'adresse est dans les réglages, quand l'opérateur lui envoie un programme ; le jeton est gardé comme texte dans le fichier de réglages. Il n'ouvre aucun fichier d'autres personnes, sauf le fichier G-code et la carte des hauteurs que choisit l'opérateur (lus comme du texte, jamais exécutés d'eux-mêmes) et ses propres fichiers à côté des réglages (les macros, la file gardée entre deux exécutions, la ligne qu'un programme avait atteinte) ; il n'écrit un fichier que là où l'opérateur le dit (le programme, la carte des hauteurs, le journal exporté) et n'écrit jamais le journal par-dessus un fichier. La table des emplacements du changeur d'outils, la table d'outils, la bibliothèque de matériaux et les signets sont lus là où sont les réglages (ou le programme) et ne sont écrits que par leurs propres boutons : la table d'exemple et la bibliothèque d'exemple jamais sur un fichier existant, la bibliothèque et les signets après une question quand le fichier existe déjà (la question des signets peut être désactivée dans les réglages), et chacun de ces fichiers a une limite de taille. Les macros qu'il exécute sont des lignes de G-code sur lesquelles il demande d'abord, et la file qui revient ne démarre jamais seule. Ce n'est pas un système de sécurité. Voir [SECURITY.md](SECURITY.md).
 
 ## 🚀 Démarrage rapide
 
@@ -177,7 +177,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🏗️ Compilation et publication
 
-La version se trouve dans `Cargo.toml` et dans `eh3d.project.json`, et chaque version a son entrée dans [CHANGELOG.md](CHANGELOG.md). Il n'y a pas encore de programme à empaqueter, donc pas de binaires prêts à l'emploi.
+La version se trouve dans `Cargo.toml` et dans `eh3d.project.json`, et chaque version a son entrée dans [CHANGELOG.md](CHANGELOG.md). Les releases sont publiées sur GitHub avec des programmes prêts à l'emploi pour Windows (64 et 32 bits), Linux (64 bits) et macOS (Apple silicon et Intel) : chaque paquet, `phoenix-cnc-<version>-<système>.zip` ou `.tar.gz`, est fourni avec ses fichiers `.sha256` et `.sig`. Ils sont compilés par le workflow manuel Release binaries et publiés depuis la machine du mainteneur.
 
 ## 📂 Structure du dépôt
 
@@ -291,13 +291,13 @@ EH3D-PHOENIX-CNC/
 │   ├── gui/files.rs                             la carte des hauteurs et le journal de session en fichiers, par les fenêtres de fichiers
 │   └── gui/icons.rs                             les dessins des boutons, tracés avec des lignes, et le bouton de la barre d'outils
 ├── examples/                                    trois programmes G-code d'exemple, d'un carré à une longue spirale
-├── tests/                                       le test qui garde vrai le registre des exigences
+├── tests/                                       tests du registre, du README et des outils
 ├── tools/                                       contrôle de CI, du README et outils d'images
 ├── docs/                                        périmètre, exigences, état, idées écartées et données des images
 ├── .github/                                     workflow de CI, modèles d'issues et de pull requests
 ├── images/                                      bannière, les deux images et les captures d'écran
-├── build.sh build.bat                           compilent la bibliothèque
-├── run.sh run.bat                               indiquent qu'il n'y a pas encore de programme et lancent les tests
+├── build.sh build.bat                           compilent le programme
+├── run.sh run.bat                               ouvrent la fenêtre sur un programme d'exemple
 ├── eh3d.project.json                            manifeste : version, rôle, maturité et commande de compilation
 ├── Cargo.toml Cargo.lock                        le paquet Rust et ses dépendances figées
 ├── rust-toolchain.toml                          la toolchain Rust épinglée
@@ -313,21 +313,24 @@ EH3D-PHOENIX-CNC/
 
 **Limites connues aujourd'hui**
 
-* Rien ici n'a tourné sur une vraie machine : le contrôleur est un simulateur (ou GRBL sur un port série, jamais essayé) et le serveur n'est atteint que par les tests.
-* Le simulateur ne prend que le G-code de base (`G0`, `G1`, `G90`, `G91`, `G20`, `G21`, `G92`, `M3` à `M9`) ; les arcs, les cycles fixes et le palpage sont refusés, et la trajectoire ne dessine pas les arcs.
-* Il a besoin du dossier `EH3D-COMMON` à côté, car il en dépend par chemin.
+* Rien ici n'a tourné sur une vraie machine : les contrôleurs sont des simulateurs (ou GRBL, grblHAL et Marlin sur un port série, jamais essayés) et le serveur n'est atteint que par les tests.
+* Les machines simulées ne prennent que des déplacements droits : elles refusent arcs, cycles fixes et palpage, que le programme mesure, vérifie et chronomètre sur le papier ; la trajectoire dessinée montre un arc par sa corde.
+* Le palpeur, la carte des hauteurs et le changeur d'outils n'ont été essayés que contre des doublures, et les scripts des post-processeurs ne sont pas construits (leurs règles le sont).
+* La fenêtre n'a été vue sur un ordinateur que par ses images ; aucun opérateur ne l'a utilisée sur une machine.
+* Il a besoin des dossiers `EH3D-COMMON` et `EH3D-CORE-LIBS` à côté, car il en dépend par chemin.
 
 **Ensuite**
 
-* Un vrai contrôleur : d'abord GRBL par un port série, puis les autres familles, puis le contrôleur de HYDRA-UMC.
-* Les arcs et le reste du G-code dans le simulateur et dans la trajectoire.
-* Une vue 3D de la trajectoire avec la hauteur des coupes.
-* Palpage, changeur d'outils et les matériaux de la machine.
+* Une première épreuve sur une vraie machine (GRBL, grblHAL ou Marlin), avec une personne à la machine et l'arrêt d'urgence à portée de main ; puis un vrai palpeur, un vrai mesureur d'outil et un vrai changeur.
+* Le contrôleur de HYDRA-UMC, une fois son contrat accepté.
+* Des scripts pour les post-processeurs dans un bac à sable, quand les règles ne suffisent pas.
+* Décider comment la vue 3D montre la hauteur des coupes.
 * Réunir les moteurs d'EH3D-DRILLPRO et EH3D-ROUTEPRO pour qu'un seul programme perce et fraise.
+* Les idées écartées volontairement sont dans [Pas encore](docs/NOT_YET.md).
 
 ## 🌍 Langues
 
-Le README et les textes existent en anglais, espagnol, français, italien, allemand, chinois, japonais et portugais européen.
+Le README et les textes existent en anglais, espagnol, français, italien, allemand, chinois, japonais et portugais européen. La fenêtre liste les 37 langues de la vue partagée d'EH3D-COMMON, mais seules ces huit sont promises ; les mots que ce programme ajoute aux mots partagés apparaissent en anglais dans toute autre langue.
 
 ## 🔗 Projets liés
 

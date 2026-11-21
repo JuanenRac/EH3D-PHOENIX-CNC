@@ -6,7 +6,7 @@ EH3D-PHOENIX-CNC works on a computer against simulated machines: a docking windo
 
 ## Recent work
 
-The window became a docking window of twelve panels with four workspaces; the guard that fails closed is in the session and in the window; grblHAL and Marlin are driven like GRBL; the Gerber and Excellon files of a board are cut as isolation, profile and drill programs; and a record decides the engine of the scripts of the post-processors. The README still describes the first simulator in its list of known limits and says that arcs are refused; the code and the tests have moved on, and the register of requirements is the one that says what exists.
+The window became a docking window of twelve panels with four workspaces; the guard that fails closed is in the session and in the window; grblHAL and Marlin are driven like GRBL; the Gerber and Excellon files of a board are cut as isolation, profile and drill programs; and a record decides the engine of the scripts of the post-processors. The README files, this page and the register of requirements agree on what exists and what is missing; the register is the one that says it.
 
 ## Capabilities
 
