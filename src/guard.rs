@@ -509,7 +509,7 @@ impl Controller for GuardHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::faulty::{Fault, FaultyController};
+    use eh3d_controller::faulty::{Fault, FaultyController};
     use eh3d_controller::sim::SimController;
 
     fn guarded(faults: Vec<Fault>) -> Guarded<FaultyController<SimController>> {

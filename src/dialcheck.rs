@@ -4,15 +4,15 @@
 //! refused afterwards), and the same steps on cables that cut the answers in pieces and add noise, from a row of seeds. A step that does not
 //! pass makes the check not pass: the exit code is 2. The evidence is the simulator; nothing here has met a real controller.
 
+use eh3d_controller::dialtext;
+use eh3d_controller::wire::Impair;
 use eh3d_controller::{Command, Error, State};
 
-use crate::dialtext;
 use crate::guard::Trip;
 use crate::link::{self, Dialect};
 use crate::motioncfg::{GuardCfg, WireCfg};
 use crate::notes::Label;
 use crate::session::BoxedController;
-use crate::wire::Impair;
 
 /// The seeds of the noisy cables the steps are repeated on.
 pub const NOISY_SEEDS: std::ops::RangeInclusive<u64> = 1..=8;

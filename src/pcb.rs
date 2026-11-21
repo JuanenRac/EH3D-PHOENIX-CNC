@@ -1082,7 +1082,7 @@ mod tests {
 
     #[test]
     fn made_up_bytes_from_a_fixed_seed_never_panic_and_always_end_in_an_answer() {
-        let mut seed = crate::wire::Seed::new(0xC0FFEE);
+        let mut seed = eh3d_controller::wire::Seed::new(0xC0FFEE);
         let pieces = [
             "%FSLAX34Y34*%",
             "%MOMM*%",

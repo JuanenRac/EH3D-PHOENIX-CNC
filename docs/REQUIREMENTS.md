@@ -64,15 +64,15 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-033 | The guard is on by default and a switch of the motion file takes it away. | implemented | done | simulator | `src/link::the_guard_is_on_by_default_and_the_switch_takes_it_away` | - |
 | PCNC-034 | A controller that falls silent stops the machine and the window says so until the operator clears it. | implemented | done | simulator | `src/gui/shell::a_controller_that_falls_silent_stops_the_machine_and_the_window_says_so_until_the_operator_clears_it` | - |
 | PCNC-035 | A real controller does not start a program by itself unless it is said twice. | implemented | done | host-test | `src/cli::a_real_controller_does_not_start_a_program_by_itself_unless_it_is_said_twice` | - |
-| PCNC-036 | GRBL: a move past the travel is an alarm and the lock is cleared with unlock. | implemented | done | simulator | `src/grblsim::a_move_past_the_travel_is_an_alarm_and_the_lock_is_cleared_with_unlock` | - |
+| PCNC-036 | GRBL: a move past the travel is an alarm and the lock is cleared with unlock. | implemented | done | simulator | `src/link::a_simulated_grbl_alarms_on_a_move_past_its_travel_and_unlock_clears_the_lock` | - |
 | PCNC-037 | grblHAL says so in its build, starts locked and is told from GRBL. | implemented | done | simulator | `src/dialect::grbl_and_grblhal_are_told_apart_by_the_build_and_the_banner` | - |
-| PCNC-038 | Marlin: a line spoiled on the wire is never executed when the lines are numbered. | implemented | done | simulator | `src/marlin::a_line_spoiled_on_the_wire_is_never_executed_when_the_lines_are_numbered` | - |
-| PCNC-039 | Marlin: an urgent reset is the emergency stop and leaves it halted. | implemented | done | simulator | `src/marlin::an_urgent_reset_is_the_emergency_stop_and_leaves_marlin_halted` | - |
-| PCNC-040 | A simulated cable cuts, spoils and silences the lines from a fixed seed, and the answers still come back whole. | implemented | done | simulator | `src/marlin::answers_cut_in_pieces_and_noise_between_the_lines_do_not_change_the_result` | - |
+| PCNC-038 | Marlin: a line spoiled on the wire is never executed when the lines are numbered. | implemented | done | simulator | `src/dialcheck::a_cable_that_spoils_the_lines_fails_the_check_of_marlin_without_numbers_and_not_with_them` | - |
+| PCNC-039 | Marlin: an urgent reset is the emergency stop and leaves it halted. | implemented | done | simulator | `src/link::an_urgent_reset_stops_a_simulated_marlin_and_it_refuses_the_moves_after_it` | - |
+| PCNC-040 | A simulated cable cuts, spoils and silences the lines from a fixed seed, and the answers still come back whole. | implemented | done | simulator | `src/dialcheck::the_check_passes_on_a_cable_that_cuts_and_adds_noise_and_marlin_numbered` | - |
 | PCNC-041 | Each dialect passes its battery of steps against its simulator, in the language of the person. | implemented | done | simulator | `src/dialcheck::every_dialect_passes_its_check_with_the_cable_of_the_defaults` | - |
 | PCNC-042 | A silent controller is stopped for every dialect. | implemented | done | simulator | `src/dialcheck::the_silent_controller_is_stopped_for_every_dialect` | - |
 | PCNC-043 | Every alarm and error of the controllers is told in the eight languages. | implemented | done | host-test | `src/ctltext::every_alarm_and_every_error_of_the_table_has_all_eight_languages_and_they_differ` | - |
-| PCNC-044 | The Portuguese of the controllers is that of Portugal. | implemented | done | host-test | `src/dialtext::the_portuguese_of_the_dialects_is_that_of_portugal` | - |
+| PCNC-044 | The Portuguese of the controllers is that of Portugal. | implemented | done | host-test | `src/ctltext::the_portuguese_of_the_controllers_is_that_of_portugal` | - |
 | PCNC-045 | Drive a real GRBL, grblHAL or Marlin machine on a serial port. | planned | blocked | none | `planned:real_machine::a_real_controller_runs_a_program_and_stops_on_the_emergency_stop` | The serial port is built behind a feature and has never been opened on a machine; it needs a person at a real machine with the emergency stop in reach. |
 
 ## The server

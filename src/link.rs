@@ -4,16 +4,16 @@
 use std::time::Duration;
 
 use eh3d_controller::grbl::GrblController;
+use eh3d_controller::grblsim::{Flavor, GrblDevice};
+use eh3d_controller::marlin::{MarlinController, MarlinDevice, E_HOMING};
 use eh3d_controller::sim::SimController;
+use eh3d_controller::wire::{Impair, WireLink};
 use eh3d_controller::Family;
 
 use crate::cli::Options;
-use crate::grblsim::{Flavor, GrblDevice};
 use crate::guard::GuardHandle;
-use crate::marlin::{MarlinController, MarlinDevice, E_HOMING};
 use crate::motioncfg::{GuardCfg, MotionCfg, WireCfg};
 use crate::session::BoxedController;
-use crate::wire::{Impair, WireLink};
 
 /// The baud rate of GRBL 1.1 when the option names only the port.
 pub const GRBL_BAUD: u32 = 115_200;
@@ -349,6 +349,32 @@ mod tests {
     }
 
     #[test]
+    fn a_simulated_grbl_alarms_on_a_move_past_its_travel_and_unlock_clears_the_lock() {
+        use eh3d_controller::{Command, Error, State};
+        let mut c = simulated(Dialect::Grbl, &WireCfg::default());
+        let e = c.send_line("G0 X900").unwrap_err();
+        assert!(matches!(e, Error::Alarm(_)), "{e:?}");
+        assert_eq!(e.code(), Some(2));
+        assert_eq!(c.status().unwrap().state, State::Alarm);
+        assert_eq!(c.send_line("G0 X1").unwrap_err().code(), Some(9));
+        c.command(Command::Unlock).unwrap();
+        c.send_line("G0 X1").unwrap();
+    }
+
+    #[test]
+    fn an_urgent_reset_stops_a_simulated_marlin_and_it_refuses_the_moves_after_it() {
+        use eh3d_controller::urgent::Urgent;
+        use eh3d_controller::Error;
+        let mut c = simulated(Dialect::Marlin, &WireCfg::default());
+        let channel = c.urgent_channel().expect("Marlin takes urgent orders");
+        channel.send(Urgent::Reset);
+        assert!(c.send_line("G1 X5 F100").is_err());
+        let e = c.send_line("G1 X6 F100").unwrap_err();
+        assert!(matches!(e, Error::Alarm(_)), "{e:?}");
+        assert_eq!(e.code(), Some(eh3d_controller::marlin::E_HALTED));
+    }
+
+    #[test]
     fn without_the_option_the_simulator_is_driven() {
         assert!(controller_for(&Options::default()).is_ok());
     }
@@ -367,7 +393,7 @@ mod tests {
     }
 
     fn after_a_jump() -> BoxedController {
-        use crate::faulty::{Fault, FaultyController};
+        use eh3d_controller::faulty::{Fault, FaultyController};
         let mut offset_mm = [0.0; eh3d_controller::AXES];
         offset_mm[0] = 900.0;
         Box::new(FaultyController::new(

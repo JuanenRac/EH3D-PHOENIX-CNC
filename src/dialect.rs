@@ -266,6 +266,9 @@ mod tests {
             Kind::Grbl
         );
         assert_eq!(parse_build(&[]).kind, Kind::Unknown);
+        // the build a simulated grblHAL prints is told from GRBL's by its extra options
+        let sim = parse_build(&v(&["[VER:1.1f.20240401:]", "[NEWOPT:ENC,RT+,TMC]"]));
+        assert_eq!(sim.kind.family(), Family::GrblHal);
     }
 
     #[test]

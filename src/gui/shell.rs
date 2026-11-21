@@ -298,10 +298,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::faulty::{Fault, FaultyController};
     use crate::guard::Trip;
     use crate::link;
     use crate::motioncfg::GuardCfg;
+    use eh3d_controller::faulty::{Fault, FaultyController};
     use eh3d_controller::sim::SimController;
 
     /// A window with its own settings file, a program and the frame around it.
