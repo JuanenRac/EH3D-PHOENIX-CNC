@@ -738,66 +738,14 @@
         {
           "name": "ctltext.rs",
           "desc": {
-            "en": "alarms, errors and guard messages by number in eight languages",
-            "es": "alarmas, errores y mensajes del guardián por número, en ocho idiomas",
-            "de": "Alarme, Fehler und Wächtermeldungen nach Nummer in acht Sprachen",
-            "fr": "alarmes, erreurs et messages du garde par numéro, en huit langues",
-            "it": "allarmi, errori e messaggi della guardia per numero, in otto lingue",
-            "ja": "アラーム、エラー、ガードのメッセージを番号別に8言語で",
-            "zh": "按编号提供的报警、错误和守卫消息，八种语言",
-            "pt": "alarmes, erros e mensagens do guarda por número, em oito idiomas"
-          }
-        },
-        {
-          "name": "dialtext.rs",
-          "desc": {
-            "en": "the errors and alarms that belong to grblHAL and to Marlin, in eight languages",
-            "es": "los errores y alarmas propios de grblHAL y de Marlin, en ocho idiomas",
-            "de": "die Fehler und Alarme von grblHAL und Marlin in acht Sprachen",
-            "fr": "les erreurs et alarmes propres à grblHAL et à Marlin, en huit langues",
-            "it": "gli errori e gli allarmi propri di grblHAL e di Marlin, in otto lingue",
-            "ja": "grblHAL と Marlin 固有のエラーとアラームを 8 言語で",
-            "zh": "grblHAL 和 Marlin 特有的错误与报警，八种语言",
-            "pt": "os erros e alarmes próprios do grblHAL e do Marlin, em oito idiomas"
-          }
-        },
-        {
-          "name": "wire.rs",
-          "desc": {
-            "en": "a simulated cable: pieces, noise, flipped bits and silence, from a fixed seed",
-            "es": "un cable simulado: trozos, ruido, bits cambiados y silencio, con semilla fija",
-            "de": "ein simuliertes Kabel: Stücke, Rauschen, gekippte Bits und Stille, mit festem Seed",
-            "fr": "un câble simulé : morceaux, bruit, bits inversés et silence, à graine fixe",
-            "it": "un cavo simulato: pezzi, rumore, bit invertiti e silenzio, con seme fisso",
-            "ja": "模拟线缆：分段、噪声、位翻转和无应答，固定种子",
-            "zh": "模拟线缆：分段、噪声、位翻转和静默，使用固定种子",
-            "pt": "um cabo simulado: pedaços, ruído, bits trocados e silêncio, com semente fixa"
-          }
-        },
-        {
-          "name": "grblsim.rs",
-          "desc": {
-            "en": "GRBL and grblHAL as simulated devices: lines, reports, alarms, errors by number",
-            "es": "GRBL y grblHAL como dispositivos simulados: líneas, informes, alarmas, errores por número",
-            "de": "GRBL und grblHAL als simulierte Geräte: Zeilen, Berichte, Alarme, Fehler nach Nummer",
-            "fr": "GRBL et grblHAL en appareils simulés : lignes, rapports, alarmes, erreurs par numéro",
-            "it": "GRBL e grblHAL come dispositivi simulati: righe, rapporti, allarmi, errori per numero",
-            "ja": "模擬デバイスとしての GRBL と grblHAL：行、レポート、アラーム、番号別エラー",
-            "zh": "模拟设备形式的 GRBL 和 grblHAL：行、状态报告、报警、按编号的错误",
-            "pt": "GRBL e grblHAL como dispositivos simulados: linhas, relatórios, alarmes, erros por número"
-          }
-        },
-        {
-          "name": "marlin.rs",
-          "desc": {
-            "en": "Marlin: the controller of its dialect and the simulated Marlin it is tried on",
-            "es": "Marlin: el controlador de su dialecto y el Marlin simulado con el que se prueba",
-            "de": "Marlin: die Steuerung seines Dialekts und das simulierte Marlin, an dem sie geprüft wird",
-            "fr": "Marlin : le contrôleur de son dialecte et le Marlin simulé sur lequel il est essayé",
-            "it": "Marlin: il controllore del suo dialetto e il Marlin simulato su cui si prova",
-            "ja": "Marlin：その方言のコントローラーと、試験に使う模擬 Marlin",
-            "zh": "Marlin：其方言的控制器，以及用于测试的模拟 Marlin",
-            "pt": "Marlin: o controlador do seu dialeto e o Marlin simulado em que é testado"
+            "en": "the messages of the guard, and the words of the controllers, in eight languages",
+            "es": "los mensajes del guardián y las palabras de los controladores, en ocho idiomas",
+            "de": "die Wächtermeldungen und die Wörter der Steuerungen in acht Sprachen",
+            "fr": "les messages du garde et les mots des contrôleurs, en huit langues",
+            "it": "i messaggi della guardia e le parole dei controllori, in otto lingue",
+            "ja": "ガードのメッセージとコントローラーの文言を 8 言語で",
+            "zh": "守卫消息和控制器用语，八种语言",
+            "pt": "as mensagens do guarda e as palavras dos controladores, em oito idiomas"
           }
         },
         {
@@ -811,19 +759,6 @@
             "ja": "方言をシミュレーターで検査：手順、ノイズ、無応答、ガード",
             "zh": "对照模拟器检查一种方言：步骤、噪声、静默和防护",
             "pt": "a verificação de um dialeto contra o seu simulador: passos, ruído, silêncio e a guarda"
-          }
-        },
-        {
-          "name": "faulty.rs",
-          "desc": {
-            "en": "a controller that goes wrong on purpose: silence, busy, error at a line, false position",
-            "es": "un controlador que falla a propósito: silencio, ocupado, error en una línea, posición falsa",
-            "de": "eine absichtlich fehlerhafte Steuerung: Stille, belegt, Fehler in einer Zeile, falsche Position",
-            "fr": "un contrôleur qui se trompe exprès : silence, occupé, erreur à une ligne, fausse position",
-            "it": "un controllore che sbaglia di proposito: silenzio, occupato, errore a una riga, posizione falsa",
-            "ja": "意図的に誤動作するコントローラー：無応答、ビジー、行エラー、偽の位置",
-            "zh": "故意出错的控制器：无应答、忙、某行出错、位置错误",
-            "pt": "um controlador que falha de propósito: silêncio, ocupado, erro numa linha, posição falsa"
           }
         },
         {
@@ -907,14 +842,14 @@
         {
           "name": "motioncfg.rs",
           "desc": {
-            "en": "the motion file: planner, guard, importers and tool setter values",
-            "es": "el fichero de movimiento: valores del planificador, el guardián, los importadores y el medidor",
-            "de": "die Bewegungsdatei: Werte für Planer, Wächter, Importer und Werkzeugsensor",
-            "fr": "le fichier de mouvement : valeurs du planificateur, du garde, des importateurs et du capteur",
-            "it": "il file di movimento: valori di pianificatore, guardia, importatori e sensore utensile",
-            "ja": "モーションファイル：プランナー、ガード、インポーター、ツールセッターの値",
-            "zh": "运动文件：规划器、守卫、导入器和对刀仪的数值",
-            "pt": "o ficheiro de movimento: valores do planeador, do guarda, dos importadores e do sensor"
+            "en": "the motion file: planner, guard, importers, tool setter and Klipper link values",
+            "es": "el fichero de movimiento: planificador, guardián, importadores, medidor y enlace con Klipper",
+            "de": "die Bewegungsdatei: Planer, Wächter, Importer, Werkzeugsensor und Klipper-Verbindung",
+            "fr": "le fichier de mouvement : planificateur, garde, importateurs, capteur et liaison Klipper",
+            "it": "il file di movimento: pianificatore, guardia, importatori, sensore e collegamento Klipper",
+            "ja": "モーションファイル：プランナー、ガード、インポーター、ツールセッター、Klipper リンクの値",
+            "zh": "运动文件：规划器、守卫、导入器、对刀仪和 Klipper 链路的数值",
+            "pt": "o ficheiro de movimento: planeador, guarda, importadores, sensor e ligação ao Klipper"
           }
         },
         {
