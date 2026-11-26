@@ -10,7 +10,7 @@ The command `project` keeps the work in the branch `cnc/` of an `.eh3d` project 
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 145 requirements: 136 implemented, 2 prototype, 7 planned and 0 validated. By progress: 136 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 146 requirements: 137 implemented, 2 prototype, 7 planned and 0 validated. By progress: 137 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
@@ -20,7 +20,7 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 
 ## What it needs from other repositories
 
-* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame and the server client.
+* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The CI takes its main branch until the release that holds what a program does with its branch; the workflows are then pinned to that release.
 * EH3D-CORE-LIBS: the readers of Gerber and Excellon files.
 * A real machine with GRBL, grblHAL, Marlin or Klipper, a probe, a tool setter and a changer, for the proofs that no simulator can give.
 
