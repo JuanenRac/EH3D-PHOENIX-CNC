@@ -9,7 +9,9 @@ use eh3d_container::{sha256_hex, AtomicOptions};
 use eh3d_phoenix_cnc::eh3dcli;
 use eh3d_phoenix_cnc::eh3dfile::{self, Identity, Inputs};
 use eh3d_phoenix_cnc::motioncfg::MotionCfg;
-use eh3d_project::{BranchUpdate, NewProject, OpenOptions, Project, SaveOptions, Seal, Writer};
+use eh3d_project::{
+    BranchUpdate, Ed25519Signer, NewProject, OpenOptions, Project, SaveOptions, Seal, Writer,
+};
 
 const DXF: &str = "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n0\n11\n10\n21\n0\n0\nCIRCLE\n10\n50\n20\n50\n40\n5\n0\nENDSEC\n0\nEOF\n";
 
@@ -408,6 +410,33 @@ fn fields_and_files_this_version_does_not_know_stay() {
     assert_eq!(manifest["future"]["k"], 1);
     let record = project.branch("cnc").unwrap().record.clone().unwrap();
     assert_eq!(record.extra["hint"], "kept");
+}
+
+#[test]
+fn a_signed_branch_is_listed_and_a_change_says_the_signature_is_gone() {
+    let dir = folder("signed");
+    let file = dir.join("job.eh3d");
+    synthetic(&file);
+    eh3dfile::save(&file, &program(), &Identity::default()).unwrap();
+    let key = Ed25519Signer::from_seed(&[7; 32]);
+    Project::open(&file, &OpenOptions::default())
+        .unwrap()
+        .sign_branch("cnc", &key, &SaveOptions::default())
+        .unwrap();
+    let signed = || {
+        eh3dfile::list(&file)
+            .unwrap()
+            .rows
+            .iter()
+            .any(|r| r.id == "cnc" && r.notes.contains(&"signed"))
+    };
+    assert!(signed());
+    let notes = eh3dfile::save(&file, &program(), &Identity::default()).unwrap();
+    assert!(
+        notes.iter().any(|n| n.contains("signature of the branch")),
+        "{notes:?}"
+    );
+    assert!(!signed());
 }
 
 #[test]
