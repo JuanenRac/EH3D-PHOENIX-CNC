@@ -1072,10 +1072,12 @@ impl App {
         const APART: f32 = 40.0;
         let room = ui.available_width();
         let wide = room >= 5.0 * PAD_BUTTON.x + APART + 5.0 * GAP;
-        let one_block = room >= 5.0 * 36.0 + 4.0 * GAP;
+        let one_block = room >= 5.0 * 30.0 + 4.0 * GAP;
         let columns = if one_block { 5.0 } else { 3.0 };
         let width = ((room - (columns - 1.0) * GAP) / columns).clamp(30.0, PAD_BUTTON.x);
-        let size = Vec2::new(width, PAD_BUTTON.y);
+        // two blocks, one over the other, take lower buttons so that both stay in sight
+        let height = if one_block { PAD_BUTTON.y } else { 30.0 };
+        let size = Vec2::new(width, height);
         let mut pad = |ui: &mut egui::Ui, label: &str, axis: usize, dir: f64| {
             if ui.add(egui::Button::new(label).min_size(size)).clicked() {
                 self.session.jog(axis, dir);

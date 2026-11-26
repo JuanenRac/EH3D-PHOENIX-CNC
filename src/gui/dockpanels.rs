@@ -860,8 +860,11 @@ mod layout_tests {
     #[test]
     fn the_jog_pad_cuts_no_button_in_a_narrow_panel() {
         let mut a = App::isolated();
-        for width in [220.0, 260.0, 300.0, 360.0, 412.0, 440.0, 520.0, 700.0] {
-            let size = Vec2::new(width, 700.0);
+        let tall = [220.0, 260.0, 300.0, 360.0, 412.0, 440.0, 520.0, 700.0].map(|w| (w, 700.0));
+        // the height of the panel in the window of the pictures
+        let low = [260.0, 300.0, 412.0].map(|w| (w, 345.0));
+        for (width, height) in tall.into_iter().chain(low) {
+            let size = Vec2::new(width, height);
             let texts = painted(size, |ui| a.panel_jog(ui));
             for label in ["X-", "X+", "Y-", "Y+", "Z-", "Z+", "A-", "A+"] {
                 whole(&texts, label, size);
