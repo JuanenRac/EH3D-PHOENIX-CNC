@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 139 requirements: 130 implemented, 2 prototype, 7 planned and 0 validated. By progress: 130 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 145 requirements: 136 implemented, 2 prototype, 7 planned and 0 validated. By progress: 136 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -203,3 +203,9 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-137 | The chip load and the cutting speed of a point are worked out and a chip too thin or too thick for the diameter is said. | implemented | done | host-test | `shared::the_chip_load_follows_the_feed_the_speed_and_the_teeth_and_the_verdict_only_goes_up` | The limits (0.2 % and 8 % of the diameter) are a rule of thumb for small cutters, never measured on a machine. |
 | PCNC-138 | The material of the settings can be one of the shared database and the check of a program is held to the feed and the speed of its points. | implemented | done | host-test | `shared::the_material_of_the_settings_can_be_one_of_the_shared_database` | - |
 | PCNC-139 | The format of a program can be checked for Marlin and for Klipper, from what their documentation lists. | implemented | done | host-test | `shared::the_formats_of_marlin_and_klipper_say_what_a_milling_program_takes_from_them` | The lists are read from the documentation, not from a controller: a code that is not listed is a reason to read the line. |
+| PCNC-140 | The program, the drawing, the table of tools and the motion file saved in the branch cnc of a project come back byte for byte. | implemented | done | host-test | `eh3dfile::a_saved_branch_comes_back_byte_for_byte` | - |
+| PCNC-141 | Writing the branch cnc leaves the bytes of every other branch, known or not, as they were. | implemented | done | host-test | `eh3dfile::the_other_branches_keep_their_bytes_whatever_this_program_does` | - |
+| PCNC-142 | A copy taken from another branch keeps the hash and the format of its source and is told as out of date when the source changes. | implemented | done | host-test | `eh3dfile::a_copy_taken_from_cad_is_told_as_out_of_date_and_taken_again` | - |
+| PCNC-143 | An imported G-code program or drawing keeps its original byte for byte with a report of what was read, not read and lost on export. | implemented | done | host-test | `eh3dfile::an_imported_drawing_becomes_a_program_beside_the_original` | - |
+| PCNC-144 | A branch of a newer format or a sealed one is not written, with the code of the format, and the file stays as it was. | implemented | done | host-test | `eh3dfile::a_branch_of_a_newer_format_or_sealed_is_not_written` | - |
+| PCNC-145 | A damaged project is an error and never a crash, with damage made from a fixed seed. | implemented | done | host-test | `eh3dfile::damaged_projects_are_errors_and_never_a_crash` | - |

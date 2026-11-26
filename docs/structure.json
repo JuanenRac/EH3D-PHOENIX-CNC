@@ -801,6 +801,32 @@
           }
         },
         {
+          "name": "eh3dfile.rs",
+          "desc": {
+            "en": "the branch cnc of an .eh3d project: save, import, take, open, extract",
+            "es": "la rama cnc de un proyecto .eh3d: guardar, importar, tomar, abrir, extraer",
+            "de": "der Zweig cnc eines .eh3d-Projekts: speichern, importieren, übernehmen, öffnen, entnehmen",
+            "fr": "la branche cnc d'un projet .eh3d : enregistrer, importer, prendre, ouvrir, extraire",
+            "it": "il ramo cnc di un progetto .eh3d: salvare, importare, prendere, aprire, estrarre",
+            "ja": ".eh3d プロジェクトの cnc ブランチ：保存、取り込み、参照、展開、取り出し",
+            "zh": ".eh3d 工程的 cnc 分支：保存、导入、引用、打开、提取",
+            "pt": "o ramo cnc de um projeto .eh3d: guardar, importar, tomar, abrir, extrair"
+          }
+        },
+        {
+          "name": "eh3dcli.rs",
+          "desc": {
+            "en": "the command project of the command line",
+            "es": "el comando project de la línea de comandos",
+            "de": "der Befehl project der Kommandozeile",
+            "fr": "la commande project de la ligne de commande",
+            "it": "il comando project della riga di comando",
+            "ja": "コマンドラインの project コマンド",
+            "zh": "命令行的 project 命令",
+            "pt": "o comando project da linha de comandos"
+          }
+        },
+        {
           "name": "import.rs",
           "desc": {
             "en": "bounded readers of HPGL, DXF and SVG, and the G-code that cuts along them",

@@ -10,7 +10,14 @@ use eh3d_phoenix_cnc::cli::Options;
 fn main() -> eframe::Result {
     eh3d_phoenix_cnc::crash::install("phoenix-cnc", env!("CARGO_PKG_VERSION"));
     attach_console();
-    match Options::parse(std::env::args().skip(1)) {
+    let words: Vec<String> = std::env::args().skip(1).collect();
+    if words.first().is_some_and(|w| w == "project") {
+        let done = eh3d_phoenix_cnc::eh3dcli::run(&words[1..]);
+        print!("{}", done.out);
+        eprint!("{}", done.err);
+        std::process::exit(done.code);
+    }
+    match Options::parse(words.into_iter()) {
         Ok(o) if o.version => {
             println!("phoenix-cnc {}", env!("CARGO_PKG_VERSION"));
             std::process::exit(0);

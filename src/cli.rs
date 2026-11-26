@@ -154,6 +154,7 @@ pub fn help_text() -> String {
          Usage: phoenix-cnc [OPTIONS] [FILE.NC ...]\n\
          \n\
          A G-code file is opened as the program; more files make a queue that runs one after the other.\n\
+         `phoenix-cnc project --help` lists the commands of a project of the suite (.eh3d), of which this program writes the branch cnc only.\n\
          \n\
          Options:\n\
          \x20 --report FILE      print the statistics, the time and what looks wrong in a program, and leave (exit code 0 clean, 1 something to read, 2 error)\n\
