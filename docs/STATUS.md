@@ -6,11 +6,13 @@ EH3D-PHOENIX-CNC works on a computer against simulated machines: a docking windo
 
 ## Recent work
 
+The window has a panel «Attachments» (the shared `eh3d-attachpanel`): the data sheets, manuals and other files of the project are listed, attached, linked to a part, extracted and removed after a question, and shown beside the list (`eh3d-project.md`). The panel itself is tested in EH3D-COMMON; it has not been tried on a screen by a person.
+
 The menu File of the window opens, saves, imports, takes and extracts an `.eh3d` project and asks before it writes one that is not its own. The command `project` keeps the work in the branch `cnc/` of an `.eh3d` project (`eh3d-project.md`): the other branches keep their bytes, copies taken from them are told as out of date and imported files keep their original with a report. The window became a docking window of thirteen panels with four workspaces; the guard that fails closed is in the session and in the window; grblHAL, Marlin and Klipper (through Moonraker over HTTP) are driven like GRBL; the Gerber and Excellon files of a board are cut as isolation, profile and drill programs; and a record decides the engine of the scripts of the post-processors. The README files, this page and the register of requirements agree on what exists and what is missing; the register is the one that says it.
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 151 requirements: 142 implemented, 2 prototype, 7 planned and 0 validated. By progress: 142 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 152 requirements: 143 implemented, 2 prototype, 7 planned and 0 validated. By progress: 143 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
