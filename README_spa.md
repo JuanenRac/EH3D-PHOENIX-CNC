@@ -156,6 +156,12 @@ Cómo encajan las partes: quién lo usará, qué contiene este repositorio y en 
 
 <p align="center"><em>La sección del cambiador de herramientas en la ventana de ajustes.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-08-about-paper.png" alt="Ventana Acerca de con el tema claro Paper" width="100%">
+</p>
+
+<p align="center"><em>La ventana Acerca de con el tema claro Paper: la versión, el autor y los enlaces del programa.</em></p>
+
 ## 🔒 Seguridad y protección
 
 Este programa abre un puerto serie solo si se arranca para GRBL, grblHAL o Marlin (`--grbl`, `--grblhal` o `--marlin`, una compilación con `--features serial`), una conexión HTTP sin cifrar con Moonraker solo si se arranca con `--klipper` (solo la red local, salvo que `klipper.allow_non_local` esté activado; la credencial, si la hay, se lee del fichero de movimiento, se envía en una cabecera y nunca se imprime) y una conexión de red con el servidor EH3D cuya dirección está en los ajustes solo cuando el operador le envía un programa; el token se guarda como texto en el fichero de ajustes. No abre ficheros de otras personas salvo el fichero G-code y el mapa de alturas que elige el operador (se leen como texto y nunca se ejecutan solos) y sus propios ficheros junto a los ajustes (las macros, la cola guardada entre ejecuciones, la línea que había alcanzado un programa); solo escribe un fichero donde el operador lo dice (el programa, el mapa de alturas, el registro exportado) y nunca escribe el registro sobre un fichero. La tabla de huecos del cambiador de herramientas, la tabla de herramientas, la biblioteca de materiales y los marcadores se leen de donde están los ajustes (o el programa) y solo los escriben sus propios botones: la tabla de ejemplo y la biblioteca de ejemplo nunca sobre un fichero que exista, y la biblioteca y los marcadores tras una pregunta cuando el fichero ya existe (la pregunta de los marcadores se puede desactivar en los ajustes), y cada uno de estos ficheros tiene un límite de tamaño. Las macros que ejecuta son líneas de G-code por las que pregunta antes, y la cola que vuelve nunca empieza sola. No es un sistema de seguridad. Véase [SECURITY.md](SECURITY.md).

@@ -156,6 +156,12 @@ Come si incastrano le parti: chi lo userà, cosa contiene questo repository e su
 
 <p align="center"><em>La sezione del cambio utensile nella finestra delle impostazioni.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-08-about-paper.png" alt="La finestra Informazioni con il tema chiaro Carta" width="100%">
+</p>
+
+<p align="center"><em>La finestra Informazioni con il tema chiaro Carta: la versione, l'autore e i collegamenti del programma.</em></p>
+
 ## 🔒 Sicurezza e protezione
 
 Questo programma apre una porta seriale solo se avviato per GRBL, grblHAL o Marlin (`--grbl`, `--grblhal` o `--marlin`, una compilazione con `--features serial`), una connessione HTTP non cifrata verso Moonraker solo se avviato con `--klipper` (solo la rete locale, a meno che `klipper.allow_non_local` sia attivo; la credenziale, se c'è, è letta dal file di movimento, inviata in un'intestazione e mai stampata) e una connessione di rete verso il server EH3D il cui indirizzo è nelle impostazioni solo quando l'operatore gli invia un programma; il token è conservato come testo nel file delle impostazioni. Non apre file di altre persone, salvo il file G-code e la mappa delle altezze che sceglie l'operatore (letti come testo, mai eseguiti da soli) e i propri file accanto alle impostazioni (le macro, la coda conservata tra le esecuzioni, la riga raggiunta da un programma); scrive un file solo dove l'operatore lo dice (il programma, la mappa delle altezze, il registro esportato) e non scrive mai il registro sopra un file. La tabella dei posti del cambio utensile, la tabella utensili, la libreria dei materiali e i segnalibri vengono letti dove stanno le impostazioni (o il programma) e scritti solo dai loro pulsanti: la tabella di esempio e la libreria di esempio mai sopra un file esistente, la libreria e i segnalibri dopo una domanda quando il file esiste già (la domanda sui segnalibri si può disattivare nelle impostazioni), e ognuno di questi file ha un limite di dimensione. Le macro che esegue sono righe di G-code su cui chiede prima, e la coda che torna non parte mai da sola. Non è un sistema di sicurezza. Vedi [SECURITY.md](SECURITY.md).

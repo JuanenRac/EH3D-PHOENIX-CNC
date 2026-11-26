@@ -156,6 +156,12 @@ Como as partes se encaixam: quem o vai usar, o que este repositório contém e e
 
 <p align="center"><em>A secção do trocador de ferramentas na janela de definições.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-08-about-paper.png" alt="A janela Acerca de com o tema claro Papel" width="100%">
+</p>
+
+<p align="center"><em>A janela Acerca de com o tema claro Papel: a versão, o autor e as ligações do programa.</em></p>
+
 ## 🔒 Segurança e proteção
 
 Este programa só abre uma porta série quando é arrancado para GRBL, grblHAL ou Marlin (`--grbl`, `--grblhal` ou `--marlin`, uma compilação com `--features serial`), só abre uma ligação HTTP sem cifra ao Moonraker quando é arrancado com `--klipper` (só a rede local, a menos que `klipper.allow_non_local` esteja ativado; a credencial, se existir, é lida do ficheiro de movimento, enviada num cabeçalho e nunca impressa) e só abre uma ligação de rede ao servidor EH3D cujo endereço está nas definições quando o operador lhe envia um programa; o token fica guardado como texto no ficheiro de definições. Não abre ficheiros de outras pessoas, exceto o ficheiro G-code e o mapa de alturas que o operador escolhe (lidos como texto, nunca executados por si) e os seus próprios ficheiros junto às definições (as macros, a fila guardada entre execuções, a linha que um programa tinha alcançado); só escreve um ficheiro onde o operador o diz (o programa, o mapa de alturas, o registo exportado) e nunca escreve o registo por cima de um ficheiro. A tabela de posições do trocador de ferramentas, a tabela de ferramentas, a biblioteca de materiais e os marcadores são lidos de onde estão as definições (ou o programa) e só são escritos pelos seus próprios botões: a tabela de exemplo e a biblioteca de exemplo nunca por cima de um ficheiro existente, e a biblioteca e os marcadores depois de uma pergunta quando o ficheiro já existe (a pergunta dos marcadores pode ser desativada nas definições), e cada um destes ficheiros tem um limite de tamanho. As macros que executa são linhas de G-code sobre as quais pergunta antes, e a fila que volta nunca arranca sozinha. Não é um sistema de segurança. Ver [SECURITY.md](SECURITY.md).

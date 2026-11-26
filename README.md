@@ -156,6 +156,12 @@ How the parts fit together: who will use it, what this repository holds and what
 
 <p align="center"><em>The section of the tool changer in the settings window.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-08-about-paper.png" alt="The About window on the light Paper theme" width="100%">
+</p>
+
+<p align="center"><em>The About window on the light Paper theme: the version, the author and the links of the program.</em></p>
+
 ## 🔒 Security & Safety
 
 This program opens a serial port only when it is started for GRBL, grblHAL or Marlin (`--grbl`, `--grblhal` or `--marlin`, a build with `--features serial`), a plain HTTP connection to Moonraker only when it is started with `--klipper` (the local network only unless `klipper.allow_non_local` is on; the credential, if there is one, is read from the motion file, sent in a header and never printed), and a network connection to the EH3D server whose address is in its settings only when the operator sends a program to it; the token is kept as text in the settings file. It opens no file of other people except the G-code file and the height map the operator chooses (read as text, never run by itself) and its own files next to the settings (the macros, the queue kept between runs, the line a program had reached); it writes a file only where the operator says (the program, the height map, the exported log) and never writes the log over a file. The table of slots of the tool changer, the table of tools, the library of materials and the bookmarks are read from where the settings (or the program) are and written only by their own buttons: the example table and the example library never over a file that is there, the library and the bookmarks after a question when the file is there already (the question about the bookmarks can be turned off in the settings), and every one of these files has a size limit. The macros it runs are lines of G-code that it asks about first, and the queue that comes back never starts by itself. It is not a safety system. See [SECURITY.md](SECURITY.md).
