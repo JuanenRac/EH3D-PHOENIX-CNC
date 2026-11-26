@@ -32,7 +32,7 @@ impl Shell {
         let (lang, recent) = (app.lang, app.settings.recent.clone());
         let app = Rc::new(RefCell::new(app));
         let mut dock = Dock::new(panels::defs(), panels::workspaces());
-        let draw: [(&str, PanelDraw); 12] = [
+        let draw: [(&str, PanelDraw); 13] = [
             (pid::VIEWER, App::panel_viewer),
             (pid::JOG, App::panel_jog),
             (pid::POSITION, App::panel_position),
@@ -45,6 +45,7 @@ impl Shell {
             (pid::PLAN, App::panel_plan),
             (pid::REPORT, App::panel_report),
             (pid::CONSOLE, App::panel_console),
+            (pid::ATTACHMENTS, App::panel_attachments),
         ];
         for (name, f) in draw {
             let a = app.clone();

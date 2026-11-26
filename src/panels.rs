@@ -5,7 +5,7 @@
 
 use eh3d_dock::core::PanelDef;
 use eh3d_dock::geom::Side;
-use eh3d_dock::menu::{Entry, Item, Label, Menu, MenuBar, StdAction};
+use eh3d_dock::menu::{DockAction, Entry, Item, Label, Menu, MenuBar, StdAction};
 use eh3d_dock::model::{Layout, Node};
 use eh3d_dock::sectors::{titles, Sector};
 use eh3d_dock::stdmenus::{edit_menu, file_menu, help_menu, view_menu, window_menu, HelpOptions};
@@ -44,10 +44,24 @@ pub mod id {
     /// The commands typed by the operator and the log.
     pub const CONSOLE: &str = "console";
 
+    /// The attachments of the project of the suite: data sheets, manuals and other files, with their viewer.
+    pub const ATTACHMENTS: &str = eh3d_attachpanel::PANEL_ID;
+
     /// Every panel, in the order of the View menu.
-    pub const ALL: [&str; 12] = [
-        VIEWER, JOG, POSITION, JOB, FILES, TOOL_TABLE, TOOLSETTER, PROBE, IMPORT, PLAN, REPORT,
+    pub const ALL: [&str; 13] = [
+        VIEWER,
+        JOG,
+        POSITION,
+        JOB,
+        FILES,
+        TOOL_TABLE,
+        TOOLSETTER,
+        PROBE,
+        IMPORT,
+        PLAN,
+        REPORT,
         CONSOLE,
+        ATTACHMENTS,
     ];
 }
 
@@ -135,6 +149,7 @@ pub fn defs() -> Vec<PanelDef> {
             .icon("R")
             .min(240.0, 140.0),
     );
+    v.push(eh3d_attachpanel::panel_def());
     // the order of the View menu
     let order = |p: &PanelDef| {
         id::ALL
@@ -161,7 +176,13 @@ pub fn workspaces() -> Vec<Workspace> {
             WS_PREPARE,
             Node::row(
                 0.22,
-                t(&[id::FILES, id::IMPORT, id::TOOL_TABLE, id::TOOLSETTER]),
+                t(&[
+                    id::FILES,
+                    id::IMPORT,
+                    id::TOOL_TABLE,
+                    id::TOOLSETTER,
+                    id::ATTACHMENTS,
+                ]),
                 Node::row(
                     0.7,
                     Node::column(0.74, t(&[id::VIEWER]), t(&[id::CONSOLE])),
@@ -349,6 +370,11 @@ fn suite_menu() -> Menu<Cmd> {
             "file.suite.branches",
             S::MenuBranches,
             Cmd::SuiteBranches,
+        ))
+        .entry(Entry::dock(
+            "file.suite.attachments",
+            Label::Own(eh3d_attachpanel::panel_title()),
+            DockAction::ShowPanel(id::ATTACHMENTS.to_string()),
         ))
 }
 
@@ -747,7 +773,7 @@ mod tests {
     #[test]
     fn the_panels_have_names_that_hold_and_titles_in_the_eight_languages() {
         let d = defs();
-        assert_eq!(d.len(), 12);
+        assert_eq!(d.len(), 13);
         let names: Vec<&str> = d.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(names, id::ALL.to_vec());
         for p in &d {
@@ -867,6 +893,7 @@ mod tests {
             "file.suite.take",
             "file.suite.extract",
             "file.suite.branches",
+            "file.suite.attachments",
             "program.lookahead",
             "program.post",
             "machine.toolsetter",

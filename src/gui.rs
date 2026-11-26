@@ -10,6 +10,7 @@ use eframe::egui::{
     self, Align2, Color32, FontData, FontDefinitions, FontFamily, Pos2, Rect, RichText, Stroke,
     StrokeKind, Vec2,
 };
+use eh3d_attachpanel::{AttachPanel, Program};
 use eh3d_controller::sim::SimController;
 use eh3d_controller::{Family, State};
 use eh3d_view::texts::{tr, Lang, Text};
@@ -254,6 +255,8 @@ pub struct App {
     recent_added: Vec<String>,
     /// The project file of the suite (`.eh3d`) the window works on.
     suite: suite::SuiteState,
+    /// The panel of the attachments of that project.
+    attachments: AttachPanel,
     /// The state of the panels of the import, the time and the tool setter.
     import_ui: dockpanels::ImportUi,
     plan_ui: Option<crate::workflow::TimeCompare>,
@@ -370,6 +373,10 @@ impl App {
             pending_dock: Vec::new(),
             recent_added: Vec::new(),
             suite: suite::SuiteState::default(),
+            attachments: AttachPanel::new(Program::new(
+                crate::eh3dfile::BRANCH,
+                env!("CARGO_PKG_VERSION"),
+            )),
             import_ui: dockpanels::ImportUi::default(),
             plan_ui: None,
             setter_ui: dockpanels::SetterUi::default(),
