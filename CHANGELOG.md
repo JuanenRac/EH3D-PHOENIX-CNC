@@ -4,7 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-- **The shared repository is taken at its tag v0.3.4 and the pictures of the window are new:** the workflows, the Rust checks included, build against the tag v0.3.4 of EH3D-COMMON and the tag v0.1.3 of EH3D-CORE-LIBS; a manual workflow (Window pictures) takes the pictures of the README.
+- **What the tag v0.3.6 of EH3D-COMMON brings to the window:** tabs that do not fit go to further rows with their whole name, the window About reads on light themes, and saving a project keeps the compressed bytes of what did not change and checks the new file before it replaces the old one.
+- **Words that stand out are read on the light themes:** the headings and other emphasised words took the white of the dark controls on the light themes; they now take the text colour of the theme, and a test holds their contrast on every theme.
+- **The shared repository is taken at its tag v0.3.6 and the pictures of the window are new:** the workflows, the Rust checks included, build against the tag v0.3.6 of EH3D-COMMON and the tag v0.1.3 of EH3D-CORE-LIBS; a manual workflow (Window pictures) takes the pictures of the README.
 - **The documents say the languages the window has:** eight, those of the shared view, not 37.
 - **The panel «Attachments» reads its limits and takes dropped files:** `attachments.max_mb` and `viewer.max_*_mb` are read from the settings file and kept when it is written, a file can be dropped on the panel while the files the window opens are still opened, and the SHA-256 of a large file no longer stops the window.
 - **The register of requirements and the status page name the panel of the attachments.**

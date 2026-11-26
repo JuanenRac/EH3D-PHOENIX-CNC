@@ -12,7 +12,7 @@ The menu File of the window opens, saves, imports, takes and extracts an `.eh3d`
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 154 requirements: 145 implemented, 2 prototype, 7 planned and 0 validated. By progress: 145 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 155 requirements: 146 implemented, 2 prototype, 7 planned and 0 validated. By progress: 146 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
@@ -22,13 +22,13 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 
 ## What it needs from other repositories
 
-* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.4.
+* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.6.
 * EH3D-CORE-LIBS: the readers of Gerber and Excellon files.
 * A real machine with GRBL, grblHAL, Marlin or Klipper, a probe, a tool setter and a changer, for the proofs that no simulator can give.
 
 ## Known technical debt and omitted tests
 
-* 1212 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
+* 1213 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
 * No test has driven a real controller: the serial port is built behind a feature and has never been opened on a machine.
 * The look of the window has been seen on a computer by its pictures only; no operator has used it at a machine.
 * The look-ahead and the time estimates are checked for consistency, never against the time a real machine takes.
