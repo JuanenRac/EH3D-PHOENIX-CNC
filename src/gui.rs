@@ -70,7 +70,12 @@ fn apply_visuals(ctx: &egui::Context, t: &Theme) {
 }
 
 fn visuals_of(t: &Theme) -> egui::Visuals {
-    let mut v = egui::Visuals::dark();
+    // what is not set here (the title bar of a window, the bars of the tabs, the lines) comes from the base of the same lightness
+    let mut v = if t.is_light() {
+        egui::Visuals::light()
+    } else {
+        egui::Visuals::dark()
+    };
     let (panel, raised, text, accent) = (
         col(t.panel),
         col(t.panel_raised),
@@ -1223,7 +1228,14 @@ mod visuals_tests {
         for t in themes {
             let v = visuals_of(&t);
             assert_eq!(v.strong_text_color(), col(t.text), "{:?}", t.id);
-            for ground in [v.panel_fill, v.window_fill, v.extreme_bg_color] {
+            // the last two are the title bar of a window and the bar of the tabs
+            for ground in [
+                v.panel_fill,
+                v.window_fill,
+                v.extreme_bg_color,
+                v.widgets.open.weak_bg_fill,
+                v.widgets.noninteractive.bg_fill,
+            ] {
                 let ratio = contrast(v.strong_text_color(), ground);
                 assert!(ratio >= 4.5, "{:?}: {ratio} on {ground:?}", t.id);
             }
