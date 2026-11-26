@@ -66,7 +66,16 @@ fn alpha(c: Color32, a: u8) -> Color32 {
 
 /// The colours of egui made from the theme.
 fn apply_visuals(ctx: &egui::Context, t: &Theme) {
-    let mut v = egui::Visuals::dark();
+    ctx.set_visuals(visuals_of(t));
+}
+
+fn visuals_of(t: &Theme) -> egui::Visuals {
+    // what is not set here (the title bar of a window, the bars of the tabs, the lines) comes from the base of the same lightness
+    let mut v = if t.is_light() {
+        egui::Visuals::light()
+    } else {
+        egui::Visuals::dark()
+    };
     let (panel, raised, text, accent) = (
         col(t.panel),
         col(t.panel_raised),
@@ -93,7 +102,9 @@ fn apply_visuals(ctx: &egui::Context, t: &Theme) {
     v.widgets.hovered.weak_bg_fill = alpha(accent, 50);
     v.widgets.active.bg_stroke = Stroke::new(2.0, accent);
     v.widgets.active.weak_bg_fill = alpha(accent, 110);
-    ctx.set_visuals(v);
+    // words that stand out (`strong()`) do not take `override_text_color`: egui draws them in this colour
+    v.widgets.active.fg_stroke.color = text;
+    v
 }
 
 fn install_fonts(ctx: &egui::Context) {
@@ -1186,4 +1197,48 @@ pub fn run(o: &Options) -> eframe::Result {
             Ok(Box::new(shell))
         }),
     )
+}
+
+#[cfg(test)]
+mod visuals_tests {
+    use super::*;
+
+    fn luminance(c: Color32) -> f32 {
+        let f = |v: u8| {
+            let v = f32::from(v) / 255.0;
+            if v <= 0.040_45 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * f(c.r()) + 0.7152 * f(c.g()) + 0.0722 * f(c.b())
+    }
+
+    fn contrast(a: Color32, b: Color32) -> f32 {
+        let (a, b) = (luminance(a), luminance(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    #[test]
+    fn the_words_that_stand_out_are_read_on_every_theme() {
+        let mut themes: Vec<Theme> = ThemeId::ALL.into_iter().map(Theme::for_id).collect();
+        themes.push(Theme::from_system_values(true, None));
+        themes.push(Theme::from_system_values(false, None));
+        for t in themes {
+            let v = visuals_of(&t);
+            assert_eq!(v.strong_text_color(), col(t.text), "{:?}", t.id);
+            // the last two are the title bar of a window and the bar of the tabs
+            for ground in [
+                v.panel_fill,
+                v.window_fill,
+                v.extreme_bg_color,
+                v.widgets.open.weak_bg_fill,
+                v.widgets.noninteractive.bg_fill,
+            ] {
+                let ratio = contrast(v.strong_text_color(), ground);
+                assert!(ratio >= 4.5, "{:?}: {ratio} on {ground:?}", t.id);
+            }
+        }
+    }
 }

@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1212-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1213-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch, in der Draufsicht oder in 3D, mit den erledigten Zeilen markiert, und hält an, was die Steuerung ablehnt. Darüber hinaus prüft, misst und bereitet es Programme vor (Bögen, Festzyklen, Fräserradiuskorrektur, Sperrbereiche, einen Taster, eine Höhenkarte, einen Werkzeugwechsler, eine Werkzeugtabelle und eine Materialtabelle), importiert Zeichnungen und die Gerber- und Excellon-Dateien von Platinen und sendet ein Programm an den EH3D-Server. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) wird für GRBL, grblHAL, Marlin und Klipper gegen Simulatoren ihrer Dialekte auf simulierten Kabeln angesteuert; die übrigen aufgeführten Familien werden nicht angesteuert. 1212 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**: eine serielle Schnittstelle wird nur für GRBL, grblHAL oder Marlin geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird oder Klipper mit `--klipper` erreicht wird. Die simulierten Maschinen nehmen nur gerade Bewegungen an und lehnen Bögen, Festzyklen und Tasten ab; diese werden daher auf dem Papier gemessen, geprüft und zeitlich berechnet, die gezeichnete Bahn zeigt einen Bogen als seine Sehne, und ein Programm, das sie enthält, hält im Simulator an dieser Zeile an. Das Fenster trägt elf Themen und bietet acht Sprachen an, die der gemeinsamen Ansicht von EH3D-COMMON: seine Wörter gibt es auf Englisch, Spanisch, Deutsch, Französisch, Italienisch, Japanisch, Chinesisch und europäischem Portugiesisch.
+**Ehrlichkeitscheck - was heute tatsächlich läuft:** ein Rust-Programm mit einem Fenster (`phoenix-cnc`), das eine **simulierte** Maschine steuert: es zeigt die Position der Maschine (Werkstück und Maschine), fährt sie von Hand mit einem Jog-Feld, setzt den Nullpunkt, fährt die Referenz an, nimmt die vom Bediener getippten Befehle an, führt ein G-Code-Programm Zeile für Zeile aus (mit Pause, Stopp und Not-Halt), zeichnet die Bahn des Programms auf den Tisch, in der Draufsicht oder in 3D, mit den erledigten Zeilen markiert, und hält an, was die Steuerung ablehnt. Darüber hinaus prüft, misst und bereitet es Programme vor (Bögen, Festzyklen, Fräserradiuskorrektur, Sperrbereiche, einen Taster, eine Höhenkarte, einen Werkzeugwechsler, eine Werkzeugtabelle und eine Materialtabelle), importiert Zeichnungen und die Gerber- und Excellon-Dateien von Platinen und sendet ein Programm an den EH3D-Server. Die Steuerungsschnittstelle (`eh3d-controller`, in EH3D-COMMON) wird für GRBL, grblHAL, Marlin und Klipper gegen Simulatoren ihrer Dialekte auf simulierten Kabeln angesteuert; die übrigen aufgeführten Familien werden nicht angesteuert. 1213 Tests laufen auf einem Rechner. **Nichts davon lief auf einer echten Maschine**: eine serielle Schnittstelle wird nur für GRBL, grblHAL oder Marlin geöffnet und eine Netzverbindung nur, wenn ein Programm an den Server gesendet wird oder Klipper mit `--klipper` erreicht wird. Die simulierten Maschinen nehmen nur gerade Bewegungen an und lehnen Bögen, Festzyklen und Tasten ab; diese werden daher auf dem Papier gemessen, geprüft und zeitlich berechnet, die gezeichnete Bahn zeigt einen Bogen als seine Sehne, und ein Programm, das sie enthält, hält im Simulator an dieser Zeile an. Das Fenster trägt elf Themen und bietet acht Sprachen an, die der gemeinsamen Ansicht von EH3D-COMMON: seine Wörter gibt es auf Englisch, Spanisch, Deutsch, Französisch, Italienisch, Japanisch, Chinesisch und europäischem Portugiesisch.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.2.3` |
 | Reifegrad | Funktionsfähig |
-| Tests | 1212 |
+| Tests | 1213 |
 | Technologie-Stack | Rust |
 | Auf echter Hardware | Nein: standardmäßig steuert es eine simulierte Maschine; eine echte GRBL-Steuerung (`--grbl`) wurde nie erprobt |
 
@@ -47,7 +47,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel zeigt, wie weit er heu
 | Basis-Bibliothek | 🟡 | Ein Rust-Crate, das `scene`, `texts` und `theme` aus `eh3d-view` unter dem Namen dieses Programms erneut exportiert; es braucht den Ordner von EH3D-COMMON daneben. |
 | Szene und Ansichten | 🟡 | In EH3D-COMMON geschrieben und getestet; das Fenster dieses Programms zeichnet die Bahn eines Programms auf den Tisch und die Position des Werkzeugs (auf einem Rechner gesehen). |
 | Themen und Texte | 🟡 | Elf Themen und die Wörter der Oberfläche: das Fenster bietet die acht Sprachen der gemeinsamen Ansicht an, und die Wörter der eigenen Felder und Werkzeuge dieses Programms gibt es in denselben acht; im Fenster dieses Programms gesehen. |
-| Tests | 🟡 | 1212 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
+| Tests | 🟡 | 1213 Tests bestehen auf einem Rechner (`cargo test --features gui`): die Sitzung (Jog, Nullpunkt, Referenz, ein Programm, Pause, Alarm, Not-Halt), die Bahn eines Programms und die Befehlszeile; die simulierte Steuerung wird in EH3D-COMMON getestet. |
 | Fenster und Jog | 🟡 | Läuft auf einem Rechner mit der simulierten Steuerung: Position, Jog-Feld, Schritte, Vorschub, Referenz, Nullpunkt, Entsperren, eine Befehlszeile und ein Protokoll; keine echte Maschine. |
 | Maschinensteuerung | 🟠 | Nur Simulatoren: ein Programm läuft Zeile für Zeile mit Pause, Stopp und Not-Halt auf der simulierten Maschine oder auf einem simulierten GRBL, grblHAL, Marlin oder Klipper; die serielle Schnittstelle für GRBL, grblHAL und Marlin liegt hinter einem Build-Feature, die HTTP-Verbindung von Klipper ist nur einem Ersatz-Moonraker begegnet, und es wurde keine echte Steuerung angeschlossen. |
 | Dokumentation | 🟡 | README in acht Sprachen, die beiden Bilder, drei Beispielprogramme und das Changelog. |
@@ -156,6 +156,12 @@ Wie die Teile zusammenpassen: wer es nutzen wird, was dieses Repository enthält
 
 <p align="center"><em>Der Abschnitt des Werkzeugwechslers im Einstellungsfenster.</em></p>
 
+<p align="center">
+  <img src="images/screens/phoenix-cnc-08-about-paper.png" alt="Das Info-Fenster im hellen Design Papier" width="100%">
+</p>
+
+<p align="center"><em>Das Info-Fenster im hellen Design Papier: Version, Autor und Links des Programms.</em></p>
+
 ## 🔒 Sicherheit und Schutz
 
 Dieses Programm öffnet eine serielle Schnittstelle nur, wenn es für GRBL, grblHAL oder Marlin gestartet wird (`--grbl`, `--grblhal` oder `--marlin`, ein Build mit `--features serial`), eine unverschlüsselte HTTP-Verbindung zu Moonraker nur, wenn es mit `--klipper` gestartet wird (nur das lokale Netz, es sei denn, `klipper.allow_non_local` ist eingeschaltet; die Zugangsdaten werden, falls vorhanden, aus der Bewegungsdatei gelesen, in einem Header gesendet und nie ausgegeben), und eine Netzverbindung zum EH3D-Server, dessen Adresse in den Einstellungen steht, nur, wenn der Bediener ihm ein Programm sendet; das Token liegt als Text in der Einstellungsdatei. Es öffnet keine Dateien anderer Personen außer der G-Code-Datei und der Höhenkarte, die der Bediener wählt (als Text gelesen, nie von selbst ausgeführt), und seinen eigenen Dateien neben den Einstellungen (die Makros, die zwischen den Läufen gehaltene Warteschlange, die Zeile, die ein Programm erreicht hatte); es schreibt eine Datei nur dort, wo der Bediener es sagt (das Programm, die Höhenkarte, das exportierte Protokoll), und schreibt das Protokoll nie über eine Datei. Die Platztabelle des Werkzeugwechslers, die Werkzeugtabelle, die Materialbibliothek und die Lesezeichen werden dort gelesen, wo die Einstellungen (oder das Programm) liegen, und nur von ihren eigenen Schaltflächen geschrieben: die Beispieltabelle und die Beispielbibliothek nie über eine vorhandene Datei, die Bibliothek und die Lesezeichen nach einer Rückfrage, wenn die Datei schon da ist (die Rückfrage zu den Lesezeichen lässt sich in den Einstellungen abschalten), und jede dieser Dateien hat eine Größenbegrenzung. Die Makros, die es ausführt, sind G-Code-Zeilen, nach denen es vorher fragt, und die zurückkehrende Warteschlange startet nie von selbst. Es ist kein Sicherheitssystem. Siehe [SECURITY.md](SECURITY.md).
@@ -177,7 +183,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Tests
 
-`cargo test --features gui` führt 1212 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
+`cargo test --features gui` führt 1213 Tests aus: die Sitzung (Jog und Nullpunkt, ein Programm Zeile für Zeile, Pause und Weiter, eine abgelehnte Zeile, der Not-Halt und der Alarm, das Protokoll der Befehle, die Referenz), die Bahn eines Programms und die Befehlszeile; die Ansicht und die simulierte Steuerung werden in EH3D-COMMON getestet. Die CI führt außerdem `cargo fmt --check` und `cargo clippy` mit Warnungen als Fehlern aus, und `python -I tools/ci_validate.py` prüft Manifest, Versionen, Changelog und die acht READMEs.
 
 ## 🏗️ Build und Veröffentlichung
 

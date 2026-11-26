@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 154 requirements: 145 implemented, 2 prototype, 7 planned and 0 validated. By progress: 145 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 155 requirements: 146 implemented, 2 prototype, 7 planned and 0 validated. By progress: 146 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -218,3 +218,4 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-152 | The window has the panel of the attachments of the project, and it is shown and drawn like every other panel. | implemented | done | host-test | `src/gui/shell::every_panel_can_be_shown_and_drawn_in_turn` | - |
 | PCNC-153 | The limits of the panel of the attachments are read from the settings file, kept when it is written and given to the panel. | implemented | done | host-test | `src/settings::the_lines_of_the_limits_of_the_attachments_are_kept_and_give_the_limits` | - |
 | PCNC-154 | A file dropped on the panel of the attachments is attached there, and the files the window opens are left to the window. | implemented | done | host-test | `src/gui/dialogs::the_files_the_window_opens_are_told_apart_from_the_ones_of_the_attachments` | The drop itself is tested in EH3D-COMMON with made-up events, not on a desktop. |
+| PCNC-155 | The emphasised words of the window take the text colour of the theme, and words are readable on the panels, the title bars and the tab bars of every theme, light or dark. | implemented | done | host-test | `src/gui::the_words_that_stand_out_are_read_on_every_theme` | The colours are checked as numbers, not by a person on a screen. |
