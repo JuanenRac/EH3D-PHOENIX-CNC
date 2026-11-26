@@ -1,6 +1,8 @@
 //! The menu bar, the settings window, the Open and Save windows (made over `eh3d-filedialog`, the same state every program of the suite
 //! uses), the editor of the program and the About window.
 
+use eh3d_dock::about::{AboutBrand, Phoenix};
+use eh3d_dock::gui::about_contents;
 use eh3d_filedialog::{
     date_text, size_text, Action, Browser, Chosen, Filter, Mode, PlaceKind, Problem,
 };
@@ -319,19 +321,9 @@ impl App {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                if let Some(logo) = about_logo(ctx) {
-                    ui.add(egui::Image::new(&logo).fit_to_exact_size(Vec2::splat(72.0)));
-                }
-                ui.heading(RichText::new("EH3D-PHOENIX-CNC").color(col(self.theme.accent)));
-                ui.label(format!(
-                    "{} {}",
-                    self.t(Text::Version),
-                    env!("CARGO_PKG_VERSION")
-                ));
-                ui.label(format!("{}: GPL-3.0-or-later", self.t(Text::Licence)));
-                ui.add_space(6.0);
-                ui.label(self.t(Text::McAboutBody));
-                ui.hyperlink("https://github.com/JuanenRac/EH3D-PHOENIX-CNC");
+                let mut info = Phoenix::Cnc.info(env!("CARGO_PKG_VERSION"));
+                info.extra.push(self.t(Text::McAboutBody).to_string());
+                about_contents(ui, self.lang, &info, &about_brand());
             });
         open.then_some(Win::About)
     }
@@ -1018,20 +1010,12 @@ pub(super) fn lang_name(l: Lang) -> &'static str {
     l.native_name()
 }
 
-/// The icon of the program as a texture for the About window; it is made once and kept in the context.
-fn about_logo(ctx: &egui::Context) -> Option<egui::TextureHandle> {
-    let id = egui::Id::unique("about-logo");
-    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
-        return Some(t);
+/// The look of the About window: which program this is and its own picture, drawn in a ring of its colour.
+fn about_brand() -> AboutBrand {
+    AboutBrand {
+        program: Phoenix::Cnc,
+        logo_png: super::ICON_PNG,
     }
-    let icon = super::decode_icon()?;
-    let image = egui::ColorImage::from_rgba_unmultiplied(
-        [icon.width as usize, icon.height as usize],
-        &icon.rgba,
-    );
-    let texture = ctx.load_texture("about-logo", image, egui::TextureOptions::LINEAR);
-    ctx.data_mut(|d| d.insert_temp(id, texture.clone()));
-    Some(texture)
 }
 
 #[cfg(test)]
@@ -1108,6 +1092,25 @@ mod tests {
             a.win = None;
             a.open_window(name);
             assert!(a.win.is_some(), "{name} did not open");
+        }
+    }
+
+    #[test]
+    fn the_window_about_has_the_name_the_picture_and_draws_in_every_language() {
+        let brand = about_brand();
+        assert_eq!(brand.program.name(), "EH3D-PHOENIX-CNC");
+        assert_eq!(brand.logo_png.get(1..4), Some(&b"PNG"[..]));
+        let mut a = app();
+        let ctx = egui::Context::default();
+        for lang in Lang::ALL {
+            a.lang = lang;
+            a.open_window("about");
+            let mut kept = None;
+            let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                kept = a.about_window(ui.ctx());
+            });
+            out.drop_without_applying_deltas();
+            assert!(matches!(kept, Some(Win::About)), "{lang:?}");
         }
     }
 
