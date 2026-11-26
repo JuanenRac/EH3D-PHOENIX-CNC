@@ -317,6 +317,7 @@ impl App {
         if settings.read_controller_travel {
             session.read_controller_travel();
         }
+        let panel_limits = settings.panel_limits();
         let mut app = App {
             session,
             lang: settings.lang,
@@ -386,6 +387,7 @@ impl App {
                 done: Arc::new(AtomicBool::new(false)),
             }),
         };
+        app.attachments.set_limits(panel_limits);
         if let Some(f) = &o.file {
             if o.more.is_empty() {
                 app.open(f);
@@ -1068,14 +1070,8 @@ impl App {
         if self.start_at == Some(self.frame) && !self.start_refused() {
             self.session.start();
         }
-        let dropped: Vec<PathBuf> = ctx.input(|i| {
-            i.raw
-                .dropped_files
-                .iter()
-                .map(|f| f.path().to_path_buf())
-                .filter(|p| !p.as_os_str().is_empty())
-                .collect()
-        });
+        // a file dropped on the panel of the attachments is attached there
+        let dropped = self.attachments.take_drop(&ctx, dialogs::opens_file);
         // several files dropped together are a queue
         self.start_queue(dropped);
         // the lines go out by a thread of their own: the window only hands them over and looks at what was done
