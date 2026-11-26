@@ -58,13 +58,18 @@ jobs:
           touch -d "2026-01-01 12:00:00 UTC" examples/*
           shot() {
             local name="$1"; shift
-            rm -rf /tmp/pictures && mkdir -p /tmp/pictures/home /tmp/pictures/config
+            rm -rf /tmp/pictures && mkdir -p /tmp/pictures/home /tmp/pictures/config/eh3d
+            # the workspace Run of the window: the state of the machine and the hand control beside the path
+            printf '%s\n' 'dock.version = 1' 'dock.current = 0' 'dock.ws.0.name = Run' \
+              'dock.ws.0.tree = H240(V500(T0(position),T0(jog)),H700(V740(T0(viewer),T0(console)),T0(job,files)))' \
+              > /tmp/pictures/config/eh3d/phoenix-cnc.cfg
             HOME=/tmp/pictures/home XDG_CONFIG_HOME=/tmp/pictures/config xvfb-run -a -s "-screen 0 1920x1080x24" timeout 180 "$exe" "$@" --shot "$out/phoenix-cnc-$name.png"
             test -s "$out/phoenix-cnc-$name.png"
           }
           shot 01-running --lang en --theme forge examples/02_frame_and_pocket.nc --start --wait 14
+          for wait in 2 4 6 9; do shot "01-running-$wait" --lang en --theme forge examples/02_frame_and_pocket.nc --start --wait "$wait"; done
           shot 02-midnight --lang en --theme midnight examples/03_spiral.nc --start --wait 600
-          shot 03-german-light --lang de --theme paper examples/02_frame_and_pocket.nc --start --window about --wait 120
+          shot 03-german-light --lang de --theme paper examples/02_frame_and_pocket.nc --start --wait 120
           shot 04-settings --lang en --theme forge examples/01_square.nc --window settings --wait 20
           shot 05-open --lang en --theme forge examples/01_square.nc --window open --wait 20
           shot 06-machine --lang en --theme forge examples/02_frame_and_pocket.nc --window machine --wait 20
