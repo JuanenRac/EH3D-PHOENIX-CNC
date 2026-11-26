@@ -3,6 +3,7 @@
 //! This program writes only `cnc/`. What it takes from another branch is a copy with a reference that remembers the content hash and the format of its source, so that a later change
 //! of the source is told as out of date. Every other branch, known or not, keeps its bytes. Nothing in a project is run and nothing here moves a machine.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use eh3d_project::appbranch::{
@@ -10,6 +11,7 @@ use eh3d_project::appbranch::{
     Conversion, Notice,
 };
 use eh3d_project::meta::ConversionReport;
+use eh3d_project::Project;
 
 use crate::import::{self, Format};
 use crate::motioncfg::{ImportCfg, MotionCfg};
@@ -62,6 +64,40 @@ pub struct Opened {
     pub warnings: Vec<String>,
     /// The files written out, when the branch was taken out.
     pub written: Option<usize>,
+    /// The bytes of every file of the branch, by its name inside it.
+    pub files: BTreeMap<String, Vec<u8>>,
+}
+
+/// A file on its way into the branch: the name it is told by and its bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Held {
+    /// The name of the file, or the path it was read from.
+    pub name: String,
+    /// What it holds.
+    pub bytes: Vec<u8>,
+}
+
+/// What [`save_contents`] puts into the branch: only what is there replaces what the branch holds.
+#[derive(Debug, Default, Clone)]
+pub struct Contents {
+    /// The G-code program, under the name of its file.
+    pub program: Option<Held>,
+    /// The drawing, under the name of its file.
+    pub drawing: Option<Held>,
+    /// The table of tools.
+    pub tools: Option<Held>,
+    /// The motion file.
+    pub motion: Option<Held>,
+}
+
+impl Contents {
+    /// Whether there is nothing to put.
+    pub fn is_empty(&self) -> bool {
+        self.program.is_none()
+            && self.drawing.is_none()
+            && self.tools.is_none()
+            && self.motion.is_none()
+    }
 }
 
 fn describe(e: BranchError) -> String {
@@ -72,7 +108,7 @@ fn said(notices: Vec<Notice>) -> Vec<String> {
     notices.iter().map(ToString::to_string).collect()
 }
 
-fn is_program(name: &str) -> bool {
+pub(crate) fn is_program(name: &str) -> bool {
     matches!(
         extension_of(name).as_str(),
         "nc" | "ngc" | "gcode" | "gco" | "tap" | "cnc"
@@ -131,60 +167,78 @@ pub fn motion_of(path: Option<&str>) -> Result<MotionCfg, String> {
 
 /// Puts the work of the machine into the branch `cnc/` of the project at `path`, creating the project when it is not there. What is not given stays as it was.
 pub fn save(path: &Path, inputs: &Inputs, identity: &Identity) -> Result<Vec<String>, String> {
-    if inputs.program.is_none()
-        && inputs.drawing.is_none()
-        && inputs.tools.is_none()
-        && inputs.motion.is_none()
-    {
+    // a motion file with mistakes is refused before the other files are read
+    let motion = motion_of(inputs.motion.as_deref())?;
+    let held = |file: &String, name: String, limit: u64| -> Result<Held, String> {
+        let bytes = read_bounded(Path::new(file), limit).map_err(describe)?;
+        Ok(Held { name, bytes })
+    };
+    let named = |file: &String| file_name(Path::new(file)).map_err(describe);
+    let small = crate::motioncfg::MAX_FILE_BYTES;
+    let contents = Contents {
+        program: match &inputs.program {
+            Some(file) => Some(held(file, named(file)?, MAX_PROGRAM_BYTES)?),
+            None => None,
+        },
+        drawing: match &inputs.drawing {
+            Some(file) => Some(held(file, named(file)?, motion.import.max_bytes)?),
+            None => None,
+        },
+        tools: match &inputs.tools {
+            Some(file) => Some(held(file, file.clone(), small)?),
+            None => None,
+        },
+        motion: match &inputs.motion {
+            Some(file) => Some(held(file, file.clone(), small)?),
+            None => None,
+        },
+    };
+    save_contents(path, &contents, identity, &motion)
+}
+
+/// The same as [`save`] with the files already read, which is how the window gives what it holds. A drawing is read with the importers of `motion`. Everything is checked before anything is written.
+pub fn save_contents(
+    path: &Path,
+    contents: &Contents,
+    identity: &Identity,
+    motion: &MotionCfg,
+) -> Result<Vec<String>, String> {
+    if contents.is_empty() {
         return Err(
             "there is nothing to save: give a program, a drawing, tools or a motion file".into(),
         );
     }
-    // every file is read and checked before anything is written
-    let motion = motion_of(inputs.motion.as_deref())?;
-    let program = match &inputs.program {
-        Some(file) => {
-            let bytes = read_bounded(Path::new(file), MAX_PROGRAM_BYTES).map_err(describe)?;
-            Some((
-                format!(
-                    "{PROGRAM_DIR}{}",
-                    file_name(Path::new(file)).map_err(describe)?
-                ),
-                bytes,
-            ))
+    if let Some(held) = &contents.motion {
+        let (_, problems) = MotionCfg::parse(&String::from_utf8_lossy(&held.bytes));
+        if !problems.is_empty() {
+            return Err(format!(
+                "{}: {} line(s) are not valid",
+                held.name,
+                problems.len()
+            ));
+        }
+    }
+    let program = contents
+        .program
+        .as_ref()
+        .map(|held| (format!("{PROGRAM_DIR}{}", held.name), held.bytes.clone()));
+    let drawing = match &contents.drawing {
+        Some(held) => {
+            read_drawing(&held.name, &held.bytes, &motion.import)?;
+            Some((format!("{DRAWING_DIR}{}", held.name), held.bytes.clone()))
         }
         None => None,
     };
-    let drawing = match &inputs.drawing {
-        Some(file) => {
-            let bytes = read_bounded(Path::new(file), motion.import.max_bytes).map_err(describe)?;
-            let name = file_name(Path::new(file)).map_err(describe)?;
-            read_drawing(&name, &bytes, &motion.import)?;
-            Some((format!("{DRAWING_DIR}{name}"), bytes))
+    if let Some(held) = &contents.tools {
+        let table = ToolTable::parse(&String::from_utf8_lossy(&held.bytes));
+        if !table.issues.is_empty() {
+            return Err(format!(
+                "{}: {} line(s) of the table of tools are not valid",
+                held.name,
+                table.issues.len()
+            ));
         }
-        None => None,
-    };
-    let tools = match &inputs.tools {
-        Some(file) => {
-            let bytes = read_bounded(Path::new(file), crate::motioncfg::MAX_FILE_BYTES)
-                .map_err(describe)?;
-            let table = ToolTable::parse(&String::from_utf8_lossy(&bytes));
-            if !table.issues.is_empty() {
-                return Err(format!(
-                    "{file}: {} line(s) of the table of tools are not valid",
-                    table.issues.len()
-                ));
-            }
-            Some(bytes)
-        }
-        None => None,
-    };
-    let motion_bytes = match &inputs.motion {
-        Some(file) => Some(
-            read_bounded(Path::new(file), crate::motioncfg::MAX_FILE_BYTES).map_err(describe)?,
-        ),
-        None => None,
-    };
+    }
     for (rel, _) in program.iter().chain(drawing.iter()) {
         KIT.check_name(rel).map_err(describe)?;
     }
@@ -199,12 +253,12 @@ pub fn save(path: &Path, inputs: &Inputs, identity: &Identity) -> Result<Vec<Str
                 copy.put(&rel, bytes)?;
                 copy.choose("drawing", DRAWING_DIR, &rel);
             }
-            if let Some(bytes) = tools {
-                copy.put("settings/tools.txt", bytes)?;
+            if let Some(held) = &contents.tools {
+                copy.put("settings/tools.txt", held.bytes.clone())?;
                 copy.set("tools", "settings/tools.txt");
             }
-            if let Some(bytes) = motion_bytes {
-                copy.put("settings/motion.txt", bytes)?;
+            if let Some(held) = &contents.motion {
+                copy.put("settings/motion.txt", held.bytes.clone())?;
                 copy.set("motion", "settings/motion.txt");
             }
             Ok(())
@@ -357,25 +411,42 @@ pub fn list(path: &Path) -> Result<Listing, String> {
     appbranch::list(path).map_err(describe)
 }
 
-/// Opens the branch `cnc/`: reads and checks what it holds and, with `into`, writes its files there (a file that is there is never written over).
-pub fn open(path: &Path, into: Option<&Path>) -> Result<Opened, String> {
-    let (mut project, copy, warnings) = KIT.open(path).map_err(describe)?;
-    let mut opened = Opened {
+fn read_branch(path: &Path) -> Result<(Project, Opened), String> {
+    let (project, copy, warnings) = KIT.open(path).map_err(describe)?;
+    let opened = Opened {
         program: copy.text("program"),
         drawing: copy.text("drawing"),
         tools: copy.text("tools"),
         motion: copy.text("motion"),
         warnings,
+        report: copy.report().map_err(describe)?,
+        files: copy.files().clone(),
         ..Opened::default()
     };
+    Ok((project, opened))
+}
+
+/// What the branch `cnc/` holds, with the bytes of its files and without reading the program.
+pub fn held(path: &Path) -> Result<Opened, String> {
+    read_branch(path).map(|(_, opened)| opened)
+}
+
+/// The lines of a program of a branch, read as the report reads them.
+pub fn program_lines(bytes: &[u8]) -> Vec<String> {
+    lines_of(bytes)
+}
+
+/// Opens the branch `cnc/`: reads and checks what it holds and, with `into`, writes its files there (a file that is there is never written over).
+pub fn open(path: &Path, into: Option<&Path>) -> Result<Opened, String> {
+    let (mut project, mut opened) = read_branch(path)?;
     if let Some(rel) = &opened.program {
-        let bytes = copy
-            .file(rel)
+        let bytes = opened
+            .files
+            .get(rel)
             .ok_or_else(|| format!("{BRANCH}/{rel}: the program is not in the branch"))?;
         let lines = lines_of(bytes);
         opened.moves = Some((lines.len(), crate::gcode::toolpath(&lines).len()));
     }
-    opened.report = copy.report().map_err(describe)?;
     if let Some(dir) = into {
         opened.written = Some(
             project

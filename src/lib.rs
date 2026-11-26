@@ -66,6 +66,8 @@ pub mod sharedmat;
 pub mod sim;
 pub mod startline;
 pub mod stats;
+pub mod suitecore;
+pub mod suitetext;
 pub mod templates;
 pub mod timesplit;
 pub mod tools;

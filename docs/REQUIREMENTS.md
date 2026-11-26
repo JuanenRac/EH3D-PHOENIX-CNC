@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 146 requirements: 137 implemented, 2 prototype, 7 planned and 0 validated. By progress: 137 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 150 requirements: 141 implemented, 2 prototype, 7 planned and 0 validated. By progress: 141 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -210,3 +210,7 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-144 | A branch of a newer format or a sealed one is not written, with the code of the format, and the file stays as it was. | implemented | done | host-test | `eh3dfile::a_branch_of_a_newer_format_or_sealed_is_not_written` | - |
 | PCNC-145 | A damaged project is an error and never a crash, with damage made from a fixed seed. | implemented | done | host-test | `eh3dfile::damaged_projects_are_errors_and_never_a_crash` | - |
 | PCNC-146 | A signed branch is listed as signed, and a change that removes the signature says so. | implemented | done | host-test | `eh3dfile::a_signed_branch_is_listed_and_a_change_says_the_signature_is_gone` | - |
+| PCNC-147 | The window opens, saves and saves under another name a project, keeping the bytes of every other branch. | implemented | done | host-test | `src/gui/suite::saving_under_another_name_keeps_every_branch_and_another_project_is_asked_about` | - |
+| PCNC-148 | The window asks before it writes a signed branch or a project it did not open, and says that a signature was removed. | implemented | done | host-test | `src/gui/suite::a_signed_branch_is_asked_about_and_the_removed_signature_is_told` | - |
+| PCNC-149 | The window takes a program of another branch, keeps what is out of date in sight and keeps the reference when it saves. | implemented | done | host-test | `src/gui/suite::a_program_taken_from_cad_is_told_as_out_of_date_and_a_save_keeps_its_reference` | - |
+| PCNC-150 | A project never replaces a running program, and the files of the machine go into one only when asked and never with a credential. | implemented | done | host-test | `src/gui/suite::the_files_of_the_machine_go_only_when_asked_and_never_with_a_credential` | - |

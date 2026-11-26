@@ -14,6 +14,7 @@ use eh3d_dock::workspaces::Workspace;
 use eh3d_view::texts::{tr, Lang, Text};
 
 use crate::paneltext::{text8, Pt};
+use crate::suitetext::S;
 use crate::words::{self, Msg};
 
 /// The names of the panels (what the settings file stores, so they never change).
@@ -207,6 +208,15 @@ pub enum Cmd {
     ImportDrawing,
     /// Save the log of the session.
     LogExport,
+    /// Open, save and save under another name a project file of the suite.
+    SuiteOpen,
+    SuiteSave,
+    SuiteSaveAs,
+    /// Import a file into the project keeping the original, take a file of another branch, extract a branch and list them.
+    SuiteImport,
+    SuiteTake,
+    SuiteExtract,
+    SuiteBranches,
     /// Edit the program in its window.
     EditProgram,
     /// The window of the transformations of the program.
@@ -312,6 +322,36 @@ fn without_keys(menus: &mut [Menu<Cmd>]) {
     }
 }
 
+/// A word of the project of the suite as the text of the frame (English, Spanish, Italian, German, French, Portuguese, Chinese,
+/// Japanese).
+fn s8(s: S) -> Text8 {
+    let [en, es, de, fr, it, ja, zh, pt] = s.words();
+    Text8([en, es, it, de, fr, pt, zh, ja])
+}
+
+/// The entries of the project file of the suite, a submenu of File.
+fn suite_menu() -> Menu<Cmd> {
+    let entry = |id: &str, word: S, cmd: Cmd| own(id, s8(word), cmd);
+    Menu::new("file.suite", Label::Own(s8(S::Menu)))
+        .entry(entry("file.suite.open", S::MenuOpen, Cmd::SuiteOpen))
+        .entry(entry("file.suite.save", S::MenuSave, Cmd::SuiteSave))
+        .entry(entry("file.suite.save_as", S::MenuSaveAs, Cmd::SuiteSaveAs))
+        .sep()
+        .entry(entry("file.suite.import", S::MenuImport, Cmd::SuiteImport))
+        .entry(entry("file.suite.take", S::MenuTake, Cmd::SuiteTake))
+        .entry(entry(
+            "file.suite.extract",
+            S::MenuExtract,
+            Cmd::SuiteExtract,
+        ))
+        .sep()
+        .entry(entry(
+            "file.suite.branches",
+            S::MenuBranches,
+            Cmd::SuiteBranches,
+        ))
+}
+
 /// The menu bar: File, Edit, View, Program, Machine, Window and Help.
 pub fn menu_bar() -> MenuBar<Cmd> {
     let mut file: Menu<Cmd> = file_menu(true);
@@ -347,6 +387,7 @@ pub fn menu_bar() -> MenuBar<Cmd> {
         at + 1,
         Item::Entry(own("file.log", w8(Msg::MenuLogExport), Cmd::LogExport)),
     );
+    file.items.insert(at + 2, Item::Submenu(suite_menu()));
     // Edit: the program, its transformations and the bookmarks, after the standard entries
     edit = edit
         .sep()
@@ -530,6 +571,8 @@ pub fn menu_bar() -> MenuBar<Cmd> {
 pub struct MenuFacts {
     /// There is a program.
     pub has_program: bool,
+    /// The window works on a project file of the suite.
+    pub has_suite: bool,
     /// The program can be started, paused, stopped, sent to the server.
     pub can_start: bool,
     pub can_pause: bool,
@@ -574,6 +617,20 @@ pub fn disabled_entries(f: &MenuFacts) -> Vec<String> {
             "edit.transform",
             "edit.bookmarks",
         ],
+    );
+    when(
+        !f.has_suite,
+        &[
+            "file.suite.import",
+            "file.suite.take",
+            "file.suite.extract",
+            "file.suite.branches",
+        ],
+    );
+    // nothing is put in place of the program while the machine moves
+    when(
+        !f.idle,
+        &["file.suite.open", "file.suite.import", "file.suite.take"],
     );
     when(!f.can_start, &["program.start"]);
     when(!f.can_pause, &["program.pause"]);
@@ -803,6 +860,13 @@ mod tests {
             "edit.undo",
             "edit.preferences",
             "file.import",
+            "file.suite.open",
+            "file.suite.save",
+            "file.suite.save_as",
+            "file.suite.import",
+            "file.suite.take",
+            "file.suite.extract",
+            "file.suite.branches",
             "program.lookahead",
             "program.post",
             "machine.toolsetter",
@@ -864,7 +928,20 @@ mod tests {
         ] {
             assert!(none.iter().any(|i| i == off), "{off} should be off");
         }
-        for on in ["machine.home", "machine.probe_z", "machine.toolsetter"] {
+        for off in [
+            "file.suite.import",
+            "file.suite.take",
+            "file.suite.branches",
+        ] {
+            assert!(none.iter().any(|i| i == off), "{off} should be off");
+        }
+        for on in [
+            "file.suite.open",
+            "file.suite.save",
+            "machine.home",
+            "machine.probe_z",
+            "machine.toolsetter",
+        ] {
             assert!(!none.iter().any(|i| i == on), "{on} should be on");
         }
         // a busy machine turns the moves off whatever else is true

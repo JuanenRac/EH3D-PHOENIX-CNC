@@ -86,6 +86,7 @@ impl Shell {
             let mut app = self.app.borrow_mut();
             app.toolbar(ui);
             app.top(ui);
+            app.suite_bar(ui);
         }
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
@@ -155,6 +156,7 @@ impl App {
         let has_program = !self.session.program.is_empty();
         MenuFacts {
             has_program,
+            has_suite: self.suite.file.is_some(),
             can_start: has_program && self.can_start(),
             can_pause: self.can_pause(),
             can_stop: self.can_stop(),
@@ -191,6 +193,19 @@ impl App {
         match cmd {
             Cmd::Std(action) => self.run_std(action),
             Cmd::ImportDrawing | Cmd::Post => self.show_panel(pid::IMPORT),
+            Cmd::SuiteOpen => {
+                self.suite_browse(eh3d_filedialog::Mode::Open, Purpose::SuiteOpen);
+            }
+            Cmd::SuiteSave => self.suite_save_entry(),
+            Cmd::SuiteSaveAs => {
+                self.suite_browse(eh3d_filedialog::Mode::Save, Purpose::SuiteSaveAs);
+            }
+            Cmd::SuiteImport => {
+                self.suite_browse(eh3d_filedialog::Mode::Open, Purpose::SuiteImport);
+            }
+            Cmd::SuiteTake => self.suite_show_list(suite::SuiteList::Take),
+            Cmd::SuiteExtract => self.suite_show_list(suite::SuiteList::Extract),
+            Cmd::SuiteBranches => self.suite_show_list(suite::SuiteList::Branches),
             Cmd::LogExport => {
                 self.win = Some(Win::Save(
                     self.browser_for(eh3d_filedialog::Mode::Save, Purpose::LogSave),

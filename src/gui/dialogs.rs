@@ -88,22 +88,33 @@ impl App {
             Purpose::MapSave | Purpose::MapLoad => &["map", "txt"],
             Purpose::LogSave => &["txt", "csv", "json", "log"],
             Purpose::ReportSave => &["html", "htm"],
+            Purpose::SuiteOpen | Purpose::SuiteSaveAs | Purpose::SuiteExtract => &["eh3d"],
+            Purpose::SuiteImport => &[
+                "nc", "ngc", "gcode", "gco", "tap", "cnc", "dxf", "svg", "plt", "hpgl", "hgl",
+            ],
         };
         let default_ext = match purpose {
             Purpose::Program => "nc",
             Purpose::MapSave | Purpose::MapLoad => "map",
             Purpose::LogSave => "txt",
             Purpose::ReportSave => "html",
+            Purpose::SuiteOpen | Purpose::SuiteSaveAs | Purpose::SuiteImport => "eh3d",
+            Purpose::SuiteExtract => "",
         };
         let mut b = Browser::new(
             mode,
             &start,
             &base,
             vec![Filter::new(extensions), Filter::any()],
-            Some(default_ext),
+            // a folder that a branch is written into has no extension of its own
+            (!default_ext.is_empty()).then_some(default_ext),
         );
         if mode == Mode::Save {
             b.name_text = match purpose {
+                // a program that came from a project is offered under its own name, never as the project
+                Purpose::Program if crate::suitecore::is_project(Path::new(&self.path)) => {
+                    self.suite_suggested_name().replace(".eh3d", ".nc")
+                }
                 Purpose::Program => Path::new(&self.path).file_name().map_or_else(
                     || "program.nc".to_string(),
                     |n| n.to_string_lossy().to_string(),
@@ -114,7 +125,9 @@ impl App {
                     || "work-report.html".to_string(),
                     |n| format!("{}-report.html", n.to_string_lossy()),
                 ),
-                Purpose::MapLoad => String::new(),
+                Purpose::SuiteSaveAs => self.suite_suggested_name(),
+                Purpose::SuiteExtract => self.suite_extract_name(),
+                Purpose::MapLoad | Purpose::SuiteOpen | Purpose::SuiteImport => String::new(),
             };
         }
         Box::new(b)
@@ -170,6 +183,10 @@ impl App {
 
     /// Saves the program as it is now, as text.
     pub(super) fn save_program(&mut self, path: &Path) -> Result<(), String> {
+        if crate::suitecore::is_project(path) {
+            let why = crate::suitetext::S::NotOverProject.tr(self.lang.code());
+            return Err(format!("{}: {why}", path.display()));
+        }
         let mut text = self.session.program.join("\n");
         text.push('\n');
         std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -674,7 +691,13 @@ impl App {
             }
             Some(Chosen::Overwrite(p)) => {
                 if mode == Mode::Open
-                    || matches!(self.file_purpose, Purpose::LogSave | Purpose::ReportSave)
+                    || matches!(
+                        self.file_purpose,
+                        Purpose::LogSave
+                            | Purpose::ReportSave
+                            | Purpose::SuiteSaveAs
+                            | Purpose::SuiteExtract
+                    )
                 {
                     // the log and the report are never written over a file: the export says so
                     self.file_chosen(mode, &p);
