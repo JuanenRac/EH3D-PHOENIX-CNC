@@ -79,10 +79,7 @@ impl App {
     /// The attachments of the project of the window; what it writes is read again by the window.
     pub(super) fn panel_attachments(&mut self, ui: &mut egui::Ui) {
         let file = self.suite.file.clone();
-        if self
-            .attachments
-            .show(ui, file.as_deref(), self.lang.code())
-        {
+        if self.attachments.show(ui, file.as_deref(), self.lang.code()) {
             self.suite_refresh();
         }
     }
