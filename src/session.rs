@@ -658,6 +658,22 @@ impl Session {
     /// relative distances here: [`Session::resume_at_safe`] does not resume one.
     pub fn preamble_for(&self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> Vec<String> {
         let m = &self.modal;
+        // the tool length offset is given in the units of the line that set it, not in the ones the preamble starts with
+        let mut units = Modal::default();
+        let mut offset_in_inches = false;
+        for line in self.program.iter().take(next) {
+            let t = line.trim();
+            if t.is_empty() || t.starts_with(';') {
+                continue;
+            }
+            units.apply(t);
+            if words(t)
+                .iter()
+                .any(|&(l, v)| l == 'G' && (v * 10.0).round() as i32 == 431)
+            {
+                offset_in_inches = units.inches;
+            }
+        }
         let mut out = vec!["G21".to_string(), "G90".to_string()];
         if m.plane != 17 {
             out.push(format!("G{}", m.plane));
@@ -666,7 +682,13 @@ impl Session {
             out.push(format!("G{}", m.wcs));
         }
         if let Some(z) = m.tool_length {
+            if offset_in_inches {
+                out.push("G20".to_string());
+            }
             out.push(format!("G43.1 Z{z}"));
+            if offset_in_inches {
+                out.push("G21".to_string());
+            }
         }
         out.push(format!("G0 Z{safe_z_mm}"));
         if m.spindle != 5 {
@@ -724,26 +746,109 @@ impl Session {
         })
     }
 
-    /// Like `resume_at`, and the controller is brought back to the state of the program when the operator resumes. Says whether the program
-    /// waits to be resumed: a program in relative distances (`G91`) at that line is not resumed, because the point it reached cannot be
-    /// rebuilt from the lines (the controller may have run fewer than were sent).
-    pub fn resume_at_safe(&mut self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> bool {
-        self.resume_preamble.clear();
-        self.resume_descent = None;
+    /// Why the program cannot go on from line `next` after the controller was stopped or reset; `None` when its state can be rebuilt from the lines
+    /// before it. Refused: relative distances (`G91`), a canned cycle or a cutter compensation still on, a shift of the zero (`G92`), which the reset
+    /// takes away and the lines cannot give back, and an axis last moved by `G28`, `G30` or `G53`, whose place in the work coordinates is not known.
+    pub fn resume_refusal(&self, next: usize) -> Option<String> {
+        let next = next.min(self.program.len());
+        let line = next + 1;
         let mut m = Modal::default();
-        for line in self.program.iter().take(next) {
-            let t = line.trim();
-            if !t.is_empty() && !t.starts_with(';') {
-                m.apply(t);
+        let mut shifted: Option<usize> = None;
+        let (mut cycle, mut comp): (Option<usize>, Option<usize>) = (None, None);
+        // for X, Y and Z: the line that left the axis where the work coordinates do not say
+        let mut lost: [Option<usize>; 3] = [None; 3];
+        for (n, text) in self.program[..next].iter().enumerate() {
+            let t = text.trim();
+            if t.is_empty() || t.starts_with(';') {
+                continue;
+            }
+            m.apply(t);
+            let all = words(t);
+            let (mut home, mut machine, mut offset) = (false, false, false);
+            for &(l, v) in &all {
+                if l != 'G' {
+                    continue;
+                }
+                match (v * 10.0).round() as i32 {
+                    800 => cycle = None,
+                    810..=890 => cycle = Some(n + 1),
+                    400 => comp = None,
+                    410 | 420 => comp = Some(n + 1),
+                    920 | 923 => {
+                        shifted = Some(n + 1);
+                        offset = true;
+                    }
+                    921 | 922 => shifted = None,
+                    100 | 431 => offset = true,
+                    280 | 300 => home = true,
+                    530 => machine = true,
+                    _ => {}
+                }
+            }
+            let named = ['X', 'Y', 'Z'].map(|axis| all.iter().any(|&(l, _)| l == axis));
+            // `G28` and `G30` with no axis take every axis away
+            let every = home && !named.contains(&true);
+            for (axis, here) in lost.iter_mut().zip(named) {
+                if (home || machine) && (here || every) {
+                    *axis = Some(n + 1);
+                } else if !(home || machine || offset) && here && m.absolute {
+                    *axis = None;
+                }
             }
         }
         if !m.absolute {
+            return Some(format!(
+                "resume: the program is in relative distances (G91) at line {line}, so where it was cannot be rebuilt; it is not resumed"
+            ));
+        }
+        if let Some(l) = cycle {
+            return Some(format!(
+                "resume: the canned cycle of line {l} is still on at line {line}; the program is not resumed"
+            ));
+        }
+        if let Some(l) = comp {
+            return Some(format!(
+                "resume: the cutter compensation of line {l} is still on at line {line}; the program is not resumed"
+            ));
+        }
+        if let Some(l) = shifted {
+            return Some(format!(
+                "resume: line {l} shifts the zero (G92), a reset of the controller takes the shift away and it cannot be rebuilt; the program is not resumed at line {line}"
+            ));
+        }
+        if let Some(l) = lost.iter().flatten().next() {
+            return Some(format!(
+                "resume: line {l} moved the machine in its own coordinates (G28, G30 or G53), so where the tool was at line {line} is not known; the program is not resumed"
+            ));
+        }
+        None
+    }
+
+    /// As [`Session::resume_refusal`], for a program that was cut short by a failure and saved: lines past `next` may have run already, so an offset
+    /// set there (`G10`), which the controller keeps, refuses it too. `margin` is the number of lines that move the saved line was taken back.
+    pub fn recovery_refusal(&self, next: usize, margin: usize) -> Option<String> {
+        self.resume_refusal(next).or_else(|| {
+            // the recovery file is written every twenty lines, so the program may have gone that much further
+            crate::recovery::offset_set_again(&self.program, next, margin, 20).map(|n| {
+                format!(
+                    "resume: line {} sets an offset (G10) that may have been taken already, so the lines before it would run in another place; the program is not resumed at line {}",
+                    n + 1,
+                    next + 1
+                )
+            })
+        })
+    }
+
+    /// Like `resume_at`, and the controller is brought back to the state of the program when the operator resumes. Says whether the program
+    /// waits to be resumed: it does not where [`Session::resume_refusal`] says the state at that line cannot be rebuilt (the controller may have
+    /// run fewer lines than were sent).
+    pub fn resume_at_safe(&mut self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> bool {
+        self.resume_preamble.clear();
+        self.resume_descent = None;
+        if let Some(why) = self.resume_refusal(next) {
             self.running = false;
             self.paused = false;
-            self.say(format!(
-                "resume: the program is in relative distances (G91) at line {}, so where it was cannot be rebuilt; it is not resumed",
-                next + 1
-            ));
+            self.say(why);
             return false;
         }
         self.resume_at(next);
@@ -1843,6 +1948,101 @@ G0 X2",
         assert!(s.resume_at_safe(4, 4.0, 0.0));
         let d = s.resume_descent.clone().expect("a descent");
         assert_eq!(d.lines[0], "G1 Z-1.0000 F80");
+    }
+
+    #[test]
+    fn a_shifted_zero_a_lost_place_or_a_mode_still_on_is_never_resumed_and_nothing_is_sent() {
+        for (program, next, want) in [
+            (
+                "G21 G90\nG0 X5 Y5 Z5\nG92 X0 Y0 Z0\nG1 X1 F100\nG1 X2",
+                4,
+                "G92",
+            ),
+            ("G21 G90\nG92.3\nG0 X1 Y1 Z5\nG0 X2", 3, "G92"),
+            ("G21 G90\nG81 X1 Y1 Z-1 R1 F50\nX2\nG80", 3, "canned cycle"),
+            ("G21 G90\nG41 D1 G1 X1 F50\nG1 X5", 2, "compensation"),
+            ("G21 G90\nG0 X5 Y6 Z2\nG53 G0 Z0\nG0 X9", 3, "G53"),
+            ("G21 G90\nG0 X5 Y6 Z2\nG28\nG0 X9 Y9\nG1 X10", 4, "G28"),
+            ("G21 G90\nG0 X5 Y6 Z2\nG28 G91 Z0\nG90\nG0 X9", 5, "G28"),
+        ] {
+            let (mut s, sent) = touchy_session(|_, _| 0.0);
+            s.load(program);
+            let why = s.recovery_refusal(next, 16).unwrap_or_default();
+            assert!(why.contains(want), "{program}: {why}");
+            assert!(!s.resume_at_safe(next, 4.0, 0.0), "{program}");
+            assert!(!s.running && !s.paused && s.resume_preamble.is_empty());
+            s.pump(10);
+            assert!(sent.lock().unwrap().is_empty(), "{program}");
+        }
+        // an offset the controller keeps, set where lines may have run, refuses the recovery of a program that failed
+        let mut s = session();
+        s.load("G21 G90\nG0 X5 Y6 Z2\nG1 X6 F50\nG1 X7\nG10 L20 P1 X0\nG1 X8");
+        let why = s.recovery_refusal(2, 16).unwrap_or_default();
+        assert!(why.contains("line 5") && why.contains("G10"), "{why}");
+        // once the shift is taken away, or every axis was named again, the program goes on
+        for (program, next) in [
+            ("G21 G90\nG92 X0\nG92.1\nG0 X1 Y1 Z5\nG0 X2", 4),
+            ("G21 G90\nG28 G91 Z0\nG90\nG0 X1 Y1\nG0 Z5\nG0 X2", 5),
+            ("G21 G90\nG53 G0 Z0\nG0 X1 Y1 Z5\nG0 X2", 3),
+        ] {
+            let mut s = session();
+            s.load(program);
+            assert_eq!(s.recovery_refusal(next, 16), None, "{program}");
+        }
+    }
+
+    #[test]
+    fn the_lines_of_a_resume_reach_the_controller_exactly_and_the_offset_keeps_its_units() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        s.load("G20 G90\nG43.1 Z-1.5\nM3 S9000\nG0 X1 Y2 Z1\nG1 X2 F10\nG1 X3\n");
+        assert!(s.resume_at_safe(5, 4.0, 0.0));
+        assert!(sent.lock().unwrap().is_empty());
+        s.start();
+        s.wait_idle();
+        s.pump(10);
+        assert_eq!(
+            *sent.lock().unwrap(),
+            [
+                "G21",
+                "G90",
+                "G20",
+                "G43.1 Z-1.5",
+                "G21",
+                "G0 Z4",
+                "M3 S9000",
+                "G0 X50.8000 Y50.8000",
+                "G20",
+                "F10",
+                "G1",
+                "G1 X3",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_program_taken_up_after_a_failure_sends_again_the_moves_the_buffer_may_have_lost() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        s.load("G21 G90\nG0 X0 Y0 Z6\nG1 X1 F100\n; a\nG1 X2\n; b\nG1 X3\n; c\n");
+        // all eight lines were taken, and the buffer held the last two moves
+        let next = crate::recovery::backed_off(&s.program, 8, 2);
+        assert_eq!(next, 4);
+        assert!(s.resume_at_safe(next, 4.0, 0.0));
+        s.start();
+        s.wait_idle();
+        s.pump(10);
+        assert_eq!(
+            *sent.lock().unwrap(),
+            [
+                "G21",
+                "G90",
+                "G0 Z4",
+                "G0 X1.0000 Y0.0000",
+                "F100",
+                "G1",
+                "G1 X2",
+                "G1 X3",
+            ]
+        );
     }
 
     /// A controller with a probe: it keeps where the head is, takes the lines of a touch and answers a contact at the height of a surface.

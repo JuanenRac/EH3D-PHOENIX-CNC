@@ -477,9 +477,11 @@ impl App {
                     file: self.path.clone(),
                     // the controller may not have run the last lines that were sent (it keeps some in its buffer): the program is
                     // taken up again a few lines before, which is safe in absolute distances
-                    next: s
-                        .next
-                        .saturating_sub(self.settings.resume_backoff_lines as usize),
+                    next: recovery::backed_off(
+                        &s.program,
+                        s.next,
+                        self.settings.resume_backoff_lines as usize,
+                    ),
                     total: s.program.len(),
                     job: String::new(),
                     sha256: recovery::program_hash(&s.program),

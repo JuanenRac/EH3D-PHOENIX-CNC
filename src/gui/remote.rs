@@ -124,17 +124,24 @@ impl App {
 
     /// Takes up a job the server already has (the program was closed while it ran); if it ended without finishing, the program goes on from `skip`.
     pub(super) fn attach_to_server(&mut self, id: String, skip: usize) {
+        // a job that still runs is followed; a new one is made only where the program can really go on from
+        let refusal = self
+            .session
+            .recovery_refusal(skip, self.settings.resume_backoff_lines as usize);
         let Some(client) = self.server_client() else {
             self.session
                 .log
                 .push("server: the address and the machine are not set in the settings".into());
             return;
         };
-        let again = self.program_request(skip);
+        let again = match refusal {
+            Some(why) => Err(why),
+            None => Ok(self.program_request(skip)),
+        };
         self.start_following(Follow::start(client, Start::Attach { id, again }));
         self.session
             .log
-            .push(format!("server: going on from line {}", skip + 1));
+            .push(format!("server: following the job (line {})", skip + 1));
     }
 
     fn start_following(&mut self, f: Follow) {
@@ -192,7 +199,12 @@ impl App {
             {
                 let r = Recovery {
                     file: self.path.clone(),
-                    next: i.line,
+                    // like on the controller of this computer: the last moves it took may not have been made
+                    next: recovery::backed_off(
+                        &self.session.program,
+                        i.line,
+                        self.settings.resume_backoff_lines as usize,
+                    ),
                     total,
                     job: i.id.clone(),
                     sha256: recovery::program_hash(&self.session.program),

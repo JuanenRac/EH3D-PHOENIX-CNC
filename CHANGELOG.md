@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Going on after a failure is refused where it cannot be made right, and takes back the moves the controller may not have made:** a program that shifted the zero with `G92` (a reset of the controller takes the shift away), that has a canned cycle or a cutter compensation still on, or that last moved an axis with `G28`, `G30` or `G53` is not resumed, and neither is one whose lines that may have run set an offset with `G10`; the log says the line and why. The `resume_backoff` margin now counts lines that move, not comments or blank lines, and applies to a job on the server too. A tool length offset given in inches is given back in inches. A job on the server that finished, or one that would start again from the first line, is not sent again by itself. Tried against stand-ins only, never on a machine.
+
 - **The panels of the machine state and of the jog adapt to their size:** in a low window the list of active G-codes was cut at the foot of the state panel; the panel now draws its rows smaller there, with the two speeds side by side and the codes after their titles. In a narrow window the buttons A+ and A- of the jog were cut; the pad now draws closer and smaller, and in a narrower panel Z and A go under X and Y. Two tests draw the panels with no screen at several sizes.
 
 - **Escape answers no to the question before a project is written:** the question that the window asks before a write removes a signature (or replaces a branch it did not write) closes with Escape without writing, Enter does not write and no key starts the machine behind it; while something runs Escape stops it as before. The commands do not ask.

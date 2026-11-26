@@ -80,6 +80,58 @@ impl Recovery {
     }
 }
 
+/// Whether a line puts a move into the buffer of the controller: it has a word of an axis (or of the centre of an arc) and is not one that takes those
+/// words to set an offset (`G10`, `G43.1`, `G92`).
+fn moves(line: &str) -> bool {
+    let words = crate::gcode::words(line);
+    let offset = words
+        .iter()
+        .any(|&(l, v)| l == 'G' && matches!((v * 10.0).round() as i32, 100 | 431 | 920));
+    !offset
+        && words
+            .iter()
+            .any(|&(l, _)| matches!(l, 'X' | 'Y' | 'Z' | 'A' | 'B' | 'C' | 'I' | 'J' | 'K'))
+}
+
+/// The line a program that stopped at `reached` goes on from: `margin` lines that move before it. The controller says `ok` when it takes a line, not
+/// when it has run it, so the last moves may not have been made; comments, blank lines and lines that move nothing take no room in its buffer and are
+/// not counted.
+pub fn backed_off(program: &[String], reached: usize, margin: usize) -> usize {
+    let mut at = reached.min(program.len());
+    let mut back = 0;
+    while at > 0 && back < margin {
+        at -= 1;
+        if moves(&program[at]) {
+            back += 1;
+        }
+    }
+    at
+}
+
+/// The first `G10` line (from 0) among those that may have run already after `next`, where the program goes on: it changed an offset that the controller
+/// keeps through a reset, so the lines before it would be run again with the new one. `margin` is the one [`backed_off`] took and `unsaved` how many
+/// lines the program may have gone past the last save.
+pub fn offset_set_again(
+    program: &[String],
+    next: usize,
+    margin: usize,
+    unsaved: usize,
+) -> Option<usize> {
+    let (mut end, mut ahead) = (next.min(program.len()), 0);
+    while end < program.len() && ahead < margin {
+        if moves(&program[end]) {
+            ahead += 1;
+        }
+        end += 1;
+    }
+    let end = end.saturating_add(unsaved).min(program.len());
+    (next.min(end)..end).find(|&n| {
+        crate::gcode::words(&program[n])
+            .iter()
+            .any(|&(l, v)| l == 'G' && (v * 10.0).round() as i32 == 100)
+    })
+}
+
 /// Where the recovery is kept: next to the settings.
 pub fn recovery_path(settings: &Path) -> PathBuf {
     settings.with_file_name("recovery.cfg")
@@ -142,6 +194,34 @@ mod tests {
         };
         let back = Recovery::parse(&r.to_text()).unwrap();
         assert_eq!(back.next, 5);
+    }
+
+    fn lines(s: &str) -> Vec<String> {
+        s.lines().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn only_the_lines_that_move_count_in_the_margin_of_a_program_that_stopped() {
+        let p =
+            lines("G0 X1\n(a note)\nG1 X2 F100\n\nM8\nG92 X0\nG1 X3\n; more\nI1 J0\nF200\nG1 Y4");
+        assert_eq!(backed_off(&p, p.len(), 0), p.len());
+        assert_eq!(backed_off(&p, p.len(), 1), 10);
+        assert_eq!(backed_off(&p, p.len(), 2), 8);
+        assert_eq!(backed_off(&p, p.len(), 3), 6);
+        // the comments, the blank line, the coolant and the offset take no room in the buffer
+        assert_eq!(backed_off(&p, p.len(), 4), 2);
+        assert_eq!(backed_off(&p, 99, 100), 0);
+    }
+
+    #[test]
+    fn an_offset_set_in_the_lines_that_may_have_run_is_found() {
+        let p = lines("G0 X1\nG1 X2\nG1 X3\nG10 L20 P1 X0\nG1 X4\nG1 X5");
+        assert_eq!(offset_set_again(&p, 1, 3, 0), Some(3));
+        assert_eq!(offset_set_again(&p, 1, 1, 0), None);
+        assert_eq!(offset_set_again(&p, 1, 1, 2), Some(3));
+        // before the line the program goes on from it stays as it is
+        assert_eq!(offset_set_again(&p, 4, 16, 20), None);
+        assert_eq!(offset_set_again(&p, 99, 16, 20), None);
     }
 
     #[test]
