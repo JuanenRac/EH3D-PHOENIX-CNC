@@ -455,12 +455,11 @@ fn counted(item: &str, count: usize, reason: Option<&str>) -> Counted {
     }
 }
 
-/// What an import of one file gives: its report and, for a drawing, the program made from it.
-fn convert(
-    name: &str,
-    bytes: &[u8],
-    motion: &MotionCfg,
-) -> Result<(ConversionReport, Option<(String, Vec<u8>)>), String> {
+/// The report of an import and, for a drawing, the name and the bytes of the program made from it.
+type Converted = (ConversionReport, Option<(String, Vec<u8>)>);
+
+/// What an import of one file gives.
+fn convert(name: &str, bytes: &[u8], motion: &MotionCfg) -> Result<Converted, String> {
     let mut got = Vec::new();
     let mut not_read = Vec::new();
     let mut export_losses = Vec::new();
