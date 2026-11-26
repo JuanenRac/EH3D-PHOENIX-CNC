@@ -17,7 +17,7 @@ fn main() -> eframe::Result {
         eprint!("{}", done.err);
         std::process::exit(done.code);
     }
-    match Options::parse(words.into_iter()) {
+    match Options::parse(words) {
         Ok(o) if o.version => {
             println!("phoenix-cnc {}", env!("CARGO_PKG_VERSION"));
             std::process::exit(0);
