@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 151 requirements: 142 implemented, 2 prototype, 7 planned and 0 validated. By progress: 142 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 152 requirements: 143 implemented, 2 prototype, 7 planned and 0 validated. By progress: 143 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -215,3 +215,4 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-149 | The window takes a program of another branch, keeps what is out of date in sight and keeps the reference when it saves. | implemented | done | host-test | `src/gui/suite::a_program_taken_from_cad_is_told_as_out_of_date_and_a_save_keeps_its_reference` | - |
 | PCNC-150 | A project never replaces a running program, and the files of the machine go into one only when asked and never with a credential. | implemented | done | host-test | `src/gui/suite::the_files_of_the_machine_go_only_when_asked_and_never_with_a_credential` | - |
 | PCNC-151 | The command line never puts a motion file that holds the credential of a link into a project: the save is refused and nothing is written. | implemented | done | host-test | `eh3dfile::the_command_line_never_puts_the_credential_of_a_link_in_a_project` | - |
+| PCNC-152 | The window has the panel of the attachments of the project, and it is shown and drawn like every other panel. | implemented | done | host-test | `src/gui/shell::every_panel_can_be_shown_and_drawn_in_turn` | - |
