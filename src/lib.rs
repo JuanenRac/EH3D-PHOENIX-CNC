@@ -19,6 +19,8 @@ pub mod cycles;
 pub mod dialcheck;
 pub mod dialect;
 pub mod editor;
+pub mod eh3dcli;
+pub mod eh3dfile;
 pub mod estimate;
 pub mod gcode;
 pub mod gcodehelp;
