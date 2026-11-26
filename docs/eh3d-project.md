@@ -30,6 +30,10 @@ File > Suite project (.eh3d) does the same with the window: Open suite project, 
 - A bar under the top bar names the project and says what is OUT OF DATE and what is signed. It is read again when the window gets the keyboard back.
 - The table of tools and the motion file of a project are never applied to the machine; extract the branch to use them. A program is never written over a project as text.
 
+## Attachments
+
+The panel «Attachments» of the window (View, or File > Suite project) is the shared panel `eh3d-attachpanel` of EH3D-COMMON (its guide is `docs/ATTACHMENTS_PANEL.md` there). It works on the project the window has open, and the window reads the project again after a write. It writes only the branch `attachments/`; the branch `cnc/` and the others keep their bytes. A write that removes a signature is asked about first. Dangerous files and kinds the suite does not know are extracted or opened only after a confirmation, programs and scripts are never opened, nothing is downloaded, and a settings file that holds `server_token` is not attached. PDF pages need the PDF library beside the program, which the packages carry with its licences; a build from source gets it with `python ../EH3D-COMMON/tools/fetch_pdfium.py --out target/release`.
+
 ## What is in the branch
 
 ```
