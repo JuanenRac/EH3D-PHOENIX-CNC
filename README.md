@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1200-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1210-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table, in plan or in 3D, with the lines done marked, and stops at what the controller refuses. Around that it checks, times and prepares programs (arcs, canned cycles, cutter compensation, keep-out boxes, a probe, a height map, a tool changer, a table of tools and one of materials), imports drawings and the Gerber and Excellon files of boards, and sends a program to the EH3D server. The controller interface (`eh3d-controller`, in EH3D-COMMON) is driven for GRBL, grblHAL, Marlin and Klipper against simulators of their dialects on simulated cables; the other families it lists are not driven. 1200 tests run on a computer. **Nothing here has run on a real machine**: a serial port is opened only for GRBL, grblHAL or Marlin and a network connection only when a program is sent to the server or Klipper is reached with `--klipper`. The simulated machines take straight moves only and refuse arcs, canned cycles and probing, so those are measured, checked and timed on paper, the drawn path shows an arc as its chord, and a program that contains them stops at that line on the simulator. The window offers the 37 languages of the shared view of EH3D-COMMON and wears eleven themes, but this program promises eight languages: the words of its own panels and tools exist in English, Spanish, German, French, Italian, Japanese, Chinese and European Portuguese.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table, in plan or in 3D, with the lines done marked, and stops at what the controller refuses. Around that it checks, times and prepares programs (arcs, canned cycles, cutter compensation, keep-out boxes, a probe, a height map, a tool changer, a table of tools and one of materials), imports drawings and the Gerber and Excellon files of boards, and sends a program to the EH3D server. The controller interface (`eh3d-controller`, in EH3D-COMMON) is driven for GRBL, grblHAL, Marlin and Klipper against simulators of their dialects on simulated cables; the other families it lists are not driven. 1210 tests run on a computer. **Nothing here has run on a real machine**: a serial port is opened only for GRBL, grblHAL or Marlin and a network connection only when a program is sent to the server or Klipper is reached with `--klipper`. The simulated machines take straight moves only and refuse arcs, canned cycles and probing, so those are measured, checked and timed on paper, the drawn path shows an arc as its chord, and a program that contains them stops at that line on the simulator. The window offers the 37 languages of the shared view of EH3D-COMMON and wears eleven themes, but this program promises eight languages: the words of its own panels and tools exist in English, Spanish, German, French, Italian, Japanese, Chinese and European Portuguese.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.2.3` |
 | Maturity | Functional |
-| Tests | 1200 |
+| Tests | 1210 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -47,7 +47,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
 | Themes and texts | 🟡 | Eleven themes and the words of the interface: the window offers the 37 languages of the shared view, and the words of this program's own panels and tools are in eight; seen in the window of this program. |
-| Tests | 🟡 | 1200 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Tests | 🟡 | 1210 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only simulators: a program runs line by line with pause, stop and the emergency stop on the simulated machine or on a simulated GRBL, grblHAL, Marlin or Klipper; the serial port for GRBL, grblHAL and Marlin is built behind a feature, the HTTP link of Klipper has only met a stand-in Moonraker, and no real controller has been connected. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -176,7 +176,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 1200 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 1210 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
