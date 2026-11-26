@@ -15,6 +15,15 @@ const GCODE_EXTENSIONS: [&str; 11] = [
     "nc", "gcode", "ngc", "tap", "cnc", "txt", "ncc", "gc", "eia", "anc", "mpf",
 ];
 
+/// Whether a file is one the window opens when it is dropped on it (a G-code program or a project): the panel of the
+/// attachments leaves those to the window.
+pub(super) fn opens_file(path: &std::path::Path) -> bool {
+    path.extension().is_some_and(|e| {
+        let e = e.to_string_lossy().to_ascii_lowercase();
+        GCODE_EXTENSIONS.contains(&e.as_str()) || e == "gco" || e == "eh3d"
+    })
+}
+
 /// The window that is open over the program (there is one at a time).
 pub(super) enum Win {
     Settings(Box<Draft>),
@@ -223,6 +232,7 @@ impl App {
         if self.theme.id != self.settings.theme {
             self.theme = Theme::for_id(self.settings.theme);
         }
+        self.attachments.set_limits(self.settings.panel_limits());
         // the time estimate follows the acceleration of the settings
         self.path_extras.accel_mm_s2 = self.settings.tuning.accel_mm_s2;
         let travel = self.settings.travel;
@@ -1044,6 +1054,26 @@ fn about_brand() -> AboutBrand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_files_the_window_opens_are_told_apart_from_the_ones_of_the_attachments() {
+        for own in ["a.nc", "a.GCODE", "a.gco", "a.eh3d", "a.txt"] {
+            assert!(opens_file(std::path::Path::new(own)), "{own}");
+        }
+        for other in ["sheet.pdf", "photo.png", "noextension"] {
+            assert!(!opens_file(std::path::Path::new(other)), "{other}");
+        }
+    }
+
+    #[test]
+    fn the_limits_of_the_settings_reach_the_panel_of_the_attachments() {
+        let mut a = app();
+        a.settings
+            .panel_lines
+            .push(("attachments.max_mb".into(), "16".into()));
+        a.apply_settings();
+        assert_eq!(a.attachments.limits(), a.settings.panel_limits());
+    }
 
     fn app() -> App {
         App::new(&Options::default())

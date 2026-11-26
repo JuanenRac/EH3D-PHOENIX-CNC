@@ -14,7 +14,7 @@ One program to drill, to route and to do 2D and 3D CNC work on the machine of a 
 * Draws the path in the plan and in 3D, times the program with and without a look-ahead, and writes a work report as one page of HTML.
 * Reads a drawing (HPGL, DXF, SVG) or the Gerber and Excellon files of a board and writes the G-code for it; converts, compares and reformats programs on the command line.
 * Sends a program as a job to the EH3D server, follows it, and gives the emergency stop and the jog routes of a machine on the server.
-* Shows the window in thirteen panels that can be moved, tabbed, floated and folded, in eleven themes and in many languages (every word of the panels in eight, the summary of a program in 37), and keeps the arrangement.
+* Shows the window in thirteen panels that can be moved, tabbed, floated and folded, in eleven themes and in eight languages, and keeps the arrangement.
 
 ## What it will not do
 

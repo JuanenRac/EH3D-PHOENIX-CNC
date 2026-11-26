@@ -16,6 +16,9 @@ use crate::tuning::Tuning;
 /// How many recent files are kept.
 pub const RECENT_MAX: usize = 8;
 
+/// The most lines of the limits of the attachments that are kept.
+const PANEL_LINES_MAX: usize = 32;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
     pub lang: Lang,
@@ -109,6 +112,8 @@ pub struct Settings {
     /// The lines of the docking window (`dock.*`): the arrangement of the panels, the workspaces, the shortcuts of the frame and the recent
     /// files. The program keeps them as they are; the frame reads and writes them.
     pub dock_lines: Vec<(String, String)>,
+    /// The lines of the limits of the panel «Attachments» (`attachments.max_mb`, `viewer.max_*_mb`), kept as they were written.
+    pub panel_lines: Vec<(String, String)>,
 }
 
 impl Default for Settings {
@@ -165,6 +170,7 @@ impl Default for Settings {
             profile: String::new(),
             material: String::new(),
             dock_lines: Vec::new(),
+            panel_lines: Vec::new(),
         }
     }
 }
@@ -433,6 +439,12 @@ impl Settings {
                     s.dock_lines.retain(|(k, _)| k != other);
                     s.dock_lines.push((other.to_string(), v.to_string()));
                 }
+                other if eh3d_attachpanel::PanelLimits::is_key(other) => {
+                    s.panel_lines.retain(|(k, _)| k != other);
+                    if s.panel_lines.len() < PANEL_LINES_MAX {
+                        s.panel_lines.push((other.to_string(), v.to_string()));
+                    }
+                }
                 _ => {}
             }
         }
@@ -517,10 +529,19 @@ impl Settings {
         out.push_str(&self.profiles_text());
         out.push_str(&format!("material = {}\n", one_line(&self.material)));
         out.push_str(&self.tuning.to_text());
-        for (k, v) in &self.dock_lines {
+        for (k, v) in self.dock_lines.iter().chain(&self.panel_lines) {
             out.push_str(&format!("{k} = {v}\n"));
         }
         out
+    }
+
+    /// The limits of the panel of the attachments that the file gives; a value that is not valid keeps the default.
+    pub fn panel_limits(&self) -> eh3d_attachpanel::PanelLimits {
+        let mut limits = eh3d_attachpanel::PanelLimits::default();
+        for (k, v) in &self.panel_lines {
+            limits.apply(k, v);
+        }
+        limits
     }
 
     /// The lines of the docking window, as the text the frame reads.
@@ -741,6 +762,7 @@ mod tests {
             profile: String::new(),
             material: String::new(),
             dock_lines: Vec::new(),
+            panel_lines: vec![("attachments.max_mb".into(), "64".into())],
         };
         s.save_profile("Small mill");
         s.spindle_rpm = 21_000.0;
@@ -1173,6 +1195,21 @@ server_jog_confirm_mm = 0
         let text = Settings::parse("material = Oak\n").to_text();
         assert_eq!(text.matches("material = Oak").count(), 1);
         assert_eq!(Settings::parse(&text), Settings::parse("material = Oak\n"));
+    }
+
+    #[test]
+    fn the_lines_of_the_limits_of_the_attachments_are_kept_and_give_the_limits() {
+        let s = Settings::parse(
+            "attachments.max_mb = 16\nviewer.max_pdf_mb = 4\nviewer.max_pdf_mb = 8\nviewer.max_text_mb = no\n",
+        );
+        let limits = s.panel_limits();
+        assert_eq!(limits.attachments.max_attachment_bytes, 16 << 20);
+        assert_eq!(limits.viewer.max_pdf_bytes, 8 << 20);
+        assert_eq!(Settings::parse(&s.to_text()).panel_lines, s.panel_lines);
+        assert_eq!(
+            Settings::default().panel_limits(),
+            eh3d_attachpanel::PanelLimits::default()
+        );
     }
 
     #[test]

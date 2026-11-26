@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1209-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1212-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table, in plan or in 3D, with the lines done marked, and stops at what the controller refuses. Around that it checks, times and prepares programs (arcs, canned cycles, cutter compensation, keep-out boxes, a probe, a height map, a tool changer, a table of tools and one of materials), imports drawings and the Gerber and Excellon files of boards, and sends a program to the EH3D server. The controller interface (`eh3d-controller`, in EH3D-COMMON) is driven for GRBL, grblHAL, Marlin and Klipper against simulators of their dialects on simulated cables; the other families it lists are not driven. 1209 tests run on a computer. **Nothing here has run on a real machine**: a serial port is opened only for GRBL, grblHAL or Marlin and a network connection only when a program is sent to the server or Klipper is reached with `--klipper`. The simulated machines take straight moves only and refuse arcs, canned cycles and probing, so those are measured, checked and timed on paper, the drawn path shows an arc as its chord, and a program that contains them stops at that line on the simulator. The window offers the 37 languages of the shared view of EH3D-COMMON and wears eleven themes, but this program promises eight languages: the words of its own panels and tools exist in English, Spanish, German, French, Italian, Japanese, Chinese and European Portuguese.
+**Honesty check - what actually runs today:** a Rust program with a window (`phoenix-cnc`) that drives a **simulated** machine: it shows the position of the machine (work and machine), moves it by hand with a jog pad, sets the zero, homes, takes the commands typed by the operator, runs a G-code program line by line (with pause, stop and the emergency stop), draws the path of the program on the table, in plan or in 3D, with the lines done marked, and stops at what the controller refuses. Around that it checks, times and prepares programs (arcs, canned cycles, cutter compensation, keep-out boxes, a probe, a height map, a tool changer, a table of tools and one of materials), imports drawings and the Gerber and Excellon files of boards, and sends a program to the EH3D server. The controller interface (`eh3d-controller`, in EH3D-COMMON) is driven for GRBL, grblHAL, Marlin and Klipper against simulators of their dialects on simulated cables; the other families it lists are not driven. 1212 tests run on a computer. **Nothing here has run on a real machine**: a serial port is opened only for GRBL, grblHAL or Marlin and a network connection only when a program is sent to the server or Klipper is reached with `--klipper`. The simulated machines take straight moves only and refuse arcs, canned cycles and probing, so those are measured, checked and timed on paper, the drawn path shows an arc as its chord, and a program that contains them stops at that line on the simulator. The window wears eleven themes and offers eight languages, those of the shared view of EH3D-COMMON: its words exist in English, Spanish, German, French, Italian, Japanese, Chinese and European Portuguese.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Version | `0.2.3` |
 | Maturity | Functional |
-| Tests | 1209 |
+| Tests | 1212 |
 | Stack | Rust |
 | On real hardware | No: by default it drives a simulated machine; a real GRBL controller (`--grbl`) has never been tried |
 
@@ -46,8 +46,8 @@ Each line is one part of this repository and the light says how far it is today.
 |---|---|---|
 | Base library | 🟡 | A Rust crate that re-exports `scene`, `texts` and `theme` of `eh3d-view` under this program's name; it needs the folder of EH3D-COMMON next to it. |
 | Scene and views | 🟡 | Written and tested in EH3D-COMMON; the window of this program draws the path of a program on the table and the position of the tool (seen on a computer). |
-| Themes and texts | 🟡 | Eleven themes and the words of the interface: the window offers the 37 languages of the shared view, and the words of this program's own panels and tools are in eight; seen in the window of this program. |
-| Tests | 🟡 | 1209 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
+| Themes and texts | 🟡 | Eleven themes and the words of the interface: the window offers eight languages, those of the shared view, and the words of this program's own panels and tools are in the same eight; seen in the window of this program. |
+| Tests | 🟡 | 1212 tests pass on a computer (`cargo test --features gui`): the session (jog, zero, home, a program, pause, alarm, emergency stop), the path of a program and the command line; the simulated controller is tested in EH3D-COMMON. |
 | Window and jog | 🟡 | Works on a computer with the simulated controller: position, jog pad, steps, feed, home, zero, unlock, a line of commands and a log; no real machine. |
 | Machine control | 🟠 | Only simulators: a program runs line by line with pause, stop and the emergency stop on the simulated machine or on a simulated GRBL, grblHAL, Marlin or Klipper; the serial port for GRBL, grblHAL and Marlin is built behind a feature, the HTTP link of Klipper has only met a stand-in Moonraker, and no real controller has been connected. |
 | Documentation | 🟡 | README in eight languages, the two pictures, three sample programs and the changelog. |
@@ -98,7 +98,7 @@ Each line is one part of this repository and the light says how far it is today.
 * **Tab finishes the code in the command box:** while the box under the window has the keyboard, Tab finishes the code being typed (`G38` gives `G38.`, `M30` gives `M30 `, `$J` gives `$J=`) or, when several fit, writes what they share and lists them beside the box (`G5` lists `G53` to `G59`). It works on the last word of the line, ignores capitals and small letters, and sends nothing: the line still goes with Enter.
 * **Projects of the suite** (`src/eh3dfile.rs`, `docs/eh3d-project.md`): `phoenix-cnc project list|save|import|open|take|extract` keeps the work in the branch `cnc/` of an `.eh3d` project, one file with a branch for each program: `save` puts the program, the drawing, the table of tools and the motion file there; `import` keeps a G-code program or a DXF, SVG or HPGL drawing byte for byte with a report of what was read, what was not and what is lost on export (a drawing also gives the program that cuts along it); `take` copies an outline or a mesh from another branch, such as `cad/`, with the hash and the format of its source, so `list` and `open` say when it is out of date. Only `cnc/` is written: every other branch, known or not, keeps its bytes. Nothing moves, and it has only been tried with made-up projects.
 * **The project in the window** (`src/gui/suite.rs`, `eh3d_project::suiteview`, `docs/eh3d-project.md`): File > Suite project (.eh3d) opens a project, saves it and saves it under another name keeping every branch, imports a file keeping the original, takes a file of another branch, extracts a branch and lists the branches. What is out of date and what is signed stays in sight; before a project that was not opened there, a branch that changed since it was read or a signature is written over, the window asks. A project is not opened, imported into or taken into while the machine moves; its table of tools and motion file are never applied, they go into a project only when ticked, and a motion file with a credential never does. The logic is tested without a screen; the entries have not been tried on a screen by a person.
-* **Attachments of the project** (panel «Attachments», the crate `eh3d-attachpanel` of EH3D-COMMON): it is in View and in File > Suite project, over the project the window works on. The data sheets, manuals and any other file kept in the `.eh3d` project are listed, attached (a file or only a link), linked to a part, extracted and removed after a question, and shown beside the list (PDF pages, pictures, text and the text of office documents). Programs, scripts, files with macros, compressed archives, HTML, SVG and unknown kinds ask before they leave the project; a program or a script is never opened, nothing is downloaded and a settings file with the token of the server is not attached. The package carries the PDF library (PDFium) with its licences. Not tried on a screen by a person.
+* **Attachments of the project** (panel «Attachments», the crate `eh3d-attachpanel` of EH3D-COMMON): it is in View and in File > Suite project, over the project the window works on. The data sheets, manuals and any other file kept in the `.eh3d` project are listed, attached (a file or only a link), linked to a part, extracted and removed after a question, and shown beside the list (PDF pages, pictures, text and the text of office documents). Programs, scripts, files with macros, compressed archives, HTML, SVG and unknown kinds ask before they leave the project; a program or a script is never opened, nothing is downloaded and a settings file with the token of the server is not attached. The package carries the PDF library (PDFium) with its licences. Not tried on a screen by a person. A file can be dropped on the panel, and its limits are read from the settings file (`attachments.max_mb`, `viewer.max_*_mb`).
 
 ## 🧩 Role in EH3D
 
@@ -177,7 +177,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Testing
 
-`cargo test --features gui` runs 1209 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
+`cargo test --features gui` runs 1212 tests: the session (jog and zero, a program run line by line, pause and go on, a refused line, the emergency stop and the alarm, the log of the commands, homing), the path of a program and the command line; the view and the simulated controller are tested in EH3D-COMMON. The CI also runs `cargo fmt --check` and `cargo clippy` with warnings as errors, and `python -I tools/ci_validate.py` checks the manifest, the versions, the changelog and the eight READMEs.
 
 ## 🏗️ Build & Release
 
@@ -333,7 +333,7 @@ EH3D-PHOENIX-CNC/
 
 ## 🌍 Languages
 
-README and texts exist in English, Spanish, French, Italian, German, Chinese, Japanese and European Portuguese. The window lists the 37 languages of the shared view of EH3D-COMMON, but only these eight are promised; the words that this program adds to the shared ones appear in English in any other language.
+README and texts exist in English, Spanish, French, Italian, German, Chinese, Japanese and European Portuguese. The window lists these eight, which are the languages of the shared view of EH3D-COMMON.
 
 ## 🔗 Related Projects
 
