@@ -22,7 +22,7 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 
 ## What it needs from other repositories
 
-* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The CI takes its main branch until the release that holds what a program does with its branch; the workflows are then pinned to that release.
+* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.4.
 * EH3D-CORE-LIBS: the readers of Gerber and Excellon files.
 * A real machine with GRBL, grblHAL, Marlin or Klipper, a probe, a tool setter and a changer, for the proofs that no simulator can give.
 
