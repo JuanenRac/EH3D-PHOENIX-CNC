@@ -251,6 +251,16 @@ impl App {
     /// Does what a key asks for. While a window is open only Esc (closes it), the list of the keys and the exit work, so that a key does not start
     /// a program behind the window the operator is looking at.
     pub(super) fn shortcut(&mut self, s: Shortcut) {
+        // the question before a project is written is a window too: Esc says no and nothing is started behind it. While something
+        // runs the keys do what they always do, so that Esc still stops it.
+        if self.suite.pending.is_some() && !self.can_stop() {
+            match s {
+                Shortcut::Stop => self.suite_cancel(),
+                Shortcut::Quit => self.quit = true,
+                _ => {}
+            }
+            return;
+        }
         if let Some(win) = &self.win {
             match s {
                 // Esc is Stop without a window; with one it closes it

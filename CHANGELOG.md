@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Escape answers no to the question before a project is written:** the question that the window asks before a write removes a signature (or replaces a branch it did not write) closes with Escape without writing, Enter does not write and no key starts the machine behind it; while something runs Escape stops it as before. The commands do not ask.
+
 ## [0.2.4] - Attached documents, the shared project from the window and the program colour
 
 - **What the tag v0.3.6 of EH3D-COMMON brings to the window:** tabs that do not fit go to further rows with their whole name, the window About reads on light themes, and saving a project keeps the compressed bytes of what did not change and checks the new file before it replaces the old one.
