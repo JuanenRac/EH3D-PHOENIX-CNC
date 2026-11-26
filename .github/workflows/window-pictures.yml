@@ -6,8 +6,6 @@ name: Window pictures
 
 on:
   workflow_dispatch:
-  push:
-    branches: [release-ready]
 
 permissions:
   contents: read
