@@ -74,6 +74,16 @@ impl App {
         !self.session.running && !self.session.busy() && !self.server_busy()
     }
 
+    // ------------------------------------------------------------------------------------------------------------ the attachments
+
+    /// The attachments of the project of the window; what it writes is read again by the window.
+    pub(super) fn panel_attachments(&mut self, ui: &mut egui::Ui) {
+        let file = self.suite.file.clone();
+        if self.attachments.show(ui, file.as_deref(), self.lang.code()) {
+            self.suite_refresh();
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------------------ the state of the machine
 
     /// The position, the speeds, the codes in force and the guard of the controller.

@@ -91,11 +91,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, label: linux-x86_64, target: x86_64-unknown-linux-gnu, ext: "", archive: tar.gz }
-          - { os: windows-latest, label: windows-x86_64, target: x86_64-pc-windows-msvc, ext: ".exe", archive: zip }
-          - { os: windows-latest, label: windows-x86, target: i686-pc-windows-msvc, ext: ".exe", archive: zip }
-          - { os: macos-latest, label: macos-arm64, target: aarch64-apple-darwin, ext: "", archive: tar.gz }
-          - { os: macos-latest, label: macos-x86_64, target: x86_64-apple-darwin, ext: "", archive: tar.gz }
+          - { os: ubuntu-latest, label: linux-x86_64, pdfium: linux-x86_64, target: x86_64-unknown-linux-gnu, ext: "", archive: tar.gz }
+          - { os: windows-latest, label: windows-x86_64, pdfium: windows-x86_64, target: x86_64-pc-windows-msvc, ext: ".exe", archive: zip }
+          - { os: windows-latest, label: windows-x86, pdfium: windows-x86, target: i686-pc-windows-msvc, ext: ".exe", archive: zip }
+          - { os: macos-latest, label: macos-arm64, pdfium: macos-aarch64, target: aarch64-apple-darwin, ext: "", archive: tar.gz }
+          - { os: macos-latest, label: macos-x86_64, pdfium: macos-x86_64, target: x86_64-apple-darwin, ext: "", archive: tar.gz }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,6 +160,9 @@ jobs:
           cp LICENSE README.md CHANGELOG.md "$name/"
           # sample G-code programs, from the simplest to a long one
           cp -r examples "$name/examples"
+          # the PDF library of the viewer of attachments, beside the program with its licences, as it is published (never signed again)
+          python3 ../EH3D-COMMON/tools/fetch_pdfium.py --platform "${MATRIX_PDFIUM}" --out "$name"
+          cp ../EH3D-COMMON/crates/viewer/THIRD_PARTY_NOTICES "$name/THIRD_PARTY_NOTICES-attachments.txt"
           mkdir -p dist
           if [ "${MATRIX_ARCHIVE}" = "zip" ]; then
             7z a -tzip "dist/${name}.zip" "$name" >/dev/null
@@ -175,6 +178,7 @@ jobs:
           MATRIX_TARGET: ${{ matrix.target }}
           MATRIX_EXT: ${{ matrix.ext }}
           MATRIX_ARCHIVE: ${{ matrix.archive }}
+          MATRIX_PDFIUM: ${{ matrix.pdfium }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: parts-${{ matrix.label }}
