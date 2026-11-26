@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The documents say the languages the window has:** eight, those of the shared view, not 37.
 - **The panel «Attachments» reads its limits and takes dropped files:** `attachments.max_mb` and `viewer.max_*_mb` are read from the settings file and kept when it is written, a file can be dropped on the panel while the files the window opens are still opened, and the SHA-256 of a large file no longer stops the window.
 - **The register of requirements and the status page name the panel of the attachments.**
 - **The attachments of the project in the window:** a panel «Attachments» (View, or *File > Suite project*) lists, attaches, links to a part, extracts and removes the data sheets, manuals and other files of the `.eh3d` project, with the viewer beside the list; dangerous and unknown files ask first. The packages carry the PDF library (PDFium) and its licences.
