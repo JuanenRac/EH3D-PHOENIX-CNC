@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.4] - Attached documents, the shared project from the window and the program colour
+
 - **What the tag v0.3.6 of EH3D-COMMON brings to the window:** tabs that do not fit go to further rows with their whole name, the window About reads on light themes, and saving a project keeps the compressed bytes of what did not change and checks the new file before it replaces the old one.
 - **Words that stand out and the title bars are read on the light themes:** the headings and other emphasised words took the white of the dark controls, and the title bar of a window (About, Settings) and the bars of the tabs stayed dark under dark words; the light themes now start from the light controls, emphasised words take the text colour of the theme, and a test holds the contrast on every theme.
 - **The shared repository is taken at its tag v0.3.6 and the pictures of the window are new:** the workflows, the Rust checks included, build against the tag v0.3.6 of EH3D-COMMON and the tag v0.1.3 of EH3D-CORE-LIBS; a manual workflow (Window pictures) takes the pictures of the README.
