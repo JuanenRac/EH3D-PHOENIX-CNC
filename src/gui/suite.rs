@@ -770,6 +770,10 @@ impl App {
                     }
                 });
             });
+        // Escape says no also when the keys are off or a box has the keyboard; no button has it, so Enter does not write
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            answer = Some(false);
+        }
         match answer {
             Some(true) => {
                 self.suite_confirm();
@@ -959,6 +963,39 @@ mod tests {
         assert_eq!(a.suite_save(), Step::Asked);
         assert!(warned(&a).contains(&S::SignedBranch));
         assert_eq!(fs::read(&project).unwrap(), bytes);
+
+        // Enter does not answer, F5 starts nothing behind the question and Escape says no, also with the keys off
+        let ctx = egui::Context::default();
+        let press = |a: &mut App, key: Option<egui::Key>| {
+            let mut input = egui::RawInput::default();
+            if let Some(key) = key {
+                input.events.push(egui::Event::Key {
+                    key,
+                    physical_key: Some(key),
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                });
+            }
+            let mut out = ctx.run_ui(input, |ui| {
+                a.keys(ui.ctx());
+                a.suite_windows(ui.ctx());
+            });
+            out.textures_delta.clear();
+        };
+        for key in [None, Some(egui::Key::Enter), Some(egui::Key::F5), None] {
+            press(&mut a, key);
+            assert!(a.suite.pending.is_some(), "{key:?}");
+        }
+        assert!(a.win.is_none() && !a.session.running);
+        for shortcuts in [true, false] {
+            a.settings.shortcuts = shortcuts;
+            press(&mut a, Some(egui::Key::Escape));
+            assert!(a.suite.pending.is_none(), "shortcuts {shortcuts}");
+            assert_eq!(a.suite_confirm(), Step::Refused);
+            assert_eq!(fs::read(&project).unwrap(), bytes);
+            assert_eq!(a.suite_save(), Step::Asked);
+        }
         assert_eq!(a.suite_confirm(), Step::Done);
         assert!(logged(&a, S::NoticeBranchSignature));
         let _ = fs::remove_dir_all(&d);

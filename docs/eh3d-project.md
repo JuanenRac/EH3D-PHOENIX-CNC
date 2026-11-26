@@ -26,7 +26,7 @@ File > Suite project (.eh3d) does the same with the window: Open suite project, 
 - Open takes the program of `cnc/` as the program of the window; a project without one leaves the window with no program. A project that cannot be read changes nothing. Open, import and take are refused while a program runs or the machine moves, and nothing here moves it.
 - Save puts the program of the window. The table of tools and the motion file of the machine go only when their boxes in the project bar are ticked, and a motion file with `klipper.api_key` is not put. What the project holds already is not written again, so a program taken from another branch keeps its reference. The drawing of the branch is kept as it is.
 - Save as to a new file copies the whole project first, so every branch goes with it. A file that is there keeps its own branches: only `cnc/` is written, after a question.
-- The window asks before writing a project it did not open, a `cnc/` that changed since it was read, or one whose signature (of the project or of the branch) the write removes.
+- The window asks before writing a project it did not open, a `cnc/` that changed since it was read, or one whose signature (of the project or of the branch) the write removes. Nothing is written until *Write* is pressed: Escape and *Cancel* say no, and no button has the keyboard, so Enter does not write. The commands do not ask.
 - A bar under the top bar names the project and says what is OUT OF DATE and what is signed. It is read again when the window gets the keyboard back.
 - The table of tools and the motion file of a project are never applied to the machine; extract the branch to use them. A program is never written over a project as text.
 
