@@ -52,6 +52,10 @@ use crate::session::{Session, STEPS};
 
 /// How many lines of the program are handed to the thread that sends them at a time.
 const PUMP_BATCH: usize = 8;
+/// Under this height the panel of the state draws its rows smaller, so that the codes in force stay in sight.
+const COMPACT_STATE_BELOW: f32 = 440.0;
+/// The size of a button of the jog pad with all the room it wants.
+const PAD_BUTTON: Vec2 = Vec2::new(52.0, 38.0);
 use crate::view::{Orbit, Plan2d};
 use dialogs::{lang_name, Win};
 use files::Purpose;
@@ -832,7 +836,7 @@ impl App {
     }
 
     /// The position: the tabs and the four axes, big. The letter of an axis sets its zero.
-    fn position_block(&mut self, ui: &mut egui::Ui) {
+    fn position_block(&mut self, ui: &mut egui::Ui, compact: bool) {
         let (work, machine, operator, gcode) = (
             self.t(Text::McWork),
             self.t(Text::McMachine),
@@ -861,19 +865,26 @@ impl App {
             (3, "mm")
         };
         let tip = self.t(Text::McZeroAxis);
+        let (letter_size, value_size, height, margin) = if compact {
+            (18.0, 20.0, 22.0, 1)
+        } else {
+            (26.0, 30.0, 34.0, 3)
+        };
         for (i, name) in ["X", "Y", "Z", "A"].iter().enumerate() {
             egui::Frame::new()
                 .fill(col(self.theme.panel_raised))
                 .corner_radius(6.0)
-                .inner_margin(egui::Margin::symmetric(8, 3))
+                .inner_margin(egui::Margin::symmetric(8, margin))
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         let letter = egui::Button::new(
-                            RichText::new(*name).size(26.0).color(col(self.theme.dim)),
+                            RichText::new(*name)
+                                .size(letter_size)
+                                .color(col(self.theme.dim)),
                         )
                         .frame(false)
-                        .min_size(Vec2::new(30.0, 34.0));
+                        .min_size(Vec2::new(30.0, height));
                         if ui.add(letter).on_hover_text(tip).clicked() {
                             match self.pos_tab {
                                 PosTab::Machine => {}
@@ -885,7 +896,7 @@ impl App {
                             ui.label(
                                 RichText::new(format!("{:9.1$} {unit}", values[i], decimals))
                                     .monospace()
-                                    .size(30.0)
+                                    .size(value_size)
                                     .color(col(self.theme.accent)),
                             );
                         });
@@ -894,63 +905,79 @@ impl App {
         }
     }
 
-    /// The speed of the move and the speed of the spindle, each with its little picture.
-    fn speed_rows(&mut self, ui: &mut egui::Ui) {
+    /// The speed of the move and the speed of the spindle, each with its little picture; side by side in a low panel.
+    fn speed_rows(&mut self, ui: &mut egui::Ui, compact: bool) {
         let st = self.session.status.clone();
         let rows = [
             (Icon::Gauge, self.t(Text::McSpeed), st.feed_mm_min),
             (Icon::Spindle, self.t(Text::McSpindle), st.spindle_rpm),
         ];
-        for (icon, tip, v) in rows {
-            egui::Frame::new()
-                .fill(col(self.theme.panel_raised))
-                .corner_radius(6.0)
-                .inner_margin(egui::Margin::symmetric(8, 3))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        let (rect, resp) =
-                            ui.allocate_exact_size(Vec2::new(34.0, 30.0), egui::Sense::hover());
-                        resp.on_hover_text(tip);
-                        let p = ui.painter_at(rect);
-                        let line = Stroke::new(1.8, col(self.theme.dim));
-                        let c = rect.center();
-                        match icon {
-                            Icon::Gauge => {
-                                p.circle_stroke(c + Vec2::new(0.0, 2.0), 12.0, line);
-                                p.line_segment(
-                                    [c + Vec2::new(0.0, 2.0), c + Vec2::new(7.0, -6.0)],
-                                    line,
-                                );
-                            }
-                            _ => {
-                                p.rect_stroke(
-                                    Rect::from_center_size(
-                                        c - Vec2::new(0.0, 5.0),
-                                        Vec2::new(14.0, 10.0),
-                                    ),
-                                    2.0,
-                                    line,
-                                    StrokeKind::Inside,
-                                );
-                                p.line_segment([c, c + Vec2::new(0.0, 11.0)], line);
-                            }
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!("{v:.2}"))
-                                    .monospace()
-                                    .size(24.0)
-                                    .color(col(self.theme.text)),
-                            );
-                        });
-                    });
-                });
+        if compact {
+            ui.columns(2, |columns| {
+                for (column, (icon, tip, v)) in columns.iter_mut().zip(rows) {
+                    self.speed_box(column, icon, tip, format!("{v:.2}"), true);
+                }
+            });
+        } else {
+            for (icon, tip, v) in rows {
+                self.speed_box(ui, icon, tip, format!("{v:.2}"), false);
+            }
         }
     }
 
+    fn speed_box(&self, ui: &mut egui::Ui, icon: Icon, tip: &str, value: String, compact: bool) {
+        // the picture keeps its shape at the smaller size
+        let (scale, value_size, margin) = if compact {
+            (0.75, 17.0, 1)
+        } else {
+            (1.0, 24.0, 3)
+        };
+        egui::Frame::new()
+            .fill(col(self.theme.panel_raised))
+            .corner_radius(6.0)
+            .inner_margin(egui::Margin::symmetric(8, margin))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    let (rect, resp) =
+                        ui.allocate_exact_size(Vec2::new(34.0, 30.0) * scale, egui::Sense::hover());
+                    resp.on_hover_text(tip);
+                    let p = ui.painter_at(rect);
+                    let line = Stroke::new(1.8, col(self.theme.dim));
+                    let c = rect.center();
+                    let at = |x: f32, y: f32| c + Vec2::new(x, y) * scale;
+                    match icon {
+                        Icon::Gauge => {
+                            p.circle_stroke(at(0.0, 2.0), 12.0 * scale, line);
+                            p.line_segment([at(0.0, 2.0), at(7.0, -6.0)], line);
+                        }
+                        _ => {
+                            p.rect_stroke(
+                                Rect::from_center_size(
+                                    at(0.0, -5.0),
+                                    Vec2::new(14.0, 10.0) * scale,
+                                ),
+                                2.0,
+                                line,
+                                StrokeKind::Inside,
+                            );
+                            p.line_segment([c, at(0.0, 11.0)], line);
+                        }
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(value)
+                                .monospace()
+                                .size(value_size)
+                                .color(col(self.theme.text)),
+                        );
+                    });
+                });
+            });
+    }
+
     /// The codes in force (G and M), or the inputs and the outputs.
-    fn info_block(&mut self, ui: &mut egui::Ui) {
+    fn info_block(&mut self, ui: &mut egui::Ui, compact: bool) {
         let (gc, io) = (self.t(Text::McGcodeTab), self.t(Text::McIoTab));
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.info_tab, 0, gc);
@@ -958,20 +985,25 @@ impl App {
         });
         let dim = col(self.theme.dim);
         if self.info_tab == 0 {
-            ui.label(RichText::new(self.t(Text::McActiveG)).color(dim));
-            ui.label(
-                RichText::new(self.session.modal.g_codes().join("  "))
-                    .monospace()
-                    .strong()
-                    .size(15.0),
-            );
-            ui.label(RichText::new(self.t(Text::McActiveM)).color(dim));
-            ui.label(
-                RichText::new(self.session.modal.m_codes().join("  "))
-                    .monospace()
-                    .strong()
-                    .size(15.0),
-            );
+            let lists = [
+                (Text::McActiveG, self.session.modal.g_codes().join("  ")),
+                (Text::McActiveM, self.session.modal.m_codes().join("  ")),
+            ];
+            let size = if compact { 13.0 } else { 15.0 };
+            for (title, codes) in lists {
+                let title = RichText::new(self.t(title)).color(dim);
+                let codes = RichText::new(codes).monospace().strong().size(size);
+                if compact {
+                    // the codes follow their title and go to a further row when they do not fit
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(title);
+                        ui.label(codes);
+                    });
+                } else {
+                    ui.label(title);
+                    ui.label(codes);
+                }
+            }
         } else {
             let st = self.session.status.clone();
             let pin = |c: char| st.pins.contains(c);
@@ -1018,7 +1050,7 @@ impl App {
                 }
             }
         });
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(self.t(Text::McJogSpeed));
             ui.add(
                 egui::DragValue::new(&mut self.session.feed_mm_min)
@@ -1029,35 +1061,85 @@ impl App {
                 self.session.unlock();
             }
         });
-        let size = Vec2::new(52.0, 38.0);
+        self.jog_pad(ui);
+    }
+
+    /// The buttons of the jog. With room for it, X and Y stand apart from Z and A; in a narrow panel the buttons draw closer and smaller, and in a narrower
+    /// one Z and A go under X and Y, so that no button is cut.
+    fn jog_pad(&mut self, ui: &mut egui::Ui) {
+        const GAP: f32 = 6.0;
+        // the empty column between the two blocks of the wide pad
+        const APART: f32 = 40.0;
+        let room = ui.available_width();
+        let wide = room >= 5.0 * PAD_BUTTON.x + APART + 5.0 * GAP;
+        let one_block = room >= 5.0 * 30.0 + 4.0 * GAP;
+        let columns = if one_block { 5.0 } else { 3.0 };
+        let width = ((room - (columns - 1.0) * GAP) / columns).clamp(30.0, PAD_BUTTON.x);
+        // two blocks, one over the other, take lower buttons so that both stay in sight
+        let height = if one_block { PAD_BUTTON.y } else { 30.0 };
+        let size = Vec2::new(width, height);
         let mut pad = |ui: &mut egui::Ui, label: &str, axis: usize, dir: f64| {
             if ui.add(egui::Button::new(label).min_size(size)).clicked() {
                 self.session.jog(axis, dir);
             }
         };
-        egui::Grid::new("pad").spacing([6.0, 6.0]).show(ui, |ui| {
+        let empty = |ui: &mut egui::Ui| {
             ui.label("");
-            pad(ui, "Y+", 1, 1.0);
-            ui.label("");
-            ui.label("");
-            pad(ui, "Z+", 2, 1.0);
-            pad(ui, "A+", 3, 1.0);
-            ui.end_row();
-            pad(ui, "X-", 0, -1.0);
-            ui.label("");
-            pad(ui, "X+", 0, 1.0);
-            ui.label("");
-            ui.label("");
-            ui.label("");
-            ui.end_row();
-            ui.label("");
-            pad(ui, "Y-", 1, -1.0);
-            ui.label("");
-            ui.label("");
-            pad(ui, "Z-", 2, -1.0);
-            pad(ui, "A-", 3, -1.0);
-            ui.end_row();
-        });
+        };
+        let grid = |name: &str| egui::Grid::new(name).spacing([GAP, GAP]).min_col_width(0.0);
+        // the rows of the two blocks: what is on the left, in the middle and on the right of X and Y, and the axes Z and A
+        let xy = [
+            [None, Some(("Y+", 1, 1.0)), None],
+            [Some(("X-", 0, -1.0)), None, Some(("X+", 0, 1.0))],
+            [None, Some(("Y-", 1, -1.0)), None],
+        ];
+        let za = [
+            [("Z+", 2, 1.0), ("A+", 3, 1.0)],
+            [("Z-", 2, -1.0), ("A-", 3, -1.0)],
+        ];
+        if one_block {
+            grid("pad").show(ui, |ui| {
+                for (row, buttons) in xy.into_iter().enumerate() {
+                    for button in buttons {
+                        match button {
+                            Some((label, axis, dir)) => pad(ui, label, axis, dir),
+                            None => empty(ui),
+                        }
+                    }
+                    if wide {
+                        ui.allocate_exact_size(Vec2::new(APART, 1.0), egui::Sense::hover());
+                    }
+                    // Z and A stand on the first and on the last row
+                    if row != 1 {
+                        for (label, axis, dir) in za[row / 2] {
+                            pad(ui, label, axis, dir);
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        } else {
+            grid("pad_xy").show(ui, |ui| {
+                for buttons in xy {
+                    for button in buttons {
+                        match button {
+                            Some((label, axis, dir)) => pad(ui, label, axis, dir),
+                            None => empty(ui),
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+            ui.add_space(GAP);
+            grid("pad_za").show(ui, |ui| {
+                for buttons in za {
+                    for (label, axis, dir) in buttons {
+                        pad(ui, label, axis, dir);
+                    }
+                    ui.end_row();
+                }
+            });
+        }
     }
 }
 

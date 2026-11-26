@@ -88,15 +88,16 @@ impl App {
 
     /// The position, the speeds, the codes in force and the guard of the controller.
     pub(super) fn panel_position(&mut self, ui: &mut egui::Ui) {
+        let compact = ui.available_height() < COMPACT_STATE_BELOW;
         egui::ScrollArea::vertical()
             .id_salt("positionscroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                self.position_block(ui);
+                self.position_block(ui, compact);
                 ui.add_space(4.0);
-                self.speed_rows(ui);
+                self.speed_rows(ui, compact);
                 ui.add_space(4.0);
-                self.info_block(ui);
+                self.info_block(ui, compact);
                 ui.separator();
                 self.guard_row(ui);
             });
@@ -804,6 +805,95 @@ impl App {
             });
         if let Some(l) = jump {
             self.show_line(l);
+        }
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+
+    /// A text that was painted, its place and the part of the screen it could use.
+    type Painted = (String, Rect, Rect);
+
+    /// Draws a panel in a screen of this size, with no window, and gives every text that was painted.
+    fn painted(size: Vec2, mut draw: impl FnMut(&mut egui::Ui)) -> Vec<Painted> {
+        let ctx = egui::Context::default();
+        let screen = Rect::from_min_size(egui::Pos2::ZERO, size);
+        let input = || egui::RawInput {
+            screen_rect: Some(screen),
+            ..Default::default()
+        };
+        // the first frames only measure
+        for _ in 0..3 {
+            ctx.run_ui(input(), &mut draw)
+                .drop_without_applying_deltas();
+        }
+        let out = ctx.run_ui(input(), &mut draw);
+        let texts = out
+            .shapes
+            .iter()
+            .filter_map(|c| match &c.shape {
+                egui::Shape::Text(t) => Some((
+                    t.galley.text().to_string(),
+                    c.shape.visual_bounding_rect(),
+                    c.clip_rect.intersect(screen),
+                )),
+                _ => None,
+            })
+            .collect();
+        out.drop_without_applying_deltas();
+        texts
+    }
+
+    fn whole(texts: &[Painted], label: &str, at: Vec2) {
+        let found: Vec<_> = texts.iter().filter(|t| t.0 == label).collect();
+        assert!(!found.is_empty(), "{at:?}: {label} is not drawn");
+        for (_, place, room) in found {
+            assert!(
+                room.expand(0.5).contains_rect(*place),
+                "{at:?}: {label} is cut: {place:?} in {room:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_jog_pad_cuts_no_button_in_a_narrow_panel() {
+        let mut a = App::isolated();
+        let tall = [220.0, 260.0, 300.0, 360.0, 412.0, 440.0, 520.0, 700.0].map(|w| (w, 700.0));
+        // the height of the panel in the window of the pictures
+        let low = [260.0, 300.0, 412.0].map(|w| (w, 345.0));
+        for (width, height) in tall.into_iter().chain(low) {
+            let size = Vec2::new(width, height);
+            let texts = painted(size, |ui| a.panel_jog(ui));
+            for label in ["X-", "X+", "Y-", "Y+", "Z-", "Z+", "A-", "A+"] {
+                whole(&texts, label, size);
+            }
+        }
+    }
+
+    #[test]
+    fn the_codes_in_force_are_in_sight_in_a_low_panel_of_the_state() {
+        let mut a = App::isolated();
+        let codes = [
+            a.session.modal.g_codes().join("  "),
+            a.session.modal.m_codes().join("  "),
+        ];
+        for lang in Lang::ALL {
+            a.lang = lang;
+            for size in [
+                Vec2::new(412.0, 320.0),
+                Vec2::new(520.0, 360.0),
+                Vec2::new(412.0, 600.0),
+            ] {
+                let texts = painted(size, |ui| a.panel_position(ui));
+                for label in [a.t(Text::McActiveG), a.t(Text::McActiveM)] {
+                    whole(&texts, label, size);
+                }
+                for label in &codes {
+                    whole(&texts, label, size);
+                }
+            }
         }
     }
 }
