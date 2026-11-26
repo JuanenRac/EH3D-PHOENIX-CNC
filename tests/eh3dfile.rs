@@ -533,3 +533,41 @@ fn a_wrong_request_creates_nothing() {
         assert!(!Path::new(&other).exists(), "{args:?}");
     }
 }
+
+#[test]
+fn the_command_line_never_puts_the_credential_of_a_link_in_a_project() {
+    let dir = folder("credential");
+    let path = dir.join("work.eh3d");
+    // the value is put together here so that no credential is written in the source
+    let value = ["abc", "123"].concat();
+    let motion = dir.join("motion.txt");
+    fs::write(&motion, format!("klipper.api_key = {value}\n")).unwrap();
+    let drawing = drawing_in(&dir);
+    let words = |motion: &Path| -> Vec<String> {
+        [
+            "save",
+            text(&path).as_str(),
+            "--drawing",
+            text(&drawing).as_str(),
+            "--motion",
+            text(motion).as_str(),
+        ]
+        .iter()
+        .map(|w| w.to_string())
+        .collect()
+    };
+    let out = eh3dcli::run(&words(&motion));
+    assert_eq!(out.code, 2);
+    assert!(out.err.contains("klipper.api_key"), "{}", out.err);
+    assert!(!out.err.contains(&value) && !out.out.contains(&value));
+    assert!(!path.exists(), "a refusal writes nothing");
+    // the same words with the line commented out are taken
+    let clean = dir.join("clean.txt");
+    fs::write(&clean, "# klipper.api_key = written by hand\n").unwrap();
+    let out = eh3dcli::run(&words(&clean));
+    assert_eq!(out.code, 0, "{}", out.err);
+    // and a refusal leaves a project that is there as it was
+    let before = fs::read(&path).unwrap();
+    assert_eq!(eh3dcli::run(&words(&motion)).code, 2);
+    assert_eq!(fs::read(&path).unwrap(), before);
+}

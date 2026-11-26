@@ -150,6 +150,9 @@ fn read_drawing(name: &str, bytes: &[u8], cfg: &ImportCfg) -> Result<import::Dra
     import::read(format, bytes, cfg).map_err(|why| format!("{name}: {}", why.text("en")))
 }
 
+/// The line of the motion file that holds the credential of a link: a motion file with it never goes into a project.
+pub const CREDENTIAL_KEY: &str = "klipper.api_key";
+
 /// The motion file given to a command, or the usual values. A file with mistakes is refused.
 pub fn motion_of(path: Option<&str>) -> Result<MotionCfg, String> {
     let Some(path) = path else {
@@ -209,6 +212,13 @@ pub fn save_contents(
         );
     }
     if let Some(held) = &contents.motion {
+        // a project is a file that is passed on: the credential of a link never goes into it
+        if eh3d_project::suiteview::sets_key(&held.bytes, CREDENTIAL_KEY) {
+            return Err(format!(
+                "{}: it holds {CREDENTIAL_KEY}, the credential of the link, so it is not put in the project (take the line out or leave the motion file out)",
+                held.name
+            ));
+        }
         let (_, problems) = MotionCfg::parse(&String::from_utf8_lossy(&held.bytes));
         if !problems.is_empty() {
             return Err(format!(

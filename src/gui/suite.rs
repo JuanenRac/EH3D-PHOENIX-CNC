@@ -7,13 +7,10 @@
 //! tools and the motion file of a project are kept in it and never applied to the machine, and nothing here moves it.
 
 use super::*;
-use crate::eh3dfile::{self, Contents, Held, Identity, Opened, BRANCH};
+use crate::eh3dfile::{self, Contents, Held, Identity, Opened, BRANCH, CREDENTIAL_KEY};
 use crate::suitecore::{self, name_of, ProjectView};
 use crate::suitetext::{Said, S};
 use eh3d_filedialog::Mode;
-
-/// The line of the motion file that holds the credential of a link: a motion file with it never goes into a project.
-const CREDENTIAL_KEY: &str = "klipper.api_key";
 
 /// Something that writes a project.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -303,11 +300,9 @@ impl App {
         let mut motion =
             self.suite_machine_file(self.suite.put_motion, &motion_path(&self.settings_path))?;
         // the project is a file that is passed on: the credential of a link never goes into it
-        let has_credential = motion.as_ref().is_some_and(|held| {
-            String::from_utf8_lossy(&held.bytes)
-                .lines()
-                .any(|l| l.trim_start().starts_with(CREDENTIAL_KEY))
-        });
+        let has_credential = motion
+            .as_ref()
+            .is_some_and(|held| suitecore::sets_key(&held.bytes, CREDENTIAL_KEY));
         if has_credential {
             motion = None;
             notes.push(Said::plain(S::MotionWithCredential));
