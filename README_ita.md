@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1200-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1210-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano, in pianta o in 3D, con le righe eseguite segnate, e si ferma su ciò che il controllore rifiuta. Inoltre controlla, misura e prepara programmi (archi, cicli fissi, compensazione del raggio, aree vietate, un tastatore, una mappa delle altezze, un cambio utensile, una tabella utensili e una dei materiali), importa disegni e i file Gerber ed Excellon delle schede e invia un programma al server EH3D. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) è pilotata per GRBL, grblHAL, Marlin e Klipper contro simulatori dei loro dialetti su cavi simulati; le altre famiglie che elenca non sono pilotate. 1200 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**: una porta seriale si apre solo per GRBL, grblHAL o Marlin e una connessione di rete solo quando un programma è inviato al server o si raggiunge Klipper con `--klipper`. Le macchine simulate accettano solo movimenti rettilinei e rifiutano archi, cicli fissi e tastatura, quindi questi sono misurati, controllati e cronometrati sulla carta, il percorso disegnato mostra un arco come la sua corda, e un programma che li contiene si ferma a quella riga sul simulatore. La finestra offre le 37 lingue della vista condivisa di EH3D-COMMON e porta undici temi, ma questo programma promette otto lingue: le parole dei suoi pannelli e strumenti esistono in inglese, spagnolo, tedesco, francese, italiano, giapponese, cinese e portoghese europeo.
+**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano, in pianta o in 3D, con le righe eseguite segnate, e si ferma su ciò che il controllore rifiuta. Inoltre controlla, misura e prepara programmi (archi, cicli fissi, compensazione del raggio, aree vietate, un tastatore, una mappa delle altezze, un cambio utensile, una tabella utensili e una dei materiali), importa disegni e i file Gerber ed Excellon delle schede e invia un programma al server EH3D. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) è pilotata per GRBL, grblHAL, Marlin e Klipper contro simulatori dei loro dialetti su cavi simulati; le altre famiglie che elenca non sono pilotate. 1210 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**: una porta seriale si apre solo per GRBL, grblHAL o Marlin e una connessione di rete solo quando un programma è inviato al server o si raggiunge Klipper con `--klipper`. Le macchine simulate accettano solo movimenti rettilinei e rifiutano archi, cicli fissi e tastatura, quindi questi sono misurati, controllati e cronometrati sulla carta, il percorso disegnato mostra un arco come la sua corda, e un programma che li contiene si ferma a quella riga sul simulatore. La finestra offre le 37 lingue della vista condivisa di EH3D-COMMON e porta undici temi, ma questo programma promette otto lingue: le parole dei suoi pannelli e strumenti esistono in inglese, spagnolo, tedesco, francese, italiano, giapponese, cinese e portoghese europeo.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.2.3` |
 | Maturità | Funzionale |
-| Test | 1200 |
+| Test | 1210 |
 | Stack tecnologico | Rust |
 | Su hardware reale | No: per impostazione predefinita pilota una macchina simulata; un vero controllore GRBL (`--grbl`) non è mai stato provato |
 
@@ -47,7 +47,7 @@ Ogni riga è una parte di questo repository e la luce dice a che punto è oggi. 
 | Libreria di base | 🟡 | Un crate Rust che riesporta `scene`, `texts` e `theme` di `eh3d-view` con il nome di questo programma; richiede la cartella di EH3D-COMMON accanto. |
 | Scena e viste | 🟡 | Scritta e provata in EH3D-COMMON; la finestra di questo programma disegna il percorso di un programma sul piano e la posizione dell'utensile (vista su un computer). |
 | Temi e testi | 🟡 | Undici temi e le parole dell'interfaccia: la finestra offre le 37 lingue della vista condivisa, e le parole dei pannelli e degli strumenti propri di questo programma sono in otto; viste nella finestra di questo programma. |
-| Test | 🟡 | 1200 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
+| Test | 🟡 | 1210 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
 | Finestra e jog | 🟡 | Funziona su un computer con il controllore simulato: posizione, tastierino di jog, passi, avanzamento, origine, zero, sblocco, una riga di comandi e un registro; nessuna macchina reale. |
 | Controllo della macchina | 🟠 | Solo simulatori: un programma gira riga per riga con pausa, stop e arresto di emergenza sulla macchina simulata o su un GRBL, grblHAL, Marlin o Klipper simulato; la porta seriale per GRBL, grblHAL e Marlin è dietro una funzione di compilazione, il collegamento HTTP di Klipper ha incontrato solo un Moonraker sostitutivo e nessun controllore reale è stato collegato. |
 | Documentazione | 🟡 | README in otto lingue, le due immagini, tre programmi di esempio e il changelog. |
@@ -97,6 +97,7 @@ Ogni riga è una parte di questo repository e la luce dice a che punto è oggi. 
 * **Viste fisse del visualizzatore:** **Vista > Vista dall'alto, Vista frontale, Vista laterale** e **Vista isometrica** (o **Ctrl+1** a **Ctrl+4**) mettono il percorso in quella vista: quella dall'alto è la pianta, quelle frontale e laterale guardano lungo un asse, a livello del piano, e quella isometrica è la vista con cui parte la finestra. `--view top|front|side|iso` (oltre a `plan` e `3d`) avvia la finestra in una di esse, da usare con `--shot`. Il piano è la vera vista ortografica dall'alto di EH3D-COMMON (`StandardView::Top`): X a destra, Y in alto, la stessa scala su entrambi gli assi, centrata nell'area.
 * **Tab completa il codice nella casella dei comandi:** finché la casella in basso nella finestra ha la tastiera, Tab completa il codice che si sta scrivendo (`G38` dà `G38.`, `M30` dà `M30 `, `$J` dà `$J=`) oppure, quando ne stanno bene diversi, scrive ciò che hanno in comune e li elenca accanto alla casella (`G5` elenca da `G53` a `G59`). Agisce sull'ultima parola della riga, non distingue maiuscole e minuscole e non invia nulla: la riga parte sempre con Invio.
 * **Progetti della suite** (`src/eh3dfile.rs`, `docs/eh3d-project.md`): `phoenix-cnc project list|save|import|open|take|extract` tiene il lavoro nel ramo `cnc/` di un progetto `.eh3d`, un solo file con un ramo per ogni programma: `save` vi mette il programma, il disegno, la tabella utensili e il file del movimento; `import` conserva byte per byte un programma G-code o un disegno DXF, SVG o HPGL con un rapporto di ciò che è stato letto, di ciò che non lo è stato e di ciò che si perde in esportazione (un disegno dà anche il programma che lo percorre tagliando); `take` copia un contorno o una mesh da un altro ramo, come `cad/`, con l'hash e il formato della sorgente, e `list` e `open` dicono quando è superata. Viene scritto solo `cnc/`: gli altri rami, noti o no, conservano i loro byte. Nulla si muove, ed è stato provato solo con progetti inventati.
+* **Il progetto nella finestra** (`src/gui/suite.rs`, `src/suitecore.rs`, `docs/eh3d-project.md`): File > Progetto della suite (.eh3d) apre un progetto, lo salva e lo salva con un altro nome mantenendo tutti i rami, importa un file conservando l'originale, prende un file di un altro ramo, estrae un ramo ed elenca i rami. Ciò che non è aggiornato o è firmato resta in vista; prima di scrivere su un progetto non aperto lì, su un ramo cambiato da quando è stato letto o su una firma, la finestra chiede. Mentre la macchina si muove non si apre, importa o prende nulla da un progetto; la sua tabella utensili e il file di movimento non vengono mai applicati, entrano in un progetto solo se spuntati, e un file di movimento con una credenziale mai. La logica è provata senza schermo; nessuna persona ha provato le voci su uno schermo.
 
 ## 🧩 Ruolo in EH3D
 
@@ -175,7 +176,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Test
 
-`cargo test --features gui` esegue 1200 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
+`cargo test --features gui` esegue 1210 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
 
 ## 🏗️ Compilazione e rilascio
 
@@ -254,6 +255,9 @@ EH3D-PHOENIX-CNC/
 │   ├── lookahead.rs                             il pianificatore su carta: velocità negli angoli, accelerazione per asse, profili e tempo
 │   ├── eh3dfile.rs                              il ramo cnc di un progetto .eh3d: salvare, importare, prendere, aprire, estrarre
 │   ├── eh3dcli.rs                               il comando project della riga di comando
+│   ├── suitecore.rs                             stato e avvisi di un progetto
+│   ├── suitetext.rs                             testi di progetto in 8 lingue
+│   ├── gui/suite.rs                             menu File per progetti .eh3d
 │   ├── import.rs                                lettori limitati di HPGL, DXF e SVG, e il G-code che taglia lungo i percorsi
 │   ├── pcb.rs                                   schede: file Gerber ed Excellon in programmi di isolamento, contorno e foratura
 │   ├── post.rs                                  post-processori come regole in un file di testo: intestazione, coda, parole, numeri, decimali

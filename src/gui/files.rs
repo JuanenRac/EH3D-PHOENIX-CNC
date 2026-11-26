@@ -6,6 +6,7 @@
 use super::*;
 use crate::heightmap::HeightMap;
 use crate::logbook::classify;
+use crate::suitetext::S;
 use crate::words::Msg;
 use eh3d_filedialog::Mode;
 
@@ -19,6 +20,11 @@ pub(super) enum Purpose {
     LogSave,
     /// The work report (a page of HTML).
     ReportSave,
+    /// A project file of the suite: to open, to save into, a file to import into it and the folder a branch is written into.
+    SuiteOpen,
+    SuiteSaveAs,
+    SuiteImport,
+    SuiteExtract,
 }
 
 /// The biggest height map file read (a grid of 100 x 100 points is a few hundred kilobytes).
@@ -33,8 +39,16 @@ impl App {
             Purpose::MapLoad => Msg::MenuMapLoad,
             Purpose::LogSave => Msg::MenuLogExport,
             Purpose::ReportSave => Msg::RepMenu,
+            Purpose::SuiteOpen => return Some(self.suite_title(S::MenuOpen)),
+            Purpose::SuiteSaveAs => return Some(self.suite_title(S::MenuSaveAs)),
+            Purpose::SuiteImport => return Some(self.suite_title(S::MenuImport)),
+            Purpose::SuiteExtract => return Some(self.suite_title(S::MenuExtract)),
         };
         Some(self.w(m).trim_end_matches('.'))
+    }
+
+    fn suite_title(&self, word: S) -> &'static str {
+        word.tr(self.lang.code()).trim_end_matches('.')
     }
 
     /// The name of the first type in the list of types of the file window.
@@ -44,6 +58,9 @@ impl App {
             Purpose::MapSave | Purpose::MapLoad => self.w(Msg::FilterMap),
             Purpose::LogSave => self.w(Msg::FilterLog),
             Purpose::ReportSave => self.w(Msg::FilterReport),
+            Purpose::SuiteOpen | Purpose::SuiteSaveAs => self.suite_title(S::Menu),
+            Purpose::SuiteImport => self.suite_title(S::MenuImport),
+            Purpose::SuiteExtract => self.suite_title(S::MenuExtract),
         }
     }
 
@@ -60,6 +77,19 @@ impl App {
             (Purpose::MapSave, _) => self.save_height_map(path),
             (Purpose::LogSave, _) => self.export_log(path),
             (Purpose::ReportSave, _) => self.export_work_report(path),
+            (Purpose::SuiteOpen, _) => {
+                self.suite_open(path);
+            }
+            (Purpose::SuiteSaveAs, _) => {
+                self.suite_save_as(path);
+            }
+            (Purpose::SuiteImport, _) => {
+                self.suite_import(path);
+            }
+            (Purpose::SuiteExtract, _) => {
+                let branch = self.suite.extract_branch.clone();
+                self.suite_extract(&branch, path);
+            }
         }
     }
 

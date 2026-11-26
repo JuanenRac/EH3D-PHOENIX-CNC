@@ -42,6 +42,7 @@ mod queue;
 mod remote;
 mod shell;
 mod sim;
+mod suite;
 mod summary;
 mod views;
 mod xform;
@@ -251,6 +252,8 @@ pub struct App {
     /// What the panels of the docking window ask of the frame: panels to show, and files that were opened (for the list of recent files).
     pending_dock: Vec<eh3d_dock::menu::DockAction>,
     recent_added: Vec<String>,
+    /// The project file of the suite (`.eh3d`) the window works on.
+    suite: suite::SuiteState,
     /// The state of the panels of the import, the time and the tool setter.
     import_ui: dockpanels::ImportUi,
     plan_ui: Option<crate::workflow::TimeCompare>,
@@ -366,6 +369,7 @@ impl App {
             guard_trip: None,
             pending_dock: Vec::new(),
             recent_added: Vec::new(),
+            suite: suite::SuiteState::default(),
             import_ui: dockpanels::ImportUi::default(),
             plan_ui: None,
             setter_ui: dockpanels::SetterUi::default(),
@@ -483,6 +487,9 @@ impl App {
 
     /// Reads the file as the program; says whether it could.
     fn load_file(&mut self, path: &Path) -> bool {
+        if crate::suitecore::is_project(path) {
+            return self.load_project(path);
+        }
         match std::fs::read(path) {
             Ok(bytes) => {
                 let text: String = bytes.iter().map(|&b| b as char).collect();
@@ -1100,6 +1107,7 @@ impl App {
         let ctx = ctx.clone();
         self.sim_guard();
         self.windows(&ctx);
+        self.suite_windows(&ctx);
         self.note_focus(&ctx);
         if self.quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);

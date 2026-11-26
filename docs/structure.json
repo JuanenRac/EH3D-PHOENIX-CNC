@@ -827,6 +827,45 @@
           }
         },
         {
+          "name": "suitecore.rs",
+          "desc": {
+            "en": "state and warnings of a project",
+            "es": "estado y avisos de un proyecto",
+            "de": "Stand und Warnungen eines Projekts",
+            "fr": "état et alertes d'un projet",
+            "it": "stato e avvisi di un progetto",
+            "ja": "プロジェクトの状態と警告",
+            "zh": "工程状态与警告",
+            "pt": "estado e avisos de um projeto"
+          }
+        },
+        {
+          "name": "suitetext.rs",
+          "desc": {
+            "en": "project words, eight languages",
+            "es": "textos del proyecto en 8 idiomas",
+            "de": "Projekttexte in 8 Sprachen",
+            "fr": "textes de projet en 8 langues",
+            "it": "testi di progetto in 8 lingue",
+            "ja": "プロジェクトの文言",
+            "zh": "工程文字（8 种语言）",
+            "pt": "textos do projeto em 8 línguas"
+          }
+        },
+        {
+          "name": "gui/suite.rs",
+          "desc": {
+            "en": "File menu for .eh3d projects",
+            "es": "menú Archivo para proyectos .eh3d",
+            "de": "Menü Datei für .eh3d-Projekte",
+            "fr": "menu Fichier des projets .eh3d",
+            "it": "menu File per progetti .eh3d",
+            "ja": ".eh3d のファイルメニュー",
+            "zh": ".eh3d 工程的文件菜单",
+            "pt": "menu Ficheiro para projetos .eh3d"
+          }
+        },
+        {
           "name": "import.rs",
           "desc": {
             "en": "bounded readers of HPGL, DXF and SVG, and the G-code that cuts along them",

@@ -17,6 +17,17 @@ The exit code is 0 when there is nothing to read, 1 when something is out of dat
 
 What every program does with its branch (open or create, save, import with a report, take, out-of-date notices, list and extract) is the module `appbranch` of the crate `eh3d-project`; this program says what its files are. `list` says when a branch is signed. Writing the branch removes a signature of the project, and a signature of the branch when there is one; the command says so. These commands neither sign nor check signatures: `eh3d-project` of EH3D-COMMON does.
 
+## In the window
+
+File > Suite project (.eh3d) does the same with the window: Open suite project, Save suite project, Save suite project as, Import a file and keep the original, Take from another branch, Extract a branch and Branches of the project. A project can also be opened with the file window, dropped on the window, picked from the recent files or given on the command line.
+
+- Open takes the program of `cnc/` as the program of the window; a project without one leaves the window with no program. A project that cannot be read changes nothing. Open, import and take are refused while a program runs or the machine moves, and nothing here moves it.
+- Save puts the program of the window. The table of tools and the motion file of the machine go only when their boxes in the project bar are ticked, and a motion file with `klipper.api_key` is not put. What the project holds already is not written again, so a program taken from another branch keeps its reference. The drawing of the branch is kept as it is.
+- Save as to a new file copies the whole project first, so every branch goes with it. A file that is there keeps its own branches: only `cnc/` is written, after a question.
+- The window asks before writing a project it did not open, a `cnc/` that changed since it was read, or one whose signature (of the project or of the branch) the write removes.
+- A bar under the top bar names the project and says what is OUT OF DATE and what is signed. It is read again when the window gets the keyboard back.
+- The table of tools and the motion file of a project are never applied to the machine; extract the branch to use them. A program is never written over a project as text.
+
 ## What is in the branch
 
 ```
