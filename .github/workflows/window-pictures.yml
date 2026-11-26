@@ -73,6 +73,8 @@ jobs:
           shot 05-open --lang en --theme forge examples/01_square.nc --window open --wait 20
           shot 06-machine --lang en --theme forge examples/02_frame_and_pocket.nc --window machine --wait 20
           shot 07-settings-atc --lang en --theme forge examples/01_square.nc --window settings-atc --wait 20
+          # the window about the program on a light theme
+          shot 08-about-paper --lang en --theme paper examples/01_square.nc --window about --wait 20
           ls -l "$out"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
