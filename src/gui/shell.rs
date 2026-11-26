@@ -5,6 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use eh3d_dock::about::Phoenix;
 use eh3d_dock::gui::Dock;
 use eh3d_dock::menu::{Chosen, DockAction, MenuBar, StdAction};
 
@@ -57,6 +58,8 @@ impl Shell {
             }
         }
         dock.set_language(lang);
+        // the accents of the window take the colour of the program; its window about is its own
+        dock.set_program(Phoenix::Cnc);
         let watch = LayoutWatch::new(&dock.core().config_pairs());
         Shell {
             app,
@@ -65,6 +68,11 @@ impl Shell {
             watch,
             ticks: 0,
         }
+    }
+
+    /// The list of recent projects lives in the folder of the user, whatever settings file is used.
+    pub(super) fn keep_user_recent(&mut self) {
+        self.dock.keep_user_recent(Phoenix::Cnc);
     }
 
     /// One frame: the controller and the keys first, then the menu bar, the bars, the panels, and last the windows.

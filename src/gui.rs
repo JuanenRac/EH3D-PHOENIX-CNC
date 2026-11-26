@@ -1151,6 +1151,7 @@ pub fn run(o: &Options) -> eframe::Result {
             std::process::exit(2);
         }
     };
+    let picture = o.shot.is_some();
     let app = App::with_link(o, linked);
     let size = if o.shot.is_some() {
         Vec2::new(1400.0, 800.0)
@@ -1174,7 +1175,12 @@ pub fn run(o: &Options) -> eframe::Result {
         options,
         Box::new(move |cc| {
             install_fonts(&cc.egui_ctx);
-            Ok(Box::new(shell::Shell::new(app)))
+            let mut shell = shell::Shell::new(app);
+            // the list of recent projects lives in the folder of the user; a picture reads and writes none
+            if !picture {
+                shell.keep_user_recent();
+            }
+            Ok(Box::new(shell))
         }),
     )
 }
