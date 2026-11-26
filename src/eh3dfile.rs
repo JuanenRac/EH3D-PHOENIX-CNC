@@ -119,7 +119,8 @@ pub fn motion_of(path: Option<&str>) -> Result<MotionCfg, String> {
     let Some(path) = path else {
         return Ok(MotionCfg::default());
     };
-    let bytes = read_bounded(Path::new(path), crate::motioncfg::MAX_FILE_BYTES)?;
+    let bytes =
+        read_bounded(Path::new(path), crate::motioncfg::MAX_FILE_BYTES).map_err(describe)?;
     let (cfg, problems) = MotionCfg::parse(&String::from_utf8_lossy(&bytes));
     if problems.is_empty() {
         Ok(cfg)
@@ -179,10 +180,9 @@ pub fn save(path: &Path, inputs: &Inputs, identity: &Identity) -> Result<Vec<Str
         None => None,
     };
     let motion_bytes = match &inputs.motion {
-        Some(file) => Some(read_bounded(
-            Path::new(file),
-            crate::motioncfg::MAX_FILE_BYTES,
-        )?),
+        Some(file) => Some(
+            read_bounded(Path::new(file), crate::motioncfg::MAX_FILE_BYTES).map_err(describe)?,
+        ),
         None => None,
     };
     for (rel, _) in program.iter().chain(drawing.iter()) {
