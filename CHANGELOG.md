@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Safety text corrected: the server starts the spindle when a job sent to it goes on.** `server_restore_outputs` decides the coolant only. While the job waits before its first move, the log says in the eight languages that the machine goes back on its own to where it stopped and starts the spindle the program had on.
+
 - **A project saved by another program is not written over:** the window keeps the mark of the project from the moment it opens or saves it, looks at it again after a question, and refuses to save, import or take when another program wrote the file meanwhile. It says so in the eight languages and offers to read it again, to save under another name or to close. 2 new tests.
 - **What the tag v0.3.7 of EH3D-COMMON brings to the window:** the panel «Attachments» refuses the same writes and reads its list again, and `viewer.max_preview_mb` (16 by default) in the settings says how much text a whole preview keeps.
 

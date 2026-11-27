@@ -174,6 +174,13 @@ impl App {
                     i.percent(),
                     i.line + 1
                 ));
+                if i.pause == "resume" {
+                    let lang = eh3d_serverclient::Lang::from_tag(self.settings.lang.code())
+                        .unwrap_or(eh3d_serverclient::Lang::En);
+                    self.session
+                        .log
+                        .push(format!("server: {}", crate::server::resume_notice(lang)));
+                }
                 if !i.message.is_empty() {
                     self.session.log.push(format!("server: {}", i.message));
                 }
