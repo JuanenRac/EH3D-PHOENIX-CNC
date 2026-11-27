@@ -316,16 +316,13 @@ fn trace(lines: &[String]) -> (Vec<Segment>, Vec<ArcRec>) {
     for (n, raw) in lines.iter().enumerate() {
         let mut off: [Option<f64>; 3] = [None; 3];
         let mut radius: Option<f64> = None;
-        let text = raw.split(';').next().unwrap_or("");
+        let text = code_of(raw);
         let mut target = [None; 3];
         let mut word = String::new();
         let mut words: Vec<String> = Vec::new();
-        let mut in_comment = false;
         for c in text.chars() {
             match c {
-                '(' => in_comment = true,
-                ')' => in_comment = false,
-                c if in_comment || c.is_whitespace() => {}
+                c if c.is_whitespace() => {}
                 c if c.is_ascii_alphabetic() => {
                     if !word.is_empty() {
                         words.push(std::mem::take(&mut word));
@@ -475,11 +472,60 @@ pub fn arc_moves(lines: &[String]) -> usize {
     count
 }
 
-/// The words of a line of G-code (a letter and its number), without the comments; what is not a word is left out.
-pub fn words(line: &str) -> Vec<(char, f64)> {
-    let text = line.split(';').next().unwrap_or("");
-    let mut out = Vec::new();
+/// The code of a line, without its comments: what stands in brackets (a `;` there is part of the comment) and what follows a `;` outside them. The characters GRBL takes
+/// out of the stream and obeys at once (`!`, `~`, `?`, control characters) are left out too, so that `X9!99` is read as the controller reads it.
+pub fn code_of(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
     let mut in_comment = false;
+    for c in line.chars() {
+        match c {
+            ';' if !in_comment => break,
+            '(' => in_comment = true,
+            ')' => in_comment = false,
+            '!' | '~' | '?' => {}
+            c if in_comment || (c.is_control() && c != '\t') => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Whether the code of a line has something that is not a letter with a number: [`words`] leaves it out, so the line cannot be judged. Lines of the controller (`$`),
+/// program markers (`%`) and the text of a message (`M117`) are not G-code and are not asked about.
+pub fn unreadable(line: &str) -> bool {
+    let code: String = code_of(line)
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let code = code.split('*').next().unwrap_or("");
+    let upper = code.to_ascii_uppercase();
+    if upper.is_empty()
+        || upper.starts_with(['$', '%', '/'])
+        || ["M117", "M118"].iter().any(|m| upper.starts_with(m))
+    {
+        return false;
+    }
+    let mut rest = code;
+    while let Some(c) = rest.chars().next() {
+        if !c.is_ascii_alphabetic() {
+            return true;
+        }
+        rest = &rest[1..];
+        let end = rest
+            .find(|c: char| !(c.is_ascii_digit() || matches!(c, '+' | '-' | '.')))
+            .unwrap_or(rest.len());
+        if rest[..end].parse::<f64>().is_err() {
+            return true;
+        }
+        rest = &rest[end..];
+    }
+    false
+}
+
+/// The words of a line of G-code (a letter and its number), without the comments; what is not a word is left out (see [`unreadable`]).
+pub fn words(line: &str) -> Vec<(char, f64)> {
+    let text = code_of(line);
+    let mut out = Vec::new();
     let mut cur: Option<(char, String)> = None;
     let flush = |cur: &mut Option<(char, String)>, out: &mut Vec<(char, f64)>| {
         if let Some((l, n)) = cur.take() {
@@ -490,9 +536,7 @@ pub fn words(line: &str) -> Vec<(char, f64)> {
     };
     for c in text.chars() {
         match c {
-            '(' => in_comment = true,
-            ')' => in_comment = false,
-            c if in_comment || c.is_whitespace() => {}
+            c if c.is_whitespace() => {}
             c if c.is_ascii_alphabetic() => {
                 flush(&mut cur, &mut out);
                 cur = Some((c.to_ascii_uppercase(), String::new()));

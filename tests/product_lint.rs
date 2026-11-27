@@ -298,7 +298,9 @@ fn a_command_of_the_controller_behind_a_comment_stops_the_program() {
         s.start();
         s.pump(10);
         assert!(
-            s.log.iter().any(|m| m.starts_with("line 2 ")),
+            s.log
+                .iter()
+                .any(|m| m.starts_with("line 2 ") && m.contains("would change the controller")),
             "{line:?}: {:?}",
             s.log
         );
