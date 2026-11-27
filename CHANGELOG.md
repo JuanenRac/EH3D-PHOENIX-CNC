@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The position follows the machine while a line waits for its `ok`:** the window asks for a status report out of turn and shows the report that comes back, instead of keeping the last status until the line ends.
+- **An option to stop the spindle on a pause, off by default (not tried on a machine):** `grbl_spindle_stop_on_pause` in Settings and in the settings file makes a pause of a GRBL or grblHAL controller also send the safety door byte (`0x84`), which stops the spindle and the coolant until the program goes on. A door state that is not confirmed is said in the log, a Start gives the resume again while the machine stays in its door state, and it takes effect the next time the program is opened. Tried against the simulated GRBL only.
+- **The workflows take EH3D-COMMON v0.3.9.**
+
 ## [0.2.6] - The emergency stop reaches the job of the server, safer restarts and imports (not tried on a machine)
 
 - **The log of the session speaks the eight languages:** the answers to the jog, the stop, the travel, the probe, the tool setter and the height map, the end of a program and the lines the program stops at were written in English whatever the language of the window. They follow it now (the words a controller sends stay as it sends them), and the exported log still marks the errors in each language.

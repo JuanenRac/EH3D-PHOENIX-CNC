@@ -6,12 +6,13 @@
 //! (GRBL answers `ok` only when its buffer has room, which with a long move in front can be minutes). The window never waits for it: it
 //! asks for the next lines with [`Session::pump_async`] and looks at what was done, and the pause, the stop and the emergency stop go
 //! to the controller out of turn through its urgent channel, so they are heard while a line is still waiting for its `ok`. What the
-//! window shows meanwhile is the last status the controller gave.
+//! window shows meanwhile is the report the controller reads while it waits (a status request sent out of turn), or the last status
+//! until one comes.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use eh3d_controller::urgent::{Urgent, UrgentChannel};
 use eh3d_controller::{Command, Controller, Error, Family, State, Status, AXES};
@@ -28,6 +29,12 @@ pub const STEPS: [f64; 5] = [0.01, 0.1, 1.0, 10.0, 100.0];
 
 /// The mark of a pause (in seconds) inside the lines that put the controller back in its state.
 const WAIT_MARK: &str = "@wait ";
+
+/// How often the report of a controller that is busy with a line is asked for out of turn.
+const LIVE_EVERY: Duration = Duration::from_millis(200);
+
+/// How long after a pause that asks for the spindle to stop the controller has to say that it is in its door state.
+const DOOR_WAIT: Duration = Duration::from_secs(3);
 
 /// A controller that can be handed to the thread of the emitter.
 pub type BoxedController = Box<dyn Controller + Send>;
@@ -106,6 +113,12 @@ pub struct Session {
     /// How many steps of the batch in flight are done.
     progress: Arc<AtomicUsize>,
     inflight: Option<InFlight>,
+    /// When the status was last asked while a line waits for its `ok`, or while a door state is awaited.
+    live_asked: Option<Instant>,
+    /// The controller was opened with the pause that also stops the spindle and the coolant (the safety door of GRBL).
+    pub spindle_stop_on_pause: bool,
+    /// A pause sent out of turn asked for the spindle to stop: the controller has until then to say that it is in its door state.
+    door_due: Option<Instant>,
     /// A stop or an emergency stop was asked while a batch was in flight: the line it cuts short is not a failure.
     aborted: bool,
     /// How many times a stop or an emergency stop was asked.
@@ -257,6 +270,9 @@ impl Session {
             halt: Arc::new(AtomicBool::new(false)),
             progress: Arc::new(AtomicUsize::new(0)),
             inflight: None,
+            live_asked: None,
+            spindle_stop_on_pause: false,
+            door_due: None,
             aborted: false,
             halts: 0,
             status: Status::default(),
@@ -363,25 +379,64 @@ impl Session {
         }
     }
 
-    /// Asks the controller how it is. While the emitter works the controller is not asked: the window keeps the last status.
+    /// Asks the controller how it is. While the emitter works the controller is not asked in the usual way: a status request goes out of
+    /// turn, the report that comes back while the line waits for its `ok` replaces the status, and until one comes the window keeps the
+    /// last status.
     pub fn refresh(&mut self) {
         if self.inflight.is_some() {
+            self.live_status();
             return;
         }
         let r = self.ctl().status();
         match r {
-            Ok(s) => {
-                // an alarm may have lost the position
-                if s.state == State::Alarm {
-                    self.homed = false;
-                }
-                if !matches!(s.state, State::Jog | State::Run) {
-                    self.last_jog = None;
-                }
-                self.status = s;
-            }
+            Ok(s) => self.take_status(s),
             Err(e) => self.failed("status", e),
         }
+    }
+
+    /// Keeps a status the controller gave.
+    fn take_status(&mut self, s: Status) {
+        // an alarm may have lost the position
+        if s.state == State::Alarm {
+            self.homed = false;
+        }
+        if !matches!(s.state, State::Jog | State::Run) {
+            self.last_jog = None;
+        }
+        self.status = s;
+    }
+
+    /// The status of a controller that is busy with a line: takes the report that has come and asks for the next one out of turn.
+    fn live_status(&mut self) {
+        let Some(channel) = self.urgent.clone() else {
+            return;
+        };
+        if let Some(report) = channel.take_report() {
+            self.take_status(report);
+        }
+        if self.live_asked.is_none_or(|at| at.elapsed() >= LIVE_EVERY) {
+            channel.send(Urgent::Status);
+            self.live_asked = Some(Instant::now());
+        }
+    }
+
+    /// Looks whether the controller said that it is in its door state after a pause sent out of turn, and says so when it did not.
+    fn check_door(&mut self) {
+        let Some(due) = self.door_due else {
+            return;
+        };
+        if self.status.state == State::Door {
+            self.door_due = None;
+        } else if Instant::now() >= due {
+            self.door_due = None;
+            self.note(Lg::SpindleNotStopped);
+        }
+    }
+
+    /// The program runs but the controller stands in its door state (a resume given before the door state was complete, or a safety door
+    /// of the machine): a start gives the resume again.
+    pub fn held_at_door(&self) -> bool {
+        self.running && !self.paused && self.status.state == State::Door
     }
 
     /// The controller has an input for a probe (the probe, the height map and the tool setter need one). A controller that is busy sending
@@ -673,6 +728,7 @@ impl Session {
         self.homed = false;
         self.running = false;
         self.paused = false;
+        self.door_due = None;
         self.resume_preamble.clear();
         self.resume_descent = None;
         self.halt.store(true, Ordering::SeqCst);
@@ -1320,6 +1376,15 @@ impl Session {
             self.tell_about(Lg::InAlarm, "start");
             return;
         }
+        self.door_due = None;
+        if self.held_at_door() {
+            if self.inflight.is_some() {
+                self.send_urgent("resume", Urgent::Resume);
+            } else {
+                self.order("resume", Command::Resume);
+            }
+            return;
+        }
         if self.paused {
             if self.inflight.is_some() {
                 // the pause came while a line was waiting: the controller is only told to go on (out of turn, it is busy with that line)
@@ -1383,10 +1448,31 @@ impl Session {
             self.paused = true;
             self.halt.store(true, Ordering::SeqCst);
             if self.inflight.is_some() {
-                self.send_urgent("pause", Urgent::Hold);
+                // out of turn the controller cannot wait for the door state: the reports are looked at (see `check_door`)
+                if self.send_urgent("pause", Urgent::Hold) && self.spindle_stop_on_pause {
+                    self.door_due = Some(Instant::now() + DOOR_WAIT);
+                }
+            } else if self.spindle_stop_on_pause {
+                self.pause_with_door();
             } else {
                 self.order("pause", Command::Pause);
             }
+        }
+    }
+
+    /// The pause that also stops the spindle, with no line in progress. When the door state is not confirmed but the feed is held, the
+    /// program stays paused (so it can be gone on with or stopped) and the log says that the spindle may still turn.
+    fn pause_with_door(&mut self) {
+        let r = self.ctl().command(Command::Pause);
+        let Err(e) = r else {
+            self.refresh();
+            return;
+        };
+        self.refresh();
+        if self.paused && self.status.state == State::Hold {
+            self.note(Lg::SpindleNotStopped);
+        } else {
+            self.failed("pause", e);
         }
     }
 
@@ -1395,6 +1481,7 @@ impl Session {
         self.halts += 1;
         self.running = false;
         self.paused = false;
+        self.door_due = None;
         self.resume_preamble.clear();
         self.resume_descent = None;
         self.halt.store(true, Ordering::SeqCst);
@@ -1411,7 +1498,18 @@ impl Session {
     /// at that line; a line that starts with `$` stops it before it is sent unless the settings allow it.
     pub fn pump_async(&mut self, max_lines: usize) {
         self.collect();
-        if self.inflight.is_some() || !self.running || self.paused {
+        if self.inflight.is_some() {
+            // the line waits for its answer: the position follows the reports asked for out of turn
+            self.live_status();
+            self.check_door();
+            return;
+        }
+        if self.door_due.is_some() && self.live_asked.is_none_or(|at| at.elapsed() >= LIVE_EVERY) {
+            self.live_asked = Some(Instant::now());
+            self.refresh();
+        }
+        self.check_door();
+        if !self.running || self.paused {
             return;
         }
         let mut steps = Vec::new();
@@ -1913,6 +2011,112 @@ G0 X2",
             t0.elapsed() < Duration::from_secs(5),
             "the window waited for the line"
         );
+    }
+
+    #[test]
+    fn the_position_follows_the_machine_while_a_line_waits_for_its_answer() {
+        let (mut s, seen) = stalled_session("G1 X1\nG1 X2");
+        let channel = s
+            .urgent
+            .clone()
+            .expect("the controller has an urgent channel");
+        let before = s.status.machine_mm[0];
+        s.refresh();
+        assert_eq!(
+            s.status.machine_mm[0], before,
+            "no report yet: the last status stays"
+        );
+        // the window calls `pump_async` every frame: that is what has to follow the machine
+        for x in [12.5, 13.0] {
+            let mut live = Status::default();
+            live.machine_mm[0] = x;
+            channel.publish_report(live);
+            s.pump_async(1);
+            assert!(s.busy(), "the line is still waiting");
+            assert_eq!(s.status.machine_mm[0], x, "the report that came is shown");
+        }
+        s.stop();
+        s.wait_idle();
+        assert!(
+            seen.lock().unwrap().contains(&Urgent::Status),
+            "a status request went out of turn"
+        );
+    }
+
+    fn door_session(no_door: bool) -> Session {
+        use eh3d_controller::grbl::GrblController;
+        use eh3d_controller::grblsim::{Flavor, GrblDevice};
+        use eh3d_controller::wire::{Impair, WireLink};
+
+        let mut device = GrblDevice::new(Flavor::Grbl);
+        device.no_door = no_door;
+        let controller = GrblController::new(WireLink::new(device, Impair::clean()))
+            .with_spindle_stop_on_pause(true);
+        let mut s = Session::new(Box::new(controller));
+        s.spindle_stop_on_pause = true;
+        s.mdi("M3 S8000");
+        s.load("G0 X1\nG0 X2");
+        s.start();
+        s
+    }
+
+    #[test]
+    fn a_pause_that_stops_the_spindle_goes_to_the_door_state_and_a_start_goes_on() {
+        let mut s = door_session(false);
+        s.pause();
+        assert!(s.paused && s.running, "{:?}", s.log);
+        assert_eq!((s.status.state, s.status.spindle_rpm), (State::Door, 0.0));
+        s.start();
+        assert!(!s.paused && s.running);
+        assert_eq!(
+            (s.status.state, s.status.spindle_rpm),
+            (State::Idle, 8000.0)
+        );
+    }
+
+    #[test]
+    fn a_pause_whose_door_state_is_not_confirmed_stays_paused_and_says_so() {
+        let mut s = door_session(true);
+        s.pause();
+        assert!(s.paused && s.running, "{:?}", s.log);
+        assert_eq!(s.status.state, State::Hold);
+        let said = logwords::say("en", Lg::SpindleNotStopped, &[] as &[&str]);
+        assert!(s.log.contains(&said), "{:?}", s.log);
+    }
+
+    #[test]
+    fn a_start_resumes_a_running_program_that_stands_in_the_door_state_without_rewinding_it() {
+        let mut s = door_session(false);
+        s.pump(1);
+        let next = s.next;
+        s.status.state = State::Door;
+        assert!(s.held_at_door());
+        s.start();
+        assert_eq!(s.next, next, "the program was not started again");
+        assert!(s.running && !s.paused && !s.held_at_door());
+    }
+
+    #[test]
+    fn a_pause_out_of_turn_that_does_not_reach_the_door_state_is_said_once() {
+        let (mut s, seen) = stalled_session("G1 X1");
+        s.spindle_stop_on_pause = true;
+        s.pause();
+        assert!(s.door_due.is_some());
+        let said = logwords::say("en", Lg::SpindleNotStopped, &[] as &[&str]);
+        s.pump_async(1);
+        assert!(!s.log.contains(&said), "the controller still has time");
+        s.door_due = Some(Instant::now());
+        s.pump_async(1);
+        s.pump_async(1);
+        assert_eq!(
+            s.log.iter().filter(|l| **l == said).count(),
+            1,
+            "{:?}",
+            s.log
+        );
+        s.stop();
+        s.wait_idle();
+        assert!(seen.lock().unwrap().contains(&Urgent::Hold));
     }
 
     #[test]

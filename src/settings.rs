@@ -86,6 +86,9 @@ pub struct Settings {
     /// The most a line of the program waits for its answer while the machine says it is working, in seconds (the controller answers a line only
     /// when its buffer has room, which behind a long move can take minutes). The stop is heard meanwhile.
     pub busy_wait_s: f64,
+    /// A pause of a GRBL or grblHAL controller also stops the spindle and the coolant (the safety door of the firmware, `0x84`), which
+    /// start again when the program goes on. Off by default; read when the controller is opened. Not tried on a real machine.
+    pub grbl_spindle_stop_on_pause: bool,
     /// When a program goes on after a failure and the program had set no feed: the feed (mm/min) the tool is lowered to its depth with.
     pub resume_plunge_feed_mm_min: f64,
     /// When a program goes on after a failure it is taken up this many lines before the last one that was sent, because the controller keeps
@@ -159,6 +162,7 @@ impl Default for Settings {
             view_3d: false,
             read_controller_travel: true,
             busy_wait_s: 4.0 * 3600.0,
+            grbl_spindle_stop_on_pause: false,
             resume_plunge_feed_mm_min: 100.0,
             resume_backoff_lines: 16,
             jog_soft_limits: JogMode::AfterHoming,
@@ -417,6 +421,7 @@ impl Settings {
                 "open_preview" => s.open_preview = on(v),
                 "view_3d" => s.view_3d = on(v),
                 "read_controller_travel" => s.read_controller_travel = on(v),
+                "grbl_spindle_stop_on_pause" => s.grbl_spindle_stop_on_pause = on(v),
                 "recent" => {
                     s.recent = v
                         .split('|')
@@ -456,7 +461,7 @@ impl Settings {
     pub fn to_text(&self) -> String {
         let t = &self.travel;
         let mut out = format!(
-            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_timeout_s = {}\nserver_retries = {}\nserver_mdns = {}\nserver_max_answer_mib = {}\nserver_restore_outputs = {}\nserver_jog_max_mm = {}\nserver_jog_max_feed = {}\nserver_jog_confirm_mm = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\n",
+            "lang = {}\ntheme = {}\nunits = {}\nstep = {}\nfeed = {}\nspindle = {}\nshow_buttons = {}\nshow_program = {}\nshow_log = {}\nshow_rapids = {}\ntravel_x = {},{}\ntravel_y = {},{}\ntravel_z = {},{}\nlast_dir = {}\nrecent = {}\nserver_address = {}\nserver_token = {}\nserver_machine = {}\nserver_timeout_s = {}\nserver_retries = {}\nserver_mdns = {}\nserver_max_answer_mib = {}\nserver_restore_outputs = {}\nserver_jog_max_mm = {}\nserver_jog_max_feed = {}\nserver_jog_confirm_mm = {}\nresume_safe_z = {}\nresume_spindle_wait = {}\nconfirm_start = {}\nreject_out_of_travel = {}\nprogram_system_commands = {}\nrapid = {}\nsummary_tiny = {}\nsummary_far = {}\nsummary_margin = {}\nshortcuts = {}\nshow_toolbar = {}\nopen_preview = {}\nview_3d = {}\nread_controller_travel = {}\nbusy_wait = {}\nresume_plunge_feed = {}\nresume_backoff = {}\ngrbl_spindle_stop_on_pause = {}\n",
             self.lang.code(),
             self.theme.key(),
             if self.inches { "in" } else { "mm" },
@@ -506,7 +511,8 @@ impl Settings {
             yes(self.read_controller_travel),
             self.busy_wait_s,
             self.resume_plunge_feed_mm_min,
-            self.resume_backoff_lines
+            self.resume_backoff_lines,
+            yes(self.grbl_spindle_stop_on_pause)
         );
         out.push_str(&format!(
             "jog_soft_limits = {}\nlint = {}\nlint_rapid_floor = {}\nlint_max_feed = {}\nlint_max_rpm = {}\nlint_arcs = {}\nlint_arc_gap = {}\nlint_reversal = {}\nlint_zero_feed = {}\nprobe_feed = {}\nprobe_depth = {}\nprobe_retract = {}\nprobe_plate = {}\nprobe_clearance = {}\nprobe_grid = {}\nheightmap_segment = {}\n",
@@ -730,6 +736,7 @@ mod tests {
             view_3d: true,
             read_controller_travel: false,
             busy_wait_s: 600.0,
+            grbl_spindle_stop_on_pause: true,
             resume_plunge_feed_mm_min: 60.0,
             resume_backoff_lines: 4,
             jog_soft_limits: JogMode::Off,
@@ -1098,6 +1105,11 @@ server_jog_confirm_mm = 0
         let d = Settings::default();
         assert!(d.confirm_start && d.reject_out_of_travel && d.shortcuts);
         assert!(d.read_controller_travel);
+        assert!(
+            !d.grbl_spindle_stop_on_pause,
+            "the pause that stops the spindle starts off"
+        );
+        assert!(Settings::parse("grbl_spindle_stop_on_pause = yes\n").grbl_spindle_stop_on_pause);
         let s = Settings::parse(
             "rapid = 0\nsummary_far = -3\nsummary_margin = lots\nconfirm_start = no\n",
         );

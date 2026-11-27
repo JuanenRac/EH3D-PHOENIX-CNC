@@ -84,10 +84,11 @@ pub enum Lg {
     SrvSays,
     GuardSays,
     MapTooBig,
+    SpindleNotStopped,
 }
 
 impl Lg {
-    pub const ALL: [Lg; 76] = [
+    pub const ALL: [Lg; 77] = [
         Lg::Busy,
         Lg::NoUrgent,
         Lg::JogRunning,
@@ -164,6 +165,7 @@ impl Lg {
         Lg::SrvSays,
         Lg::GuardSays,
         Lg::MapTooBig,
+        Lg::SpindleNotStopped,
     ];
 
     fn row(self) -> [&'static str; 8] {
@@ -927,6 +929,16 @@ impl Lg {
                 "高さマップ：{0} は高さマップとしては大きすぎます",
                 "高度图：{0} 对高度图来说过大",
                 "mapa de alturas: {0} é demasiado grande para um mapa de alturas",
+            ],
+            Lg::SpindleNotStopped => [
+                "pause: the feed is held, but the controller did not confirm that it stopped the spindle: it may still turn",
+                "pausa: el avance está retenido, pero el controlador no ha confirmado que haya parado el husillo: puede seguir girando",
+                "Pause: der Vorschub ist angehalten, aber die Steuerung hat nicht bestätigt, dass die Spindel steht: sie kann noch drehen",
+                "pause : l'avance est suspendue, mais le contrôleur n'a pas confirmé l'arrêt de la broche : elle peut encore tourner",
+                "pausa: l'avanzamento è sospeso, ma il controllore non ha confermato l'arresto del mandrino: può ancora girare",
+                "一時停止：送りは止まっていますが、コントローラーは主軸の停止を確認していません。まだ回転している可能性があります",
+                "暂停：进给已保持，但控制器未确认主轴已停止：主轴可能仍在旋转",
+                "pausa: o avanço está retido, mas o controlador não confirmou que parou o fuso: pode continuar a rodar",
             ],
         }
     }

@@ -105,18 +105,7 @@ pub fn simulated_with(
     fail_at: Option<usize>,
 ) -> BoxedController {
     match d {
-        Dialect::Grbl | Dialect::GrblHal => {
-            let flavor = if d == Dialect::Grbl {
-                Flavor::Grbl
-            } else {
-                Flavor::GrblHal
-            };
-            let mut dev = GrblDevice::new(flavor);
-            if let Some(n) = fail_at {
-                dev.fail.insert(n, d.failing_code());
-            }
-            Box::new(GrblController::new(WireLink::new(dev, impair)).as_family(d.family()))
-        }
+        Dialect::Grbl | Dialect::GrblHal => simulated_grbl(d, impair, fail_at, false),
         Dialect::Marlin => {
             let mut dev = MarlinDevice::new();
             if let Some(n) = fail_at {
@@ -132,6 +121,29 @@ pub fn simulated_with(
             Box::new(KlipperController::new(RpcLink::new(dev, impair)))
         }
     }
+}
+
+/// The simulated GRBL or grblHAL, with or without the pause that stops the spindle.
+fn simulated_grbl(
+    d: Dialect,
+    impair: Impair,
+    fail_at: Option<usize>,
+    stop_spindle_on_pause: bool,
+) -> BoxedController {
+    let flavor = if d == Dialect::Grbl {
+        Flavor::Grbl
+    } else {
+        Flavor::GrblHal
+    };
+    let mut dev = GrblDevice::new(flavor);
+    if let Some(n) = fail_at {
+        dev.fail.insert(n, d.failing_code());
+    }
+    Box::new(
+        GrblController::new(WireLink::new(dev, impair))
+            .as_family(d.family())
+            .with_spindle_stop_on_pause(stop_spindle_on_pause),
+    )
 }
 
 /// A simulated controller of the dialect with the cable of the settings.
@@ -174,7 +186,7 @@ pub fn controller_for_motion(
     busy: Duration,
     motion: &MotionCfg,
 ) -> Result<BoxedController, String> {
-    controller_for_parts(o, busy, &motion.wire, &motion.klipper)
+    controller_for_parts(o, busy, &motion.wire, &motion.klipper, false)
 }
 
 /// As [`controller_for_with`] with the cable and the numbering of Marlin of the motion file.
@@ -183,7 +195,7 @@ pub fn controller_for_cfg(
     busy: Duration,
     wire: &WireCfg,
 ) -> Result<BoxedController, String> {
-    controller_for_parts(o, busy, wire, &KlipperCfg::default())
+    controller_for_parts(o, busy, wire, &KlipperCfg::default(), false)
 }
 
 /// Splits `HOST[:PORT]` (an IPv6 address in brackets when it has a port) into the host and the port, when there is one.
@@ -244,6 +256,7 @@ fn controller_for_parts(
     busy: Duration,
     wire: &WireCfg,
     klipper: &KlipperCfg,
+    stop_spindle_on_pause: bool,
 ) -> Result<BoxedController, String> {
     if let Some(text) = o.klipper.as_deref() {
         let lang = o.lang.map_or("en", |l| l.code());
@@ -256,10 +269,20 @@ fn controller_for_parts(
         } else {
             dialect.default_baud()
         };
-        return open_real(dialect, &port, baud, busy, wire.marlin_numbering);
+        return open_real(
+            dialect,
+            &port,
+            baud,
+            busy,
+            wire.marlin_numbering,
+            stop_spindle_on_pause,
+        );
     }
     if let Some(name) = o.sim.as_deref() {
         let d = Dialect::from_key(name).ok_or_else(|| format!("unknown dialect '{name}'"))?;
+        if stop_spindle_on_pause && matches!(d, Dialect::Grbl | Dialect::GrblHal) {
+            return Ok(simulated_grbl(d, impair_of(wire), None, true));
+        }
         return Ok(simulated(d, wire));
     }
     Ok(Box::new(SimController::new()))
@@ -271,6 +294,8 @@ pub struct Linked {
     pub controller: BoxedController,
     /// The guard, when the motion file has it on.
     pub guard: Option<GuardHandle>,
+    /// The controller was opened so that a pause also stops the spindle and the coolant (GRBL and grblHAL only).
+    pub stop_spindle_on_pause: bool,
 }
 
 /// The controller the options ask for, wrapped in the guard that fails closed unless the motion file turns it off (`guard = off`). The
@@ -286,8 +311,34 @@ pub fn guarded_for_motion(
     busy: Duration,
     motion: &MotionCfg,
 ) -> Result<Linked, String> {
-    let controller = controller_for_parts(o, busy, &motion.wire, &motion.klipper)?;
-    Ok(wrap(controller, !o.is_real(), &motion.guard))
+    guarded_for_settings(o, busy, motion, false)
+}
+
+/// As [`guarded_for_motion`], with the pause that also stops the spindle and the coolant when it is asked for
+/// (`grbl_spindle_stop_on_pause` of the settings file). It only counts for a GRBL or grblHAL controller, real or simulated.
+pub fn guarded_for_settings(
+    o: &Options,
+    busy: Duration,
+    motion: &MotionCfg,
+    stop_spindle_on_pause: bool,
+) -> Result<Linked, String> {
+    let stop = stop_spindle_on_pause && takes_safety_door(o);
+    let controller = controller_for_parts(o, busy, &motion.wire, &motion.klipper, stop)?;
+    let mut linked = wrap(controller, !o.is_real(), &motion.guard);
+    linked.stop_spindle_on_pause = stop;
+    Ok(linked)
+}
+
+/// Whether the controller the options ask for is a GRBL or a grblHAL, the ones that have the safety door.
+fn takes_safety_door(o: &Options) -> bool {
+    if o.klipper.is_some() {
+        return false;
+    }
+    let dialect = match o.real_link() {
+        Some((dialect, _)) => Some(dialect),
+        None => o.sim.as_deref().and_then(Dialect::from_key),
+    };
+    matches!(dialect, Some(Dialect::Grbl | Dialect::GrblHal))
 }
 
 /// Puts a controller in the guard (or leaves it as it is when the guard is off).
@@ -296,6 +347,7 @@ pub fn wrap(controller: BoxedController, simulated: bool, cfg: &GuardCfg) -> Lin
         return Linked {
             controller,
             guard: None,
+            stop_spindle_on_pause: false,
         };
     }
     let mut cfg = cfg.clone();
@@ -306,6 +358,7 @@ pub fn wrap(controller: BoxedController, simulated: bool, cfg: &GuardCfg) -> Lin
     Linked {
         controller: Box::new(handle.clone()),
         guard: Some(handle),
+        stop_spindle_on_pause: false,
     }
 }
 
@@ -316,16 +369,22 @@ fn open_real(
     baud: u32,
     busy: Duration,
     numbering: bool,
+    stop_spindle_on_pause: bool,
 ) -> Result<BoxedController, String> {
     use eh3d_controller::serial::SerialTransport;
 
     let transport = SerialTransport::open(port, baud).map_err(|e| format!("{port}: {e}"))?;
     Ok(match dialect {
-        Dialect::Grbl => Box::new(GrblController::new(transport).with_busy_limit(busy)),
+        Dialect::Grbl => Box::new(
+            GrblController::new(transport)
+                .with_busy_limit(busy)
+                .with_spindle_stop_on_pause(stop_spindle_on_pause),
+        ),
         Dialect::GrblHal => Box::new(
             GrblController::new(transport)
                 .with_busy_limit(busy)
-                .as_family(Family::GrblHal),
+                .as_family(Family::GrblHal)
+                .with_spindle_stop_on_pause(stop_spindle_on_pause),
         ),
         Dialect::Marlin => Box::new(
             MarlinController::new(transport)
@@ -345,6 +404,7 @@ fn open_real(
     _baud: u32,
     _busy: Duration,
     _numbering: bool,
+    _stop_spindle_on_pause: bool,
 ) -> Result<BoxedController, String> {
     Err("this build has no serial port support (build with --features serial)".to_string())
 }
@@ -368,6 +428,38 @@ pub fn ports_text() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pause_that_stops_the_spindle_is_off_unless_asked_and_only_for_grbl() {
+        let linked = |args: &str, ask: bool| {
+            let o = Options::parse(args.split_whitespace().map(String::from)).unwrap();
+            guarded_for_settings(&o, Duration::from_millis(10), &MotionCfg::default(), ask).unwrap()
+        };
+        for (args, ask, want) in [
+            ("--sim grbl", false, false),
+            ("--sim grbl", true, true),
+            ("--sim grblhal", true, true),
+            ("--sim marlin", true, false),
+            ("--lang en", true, false),
+        ] {
+            assert_eq!(
+                linked(args, ask).stop_spindle_on_pause,
+                want,
+                "{args} {ask}"
+            );
+        }
+        for (ask, want) in [
+            (false, eh3d_controller::State::Hold),
+            (true, eh3d_controller::State::Door),
+        ] {
+            let mut l = linked("--sim grbl", ask);
+            l.controller.send_line("M3 S8000").unwrap();
+            l.controller
+                .command(eh3d_controller::Command::Pause)
+                .unwrap();
+            assert_eq!(l.controller.status().unwrap().state, want);
+        }
+    }
 
     #[test]
     fn the_port_and_the_baud_rate_are_read() {

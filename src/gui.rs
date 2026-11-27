@@ -468,6 +468,7 @@ impl App {
     pub fn with_link(o: &Options, linked: crate::link::Linked) -> App {
         let mut app = App::with_controller(o, linked.controller);
         app.guard = linked.guard;
+        app.session.spindle_stop_on_pause = linked.stop_spindle_on_pause;
         app
     }
 
@@ -1275,9 +1276,15 @@ pub fn run(o: &Options) -> eframe::Result {
         print!("{}", crate::link::ports_text());
         return Ok(());
     }
-    let busy = std::time::Duration::from_secs_f64(Settings::load(&settings_path()).busy_wait_s);
+    let settings = Settings::load(&settings_path());
+    let busy = std::time::Duration::from_secs_f64(settings.busy_wait_s);
     let (motion, _) = MotionCfg::read(&motion_path(&settings_path()));
-    let linked = match crate::link::guarded_for_motion(o, busy, &motion) {
+    let linked = match crate::link::guarded_for_settings(
+        o,
+        busy,
+        &motion,
+        settings.grbl_spindle_stop_on_pause,
+    ) {
         Ok(l) => l,
         Err(e) => {
             eprintln!("phoenix-cnc: {e}");
