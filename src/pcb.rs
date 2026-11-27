@@ -638,13 +638,17 @@ pub fn import_bytes(
             if assumed && ask.kind.is_none() {
                 notes.push(Note::PcbAssumedCopper);
             }
+            // what the reader could not read is not cut as if it were not there
+            if file
+                .diagnostics
+                .iter()
+                .any(|d| d.severity >= gerber::Severity::Error)
+            {
+                return Err(Fail::Syntax);
+            }
             let mut scene = from_gerber(&file);
             if scene.shapes.is_empty() {
-                let broken = file
-                    .diagnostics
-                    .iter()
-                    .any(|d| d.severity >= gerber::Severity::Error);
-                return Err(if broken { Fail::Syntax } else { Fail::Empty });
+                return Err(Fail::Empty);
             }
             if scene.shapes.len() > import.max_points {
                 return Err(Fail::TooManyPoints);
@@ -684,12 +688,24 @@ pub fn import_bytes(
             if file.drills.len() + file.slots.len() > import.max_points {
                 return Err(Fail::TooManyPoints);
             }
+            // an error in the file means a hole may be missing or in another place, however many others were read
+            if file
+                .diagnostics
+                .iter()
+                .any(|d| d.severity >= excellon::Severity::Error)
+            {
+                return Err(Fail::Syntax);
+            }
+            // a position that rests on a supposed format, zeros or units can be many times off
+            let assumed = file.assumptions().next().is_some();
+            if assumed && !pcb.allow_assumed_drill {
+                return Err(Fail::DrillAssumed);
+            }
             if file.drills.is_empty() && file.slots.is_empty() {
-                let broken = file
-                    .diagnostics
-                    .iter()
-                    .any(|d| d.severity >= excellon::Severity::Error);
-                return Err(if broken { Fail::Syntax } else { Fail::Empty });
+                return Err(Fail::Empty);
+            }
+            if assumed {
+                notes.push(Note::PcbAssumedDrill);
             }
             if from_excellon(&file).is_lossy() {
                 notes.push(Note::PcbNotDrawn);
@@ -966,17 +982,33 @@ mod tests {
     }
 
     #[test]
-    fn a_hole_with_no_tool_is_left_out_and_inches_are_converted() {
+    fn a_file_with_an_error_is_not_cut_and_inches_are_converted() {
+        // a tool that is not in the table: one hole was read, and the other would be missing from the board
         let odd = "M48\nMETRIC,TZ\nT1C0.800\n%\nT1\nX5.0Y5.0\nT9\nX7.0Y7.0\nM30\n";
-        let job = run("a.drl", odd, Ask::default()).unwrap();
-        assert_eq!(job.cuts, 1);
-        assert!(
-            job.notes.contains(&Note::PcbHoleSkipped) || job.notes.contains(&Note::PcbNotDrawn)
-        );
+        assert_eq!(run("a.drl", odd, Ask::default()), Err(Fail::Syntax));
+        // the same for a layer: it still has shapes, and one of its draws names an aperture that is not there
+        let bad = COPPER.replace("M02*", "D99*\nX100000Y100000D01*\nM02*");
+        assert_eq!(run("a.gtl", &bad, Ask::default()), Err(Fail::Syntax));
+        assert!(run("a.gtl", COPPER, Ask::default()).is_ok());
         let inch = "M48\nINCH,TZ\nT1C0.0315\n%\nT1\nX0.2Y0.4\nM30\n";
         let job = run("a.drl", inch, Ask::default()).unwrap();
         let moves: Vec<&String> = job.lines.iter().filter(|l| l.starts_with("G0 X")).collect();
         assert_eq!(moves[0], "G0 X5.08 Y10.16");
+    }
+
+    #[test]
+    fn a_drill_file_that_does_not_say_its_numbers_is_refused_unless_the_setting_allows_it() {
+        let bare = "M48\nT1C0.800\n%\nT1\nX005000Y005000\nM30\n";
+        assert_eq!(run("a.drl", bare, Ask::default()), Err(Fail::DrillAssumed));
+        let (i, mut p) = cfgs();
+        assert!(!p.allow_assumed_drill, "the cautious way is the default");
+        p.allow_assumed_drill = true;
+        let job = import_bytes("a.drl", bare.as_bytes(), &i, &p, &Ask::default()).unwrap();
+        assert_eq!(job.cuts, 1);
+        assert!(job.notes.contains(&Note::PcbAssumedDrill));
+        // a file that says them has nothing supposed
+        let said = run("a.drl", DRILL, Ask::default()).unwrap();
+        assert!(!said.notes.contains(&Note::PcbAssumedDrill));
     }
 
     #[test]

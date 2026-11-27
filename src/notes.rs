@@ -33,10 +33,12 @@ pub enum Note {
     PcbMirrored,
     /// A hole whose tool is not in the file, or that has no width, was left out.
     PcbHoleSkipped,
+    /// The drill file did not say its format, zeros or units and what was supposed was used (the setting allows it).
+    PcbAssumedDrill,
 }
 
 impl Note {
-    pub const ALL: [Note; 11] = [
+    pub const ALL: [Note; 12] = [
         Note::UnsupportedCommand,
         Note::UnitsAssumedMm,
         Note::UnitsAssumedPixels,
@@ -48,6 +50,7 @@ impl Note {
         Note::PcbNoCompensation,
         Note::PcbMirrored,
         Note::PcbHoleSkipped,
+        Note::PcbAssumedDrill,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -162,6 +165,16 @@ impl Note {
                 "刀具不在文件中或没有直径的孔已被略去。",
                 "Um furo cuja ferramenta não está no ficheiro, ou que não tem diâmetro, foi omitido.",
             ],
+            Note::PcbAssumedDrill => [
+                "The drill file does not say its format, zeros or units: they were supposed. Check the positions before drilling.",
+                "El archivo de taladrado no dice su formato, ceros o unidades: se han supuesto. Comprueba las posiciones antes de taladrar.",
+                "Die Bohrdatei nennt Format, Nullen oder Einheiten nicht: sie wurden angenommen. Vor dem Bohren die Positionen prüfen.",
+                "Le fichier de perçage ne dit pas son format, ses zéros ou ses unités : ils ont été supposés. Vérifiez les positions avant de percer.",
+                "Il file di foratura non dice formato, zeri o unità: sono stati supposti. Controlla le posizioni prima di forare.",
+                "ドリルファイルに書式、ゼロ省略、単位の指定がないため推定しました。穴あけ前に位置を確認してください。",
+                "钻孔文件未说明格式、零省略方式或单位，现为推定值。钻孔前请检查位置。",
+                "O ficheiro de furação não diz o formato, os zeros ou as unidades: foram supostos. Verifique as posições antes de furar.",
+            ],
         };
         row[column(lang)]
     }
@@ -188,10 +201,12 @@ pub enum Fail {
     NotACutLayer,
     /// A `pcb_` setting of the motion file is out of what the CAM can use.
     BadPcbSetting,
+    /// The drill file does not say its format, zeros or units, so a hole could be in another place.
+    DrillAssumed,
 }
 
 impl Fail {
-    pub const ALL: [Fail; 9] = [
+    pub const ALL: [Fail; 10] = [
         Fail::TooBig,
         Fail::TooManyPoints,
         Fail::Syntax,
@@ -201,6 +216,7 @@ impl Fail {
         Fail::GridTooBig,
         Fail::NotACutLayer,
         Fail::BadPcbSetting,
+        Fail::DrillAssumed,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
@@ -294,6 +310,16 @@ impl Fail {
                 "動作ファイルの pcb_ 設定が CAM の使える範囲外です（セルは工具の半分以下にしてください）。",
                 "运动文件中的某个 pcb_ 设置超出 CAM 可用的范围（单元格最多为刀具的一半）。",
                 "Uma definição pcb_ do ficheiro de movimento está fora do que o CAM pode usar (a célula deve ser no máximo metade da ferramenta).",
+            ],
+            Fail::DrillAssumed => [
+                "The drill file does not say its format, zeros or units, so a hole could be in another place. Export it with them, or set pcb_allow_assumed_drill in the motion file.",
+                "El archivo de taladrado no dice su formato, ceros o unidades, así que un agujero podría quedar en otro sitio. Expórtalo con ellos o activa pcb_allow_assumed_drill en el archivo de movimiento.",
+                "Die Bohrdatei nennt Format, Nullen oder Einheiten nicht, ein Loch könnte woanders liegen. Mit diesen Angaben exportieren oder pcb_allow_assumed_drill in der Bewegungsdatei setzen.",
+                "Le fichier de perçage ne dit pas son format, ses zéros ou ses unités : un trou pourrait être ailleurs. Exportez-le avec eux ou activez pcb_allow_assumed_drill dans le fichier de mouvement.",
+                "Il file di foratura non dice formato, zeri o unità, quindi un foro potrebbe finire altrove. Esportalo con questi dati o attiva pcb_allow_assumed_drill nel file di movimento.",
+                "ドリルファイルに書式、ゼロ省略、単位の指定がないため、穴の位置がずれるおそれがあります。指定を付けて出力するか、動作ファイルで pcb_allow_assumed_drill を設定してください。",
+                "钻孔文件未说明格式、零省略方式或单位，孔可能位于别处。请带上这些信息重新导出，或在运动文件中设置 pcb_allow_assumed_drill。",
+                "O ficheiro de furação não diz o formato, os zeros ou as unidades, pelo que um furo poderia ficar noutro sítio. Exporte-o com eles ou ative pcb_allow_assumed_drill no ficheiro de movimento.",
             ],
         };
         row[column(lang)]

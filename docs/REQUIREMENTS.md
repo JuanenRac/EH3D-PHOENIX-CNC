@@ -2,7 +2,7 @@
 
 This register is the single source of the state of each capability: `STATUS.md` and the README files cite it and never state a state that it does not. A state is one of `planned`, `prototype`, `implemented` and `validated`. `validated` means that a person has run the capability on a real machine and the evidence of the manifest says `bench` or `field`; nothing here is validated, because nothing of this program has run on a real machine: the controller is a simulator, a simulated GRBL, grblHAL or Marlin on a simulated cable, or a server in memory.
 
-The register has 164 requirements: 155 implemented, 2 prototype, 7 planned and 0 validated. By progress: 155 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
+The register has 167 requirements: 158 implemented, 2 prototype, 7 planned and 0 validated. By progress: 158 done, 2 partial, 1 pending and 6 blocked. High coverage is not proof of correctness, so each row says how it is checked: the test that names it, and what it shows.
 
 ## How to read the register
 
@@ -228,3 +228,6 @@ The check is `tests/reqs.rs`: it reads this table, finds each test and fails whe
 | PCNC-162 | A restarted program says its way of moving after the pause. | implemented | done | host-test | `src/restart::a_line_that_names_only_axes_still_cuts_after_a_restart` | - |
 | PCNC-163 | A resume is refused where an arc goes on unsaid, with `G93` or `G95` and with `G43`. | implemented | done | host-test | `src/session::a_resume_is_refused_where_an_arc_a_feed_mode_or_a_table_offset_cannot_be_written_back` | - |
 | PCNC-164 | The feed and the length offset are written back in the units they were given in. | implemented | done | host-test | `src/restart::the_feed_and_the_offset_are_written_in_the_units_they_were_given_in` | - |
+| PCNC-165 | A drill file or a Gerber layer with an error of the reader is not cut, however much of it was read. | implemented | done | host-test | `src/pcb::a_file_with_an_error_is_not_cut_and_inches_are_converted` | - |
+| PCNC-166 | A drill file that does not say its format, zeros or units is refused unless a setting allows it, and then the job says so. | implemented | done | host-test | `src/pcb::a_drill_file_that_does_not_say_its_numbers_is_refused_unless_the_setting_allows_it` | - |
+| PCNC-167 | A plotter file with a coordinate that cannot be read, or a coordinate without its pair, is refused. | implemented | done | host-test | `src/import::a_plotter_file_with_a_number_that_cannot_be_read_is_not_drawn_from_what_is_left` | - |

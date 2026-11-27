@@ -1002,7 +1002,7 @@ mod tests {
         );
         assert!(
             r.out
-                .contains("M0 (restart: check the machine, then resume)\nG0 X0\n"),
+                .contains("M0 (restart: check the machine, then resume)\nG0\nG0 X0\n"),
             "{}",
             r.out
         );

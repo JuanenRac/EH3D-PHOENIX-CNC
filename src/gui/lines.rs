@@ -557,7 +557,9 @@ mod tests {
                         a.windows(&ctx);
                     });
                     out.textures_delta.clear();
-                    widest = ctx.globally_used_rect().width();
+                    // the window is anchored at the centre: half of it lies to the right of the middle
+                    let right = ctx.globally_used_rect().right();
+                    widest = 2.0 * (right - screen.center().x);
                 }
                 // the window is 520 wide: a sentence that did not wrap would stretch it
                 assert!(
