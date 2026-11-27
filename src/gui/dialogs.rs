@@ -969,6 +969,11 @@ impl App {
                                     &mut d.s.read_controller_travel,
                                     self.t(Text::McGrblTravel),
                                 );
+                                ui.checkbox(
+                                    &mut d.s.grbl_spindle_stop_on_pause,
+                                    self.w(crate::words::Msg::SpindleStopPause),
+                                )
+                                .on_hover_text(self.w(crate::words::Msg::SpindleStopPauseHelp));
                                 ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     ui.label(self.t(Text::McRapidFeed));

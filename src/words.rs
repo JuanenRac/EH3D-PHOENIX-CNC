@@ -478,10 +478,12 @@ pub enum Msg {
     SharedRow,
     SharedNone,
     SharedUnknownFamily,
+    SpindleStopPause,
+    SpindleStopPauseHelp,
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 470] = [
+pub const ALL: [Msg; 472] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -952,6 +954,8 @@ pub const ALL: [Msg; 470] = [
     Msg::SharedRow,
     Msg::SharedNone,
     Msg::SharedUnknownFamily,
+    Msg::SpindleStopPause,
+    Msg::SpindleStopPauseHelp,
 ];
 
 /// The eight texts of a message, in the order of `LANGS`.
@@ -5657,6 +5661,26 @@ fn table(m: Msg) -> [&'static str; 8] {
             "没有名为 '{0}' 的机器模板（small-mill、router、engraver、pcb-mill）",
             "Nenhum modelo de máquina se chama '{0}' (small-mill, router, engraver, pcb-mill)",
         ],
+        Msg::SpindleStopPause => [
+            "Stop the spindle on pause (GRBL, untried on a machine)",
+            "Parar el husillo al pausar (GRBL, sin probar en máquina)",
+            "Spindel bei Pause stoppen (GRBL, nicht an Maschine erprobt)",
+            "Arrêter la broche en pause (GRBL, non essayé sur machine)",
+            "Ferma il mandrino in pausa (GRBL, non provato su macchina)",
+            "一時停止で主軸を止める（GRBL、実機では未確認）",
+            "暂停时停止主轴（GRBL，未在实机上试过）",
+            "Parar o fuso na pausa (GRBL, não testado em máquina)",
+        ],
+        Msg::SpindleStopPauseHelp => [
+            "Pause also sends the safety door byte (0x84): GRBL and grblHAL stop the spindle and the coolant and start them again when you press Start (press it again if the machine stays in Door). Off by default; it takes effect the next time the program is opened. Not tried on a real machine: try it with the tool clear of the work.",
+            "La pausa envía además el byte de puerta de seguridad (0x84): GRBL y grblHAL paran el husillo y el refrigerante y los arrancan de nuevo al pulsar Iniciar (púlsalo otra vez si la máquina sigue en Door). Apagada de serie; se aplica la próxima vez que se abra el programa. Sin probar en una máquina real: pruébala con la herramienta separada de la pieza.",
+            "Die Pause sendet zusätzlich das Sicherheitstür-Byte (0x84): GRBL und grblHAL stoppen Spindel und Kühlmittel und starten sie wieder, wenn Sie Start drücken (erneut drücken, wenn die Maschine in Door bleibt). Standardmäßig aus; gilt ab dem nächsten Öffnen des Programms. Nicht an einer echten Maschine erprobt: mit freistehendem Werkzeug ausprobieren.",
+            "La pause envoie aussi l'octet de porte de sécurité (0x84) : GRBL et grblHAL arrêtent la broche et l'arrosage et les relancent quand vous appuyez sur Démarrer (appuyez de nouveau si la machine reste en Door). Désactivé par défaut ; pris en compte à la prochaine ouverture du programme. Non essayé sur une machine réelle : essayez avec l'outil dégagé de la pièce.",
+            "La pausa invia anche il byte della porta di sicurezza (0x84): GRBL e grblHAL fermano il mandrino e il refrigerante e li riavviano quando si preme Avvia (premerlo di nuovo se la macchina resta in Door). Disattivata in origine; vale dalla prossima apertura del programma. Non provata su una macchina reale: provarla con l'utensile lontano dal pezzo.",
+            "一時停止時に安全ドアのバイト（0x84）も送ります。GRBL と grblHAL は主軸とクーラントを止め、開始を押すと再び動かします（Door のままならもう一度押してください）。既定はオフで、次にプログラムを開いたときから有効です。実機では未確認です。工具をワークから離した状態で試してください。",
+            "暂停时还发送安全门字节（0x84）：GRBL 和 grblHAL 会停止主轴和冷却液，按开始后重新启动（如果机床仍处于 Door 状态，请再按一次）。默认关闭；下次打开程序时生效。未在实机上试过：请在刀具离开工件时试用。",
+            "A pausa envia também o byte da porta de segurança (0x84): o GRBL e o grblHAL param o fuso e o refrigerante e voltam a ligá-los ao premir Iniciar (prima de novo se a máquina continuar em Door). Desligada de origem; aplica-se na próxima abertura do programa. Não testada numa máquina real: experimente com a ferramenta afastada da peça.",
+        ],
     }
 }
 
@@ -5720,7 +5744,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 470);
+        assert_eq!(seen.len(), 472);
     }
 
     #[test]

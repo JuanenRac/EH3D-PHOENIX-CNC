@@ -110,7 +110,7 @@ impl App {
         if self.server_busy() {
             return self.server_held();
         }
-        !(self.session.running && !self.session.paused)
+        !(self.session.running && !self.session.paused) || self.session.held_at_door()
     }
 
     pub(super) fn can_pause(&self) -> bool {

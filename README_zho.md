@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1275-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1281-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上以平面或 3D 画出程序路径并标出已完成的行，并在控制器拒绝处停下。此外它还检查、测量和准备程序（圆弧、固定循环、刀具半径补偿、禁入框、探针、高度图、换刀器、刀具表和材料表），导入图纸以及电路板的 Gerber 和 Excellon 文件，并把程序发送到 EH3D 服务器。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）已针对 GRBL、grblHAL、Marlin 和 Klipper 在模拟线路上对照其方言的模拟器进行驱动；它列出的其他系列尚未驱动。1275 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**：仅在使用 GRBL、grblHAL 或 Marlin 时打开串口，仅在向服务器发送程序或用 `--klipper` 连接 Klipper 时建立网络连接。模拟机床只接受直线移动，会拒绝圆弧、固定循环和探测，因此这些内容只在纸面上测量、检查和计时，绘制的路径把圆弧显示为其弦，包含它们的程序会在模拟器中停在那一行。窗口提供十一种主题和八种语言（即 EH3D-COMMON 共享视图的语言）：其文字有英语、西班牙语、德语、法语、意大利语、日语、中文和欧洲葡萄牙语。
+**诚实性检查 - 今天实际能运行的内容：**一个带窗口的 Rust 程序（`phoenix-cnc`），驱动一台**模拟**机床：显示机床位置（工件和机床坐标），用点动面板手动移动，设置零点，回零，接收操作员输入的命令，逐行运行 G 代码程序（可暂停、停止和急停），在工作台上以平面或 3D 画出程序路径并标出已完成的行，并在控制器拒绝处停下。此外它还检查、测量和准备程序（圆弧、固定循环、刀具半径补偿、禁入框、探针、高度图、换刀器、刀具表和材料表），导入图纸以及电路板的 Gerber 和 Excellon 文件，并把程序发送到 EH3D 服务器。控制器接口（`eh3d-controller`，在 EH3D-COMMON 中）已针对 GRBL、grblHAL、Marlin 和 Klipper 在模拟线路上对照其方言的模拟器进行驱动；它列出的其他系列尚未驱动。1281 个测试在计算机上运行。**这里没有任何内容在真实机床上运行过**：仅在使用 GRBL、grblHAL 或 Marlin 时打开串口，仅在向服务器发送程序或用 `--klipper` 连接 Klipper 时建立网络连接。模拟机床只接受直线移动，会拒绝圆弧、固定循环和探测，因此这些内容只在纸面上测量、检查和计时，绘制的路径把圆弧显示为其弦，包含它们的程序会在模拟器中停在那一行。窗口提供十一种主题和八种语言（即 EH3D-COMMON 共享视图的语言）：其文字有英语、西班牙语、德语、法语、意大利语、日语、中文和欧洲葡萄牙语。
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | 版本 | `0.2.6` |
 | 成熟度 | 可用 |
-| 测试 | 1275 |
+| 测试 | 1281 |
 | 技术栈 | Rust |
 | 真实硬件 | 否：默认驱动模拟机床；真实的 GRBL 控制器（`--grbl`）从未试过 |
 
@@ -47,7 +47,7 @@
 | 基础库 | 🟡 | 一个 Rust crate，以本程序的名称重新导出 `eh3d-view` 的 `scene`、`texts` 和 `theme`；需要旁边有 EH3D-COMMON 文件夹。 |
 | 场景与视图 | 🟡 | 在 EH3D-COMMON 中编写并测试；本程序的窗口在工作台上绘制程序路径和刀具位置（已在电脑上看过）。 |
 | 主题与文本 | 🟡 | 十一种主题和界面文字：窗口提供共享视图的八种语言，本程序自身面板和工具的文字也是这八种；已在本程序的窗口中看过。 |
-| 测试 | 🟡 | 电脑上通过 1275 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
+| 测试 | 🟡 | 电脑上通过 1281 个测试（`cargo test --features gui`）：会话（点动、零点、回零、程序、暂停、报警、急停）、程序路径和命令行；模拟控制器在 EH3D-COMMON 中测试。 |
 | 窗口与点动 | 🟡 | 在电脑上配合模拟控制器运行：位置、点动面板、步长、进给、回零、清零、解锁、命令行和日志；没有真实机床。 |
 | 机床控制 | 🟠 | 只有模拟器：程序在模拟机床或模拟的 GRBL、grblHAL、Marlin、Klipper 上逐行运行，可暂停、停止和急停；GRBL、grblHAL 和 Marlin 的串口位于构建功能之后，Klipper 的 HTTP 连接只遇到过替身 Moonraker，尚未连接任何真实控制器。 |
 | 文档 | 🟡 | 八种语言的 README、两张图片、三个示例程序和更新日志。 |
@@ -62,6 +62,7 @@
 * `eh3d-view` 的**主题和文字**：Forge（默认）、Neon Arcade、Glass Pro、经典 Windows 灰色和一个跟随 Windows 的主题，以及英语、西班牙语、意大利语、德语、法语、葡萄牙语、中文和日语界面。它将成为：基于 EH3D-DRILLPRO 和 EH3D-ROUTEPRO 引擎的、用于钻孔、铣削以及 2D 和 3D CNC 加工的一个程序；这部分尚不存在。
 * **菜单、设置和文件**：文件、编辑、视图、程序、机床、窗口和帮助菜单，包含常用功能（打开、最近文件、保存、编辑、各零点、已存位置、主轴和冷却液）；两次运行之间会记住的设置窗口（单位、语言、十一种主题、行程限位、点动）；以及套件共用的打开和保存窗口（`eh3d-filedialog`：位置、排序、过滤、保存文件的扩展名和替换前的询问）。
 * **串口上的 GRBL：** 使用 `--features serial` 构建后，`phoenix-cnc --grbl 端口[@波特率]` 驱动 GRBL 控制器（默认 115200 波特）而不是模拟器，`phoenix-cnc --ports` 列出串口；没有该功能的构建或打不开的端口会给出提示并退出。只对脚本化的控制器试过，从未对真实控制器试过。使用真实控制器时，`--start`（打开文件并在窗口打开时启动）会被拒绝，除非同时给出 `--start-real`；单独使用 `--start-real` 是错误。设置文件中的 `busy_wait`（默认 4 小时）是机器报告正在工作时一行等待其应答的最长时间，其间仍能听到停止。
+* **实时位置与暂停：** 当一行正在等待其 `ok` 时，窗口会插队请求状态报告，并显示返回的位置。暂停是进给保持，主轴仍在旋转。设置中有一个针对 GRBL 和 grblHAL 的选项，默认关闭（设置文件中的 `grbl_spindle_stop_on_pause`）：开启后暂停还会发送安全门字节（`0x84`），控制器会停止主轴和冷却液，按开始后重新启动（如果机床仍处于 Door 状态，请再按一次）；若未确认进入门状态，日志会提示主轴可能仍在旋转。下次打开程序时生效。只对模拟的 GRBL 试过，未在实机上试过。
 * **GRBL、grblHAL、Marlin 和 Klipper，对照模拟器：** `--grblhal PORT[@BAUD]` 和 `--marlin PORT[@BAUD]`（带 `--features serial` 的构建；未给出时 Marlin 用 250000 波特）在与 GRBL 相同的防护之后驱动这些控制器；`--klipper HOST[:PORT]` 在同一防护之后通过 Moonraker 以未加密的 HTTP 驱动 Klipper（除非开启 `klipper.allow_non_local`，否则仅限本地网络；链路的限制和 Moonraker 要求时的凭据是运动文件的 `klipper.*` 键，凭据从不打印也不会写回）；`--sim grbl|grblhal|marlin|klipper` 在模拟线缆上驱动其中一种方言，不涉及任何真实设备：线缆按固定种子把应答切成片段、加入噪声、翻转位并陷入静默（运动文件的 `wire_` 键），Marlin 可以给各行编号并附校验和，使损坏的行被重新请求（`marlin_numbering`，默认关闭）。控制器、模拟设备、线缆以及八种语言的错误文本来自 `eh3d-controller`（EH3D-COMMON）；本程序保留方言识别（`src/dialect.rs`）、防护（`src/guard.rs`）、设置和自己的用语（`src/ctltext.rs`、`src/problem.rs`）。`phoenix-cnc --dialect-check grbl|grblhal|marlin|klipper` 让一种方言通过一组步骤（状态、移动、点动、回零、按编号拒绝、防护下静默的控制器、有噪声的线缆），有一步不通过则以退出码 2 结束。全部是模拟，没有任何部分接触过真实控制器，Klipper 的 HTTP 链路在测试中只接触过一个替身 Moonraker。
 * **由 Gerber 和 Excellon 文件加工电路板：** `phoenix-cnc --import 文件` 还会用 EH3D-CORE-LIBS 的读取器（套件中其他程序所用的那些）读取 Gerber 图层或 Excellon 钻孔文件，并输出对应的 G 代码（`src/pcb.rs`）：铜层的隔离（离铜一个刀具半径的路径，按要求的道次数）、外形层的轮廓（板外侧和内部切口的内侧，按深度分道次）以及钻孔文件的孔和槽（先用较小的钻头，暂停换钻头，啄钻）。图层按文件所述确定（`--layer isolation|profile|drill` 可另行指定），底面图层会镜像（可用 `--mirror` 要求），窗口的“导入”面板有同样的选项。刀具、道次、深度、进给、啄钻、网格和限制都是运动文件中的 `pcb_` 键（`examples/motion.txt`），不在代码里。尚未在机床上切削过。有错误的文件不会加工；未说明坐标格式、零省略方式或单位的钻孔文件会被拒绝，除非 `pcb_allow_assumed_drill` 允许。
 * **随屏幕变化的窗口：** 窗口以最大化打开，从 720p 到 1080p 乃至更大更宽的屏幕，所有内容随之放大或缩小。
@@ -185,7 +186,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 测试
 
-`cargo test --features gui` 运行 1275 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
+`cargo test --features gui` 运行 1281 个测试：会话（点动和清零、逐行运行程序、暂停和继续、被拒绝的行、急停和报警、命令日志、回零）、程序路径和命令行；视图和模拟控制器在 EH3D-COMMON 中测试。CI 还会运行 `cargo fmt --check` 和把警告当作错误的 `cargo clippy`，`python -I tools/ci_validate.py` 检查清单、版本、更新日志和八个 README。
 
 ## 🏗️ 构建与发布
 
