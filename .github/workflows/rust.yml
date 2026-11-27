@@ -89,6 +89,9 @@ jobs:
       - name: Tests
         run: cargo test --all-targets --features gui
         working-directory: EH3D-PHOENIX-CNC
+      - name: The build with the serial port compiles
+        run: cargo check --all-targets --features gui,serial
+        working-directory: EH3D-PHOENIX-CNC
 
   main-against-main:
     name: Siblings at main
