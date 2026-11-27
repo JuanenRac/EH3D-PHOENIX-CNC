@@ -5720,7 +5720,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 469);
+        assert_eq!(seen.len(), 470);
     }
 
     #[test]

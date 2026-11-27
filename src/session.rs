@@ -1481,7 +1481,8 @@ mod tests {
             s.set_lang(lang);
             s.mdi("G1 X1 F100");
             let last = s.log.last().cloned().unwrap_or_default();
-            assert!(last.starts_with("mdi: "), "{last}");
+            let asked = format!("{}: ", crate::logwords::what(lang, "mdi"));
+            assert!(last.starts_with(&asked), "{last}");
             assert!(!last.contains("Must home"), "{lang}: {last}");
             texts.push(last);
         }
@@ -2618,7 +2619,7 @@ G0 X2",
         assert!(!s.hand_shift);
         s.mdi("G92 X0");
         assert!(s.hand_shift);
-        s.mdi("G0 X1");
+        s.mdi("G4 P1");
         assert!(s.hand_shift);
         s.mdi("G92.1");
         assert!(!s.hand_shift);
