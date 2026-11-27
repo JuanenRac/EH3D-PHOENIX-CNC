@@ -569,6 +569,8 @@ fn the_lines_that_move_the_axes_are_told_by_their_codes() {
         "  G1 X1  ",
         "G90 G0 X1",
         "G1 (cut) X5",
+        // axis words alone move in the way of moving that is in force
+        "X5 Y5",
     ] {
         assert!(line_motion(yes), "{yes}");
         assert!(line_moves(yes), "{yes}");
@@ -594,7 +596,6 @@ fn the_lines_that_do_not_move_the_axes_are_not_motion() {
         "G91.1",
         "M5",
         "",
-        "X5 Y5",
         "( G1 ) M5",
         "; G1 X1",
     ] {

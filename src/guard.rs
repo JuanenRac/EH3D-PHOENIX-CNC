@@ -83,33 +83,52 @@ fn moves(c: &Command) -> bool {
     }
 }
 
-/// What a line of G-code does: (it moves an axis, it starts something that can hurt: the spindle, the coolant, a tool change).
+/// What a line of G-code does: (it moves an axis, it starts something that can hurt: the spindle, the coolant, a tool change). The line is read as the controller
+/// reads it: comments and blanks count for nothing, so `(go) G 0 X1` is a move.
 fn scan(line: &str) -> (bool, bool) {
-    let l = line.trim().to_ascii_uppercase();
-    if let Some(rest) = l.strip_prefix('$') {
+    let spaced = crate::gcode::code_of(line).trim().to_ascii_uppercase();
+    // a macro with a name of its own (Klipper) may do anything
+    let first = spaced.split_ascii_whitespace().next().unwrap_or("");
+    if first.len() > 1
+        && first
+            .chars()
+            .take(2)
+            .all(|c| c.is_ascii_alphabetic() || c == '_')
+    {
+        return (true, true);
+    }
+    let code: String = spaced.chars().filter(|c| !c.is_whitespace()).collect();
+    if let Some(rest) = code.strip_prefix('$') {
         return (rest.starts_with("J=") || rest.starts_with('H'), false);
     }
-    let code = l.split(['(', ';']).next().unwrap_or("");
+    // the text of a message is not words
+    if code.starts_with("M117") || code.starts_with("M118") {
+        return (false, false);
+    }
     let (mut motion, mut outputs) = (false, false);
+    // axis words alone move in the modal way of moving, unless the code of the line says they are something else (an offset, a wait)
+    let (mut axis, mut not_a_move) = (false, false);
     let b = code.as_bytes();
     for i in 0..b.len() {
-        if b[i] != b'G' && b[i] != b'M' {
-            continue;
-        }
         let tail: String = code[i + 1..]
             .chars()
-            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .take_while(|c| c.is_ascii_digit() || matches!(c, '.' | '-' | '+'))
             .collect();
-        let n: f64 = tail.parse().unwrap_or(-1.0);
-        if b[i] == b'G' {
-            motion |= (0.0..=3.0).contains(&n)
-                || (28.0..=31.0).contains(&n)
-                || (38.0..39.0).contains(&n)
-                || (81.0..90.0).contains(&n);
-        } else {
-            outputs |= matches!(n as i32, 3 | 4 | 6 | 7 | 8);
+        let Ok(n) = tail.parse::<f64>() else { continue };
+        match b[i] {
+            b'G' => {
+                motion |= (0.0..=3.0).contains(&n)
+                    || (28.0..=31.0).contains(&n)
+                    || (38.0..39.0).contains(&n)
+                    || (81.0..90.0).contains(&n);
+                not_a_move |= n == 4.0 || n == 10.0 || (92.0..93.0).contains(&n);
+            }
+            b'M' => outputs |= matches!(n as i32, 3 | 4 | 6 | 7 | 8),
+            b'X' | b'Y' | b'Z' | b'A' | b'B' | b'C' | b'U' | b'V' | b'W' => axis = true,
+            _ => {}
         }
     }
+    motion |= axis && !not_a_move && !code.starts_with('M');
     (motion, outputs)
 }
 

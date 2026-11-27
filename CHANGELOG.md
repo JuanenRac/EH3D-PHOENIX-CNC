@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A line is read as the controller reads it:** a `;` inside a comment hid the words after it from the path, the keep-out boxes and the checks; a move behind a comment, with blanks inside or with axis words only was not seen as a move by the guard after a stop; a `$` line behind a comment was sent although the settings refuse it; a post-processor that strips comments dropped every word after a comment in parentheses. The warnings say when a line cannot be read, when the program pauses with the spindle turning and when `G93` or `G95` changes what `F` means. Host-tested only.
 - **Safety text corrected: the server starts the spindle when a job sent to it goes on.** `server_restore_outputs` decides the coolant only. While the job waits before its first move, the log says in the eight languages that the machine goes back on its own to where it stopped and starts the spindle the program had on.
 
 - **A project saved by another program is not written over:** the window keeps the mark of the project from the moment it opens or saves it, looks at it again after a question, and refuses to save, import or take when another program wrote the file meanwhile. It says so in the eight languages and offers to read it again, to save under another name or to close. 2 new tests.

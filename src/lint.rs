@@ -78,6 +78,12 @@ pub enum Kind {
     FeedZero,
     /// The program moves and has no `M2` or `M30`.
     NoEnd,
+    /// A part of a line is not a letter with a number: it is left out of every check.
+    Unreadable,
+    /// `M0` or `M1` while the spindle turns.
+    PauseSpindleOn,
+    /// `G93` or `G95`: `F` is not in millimetres a minute, so the feeds cannot be judged.
+    FeedMode,
 }
 
 /// One thing that looks wrong: where it first happens (the line, from 1) and how many times.
@@ -233,6 +239,36 @@ fn template(kind: Kind, lang: &str) -> &'static str {
             "{n} 个进给速度被设为零（第一个在第 {line} 行）：控制器会拒绝没有进给的切削",
             "{n} avanços estão definidos como zero (o primeiro na linha {line}): um controlador recusa um corte sem avanço",
         ],
+        Kind::Unreadable => [
+            "{n} lines hold something that cannot be read (first at line {line}): it is left out of every check",
+            "{n} líneas contienen algo que no se puede leer (la primera es la línea {line}): queda fuera de todas las comprobaciones",
+            "{n} Zeilen enthalten etwas Unlesbares (die erste ist Zeile {line}): es fehlt in jeder Prüfung",
+            "{n} lignes contiennent quelque chose d'illisible (la première est la ligne {line}) : cela échappe à toutes les vérifications",
+            "{n} righe contengono qualcosa di illeggibile (la prima è la riga {line}): resta fuori da ogni controllo",
+            "{n} 行に読み取れない部分があります（最初は {line} 行目）：どの確認にも含まれません",
+            "{n} 行含有无法读取的内容（第一个在第 {line} 行）：任何检查都不包含它",
+            "{n} linhas têm algo que não se consegue ler (a primeira é a linha {line}): fica fora de todas as verificações",
+        ],
+        Kind::PauseSpindleOn => [
+            "{n} pauses (M0 or M1) with the spindle turning (first at line {line}): stop it with M5 before the pause",
+            "{n} pausas (M0 o M1) con el husillo girando (la primera en la línea {line}): páralo con M5 antes de la pausa",
+            "{n} Pausen (M0 oder M1) bei drehender Spindel (die erste in Zeile {line}): vor der Pause mit M5 anhalten",
+            "{n} pauses (M0 ou M1) broche en rotation (la première à la ligne {line}) : arrêtez-la avec M5 avant la pause",
+            "{n} pause (M0 o M1) con il mandrino in rotazione (la prima alla riga {line}): fermalo con M5 prima della pausa",
+            "{n} 件の一時停止（M0 または M1）で主軸が回っています（最初は {line} 行目）：停止の前に M5 で止めてください",
+            "{n} 次暂停（M0 或 M1）时主轴仍在旋转（第一个在第 {line} 行）：请在暂停前用 M5 停转",
+            "{n} pausas (M0 ou M1) com o fuso a rodar (a primeira na linha {line}): pare-o com M5 antes da pausa",
+        ],
+        Kind::FeedMode => [
+            "G93 or G95 at line {line} changes what F means: the feeds of this program cannot be judged",
+            "G93 o G95 en la línea {line} cambia lo que significa F: los avances de este programa no se pueden juzgar",
+            "G93 oder G95 in Zeile {line} ändert die Bedeutung von F: die Vorschübe dieses Programms können nicht beurteilt werden",
+            "G93 ou G95 à la ligne {line} change le sens de F : les avances de ce programme ne peuvent pas être jugées",
+            "G93 o G95 alla riga {line} cambia il significato di F: gli avanzamenti di questo programma non si possono giudicare",
+            "{line} 行目の G93 または G95 は F の意味を変えます：このプログラムの送り速度は判断できません",
+            "第 {line} 行的 G93 或 G95 改变了 F 的含义：无法判断此程序的进给速度",
+            "G93 ou G95 na linha {line} muda o significado de F: os avanços deste programa não se podem julgar",
+        ],
         Kind::NoEnd => [
             "The program has no end (M2 or M30): the spindle may stay on",
             "El programa no tiene final (M2 o M30): el husillo puede quedar encendido",
@@ -300,7 +336,15 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
             })
         }
     };
+    let (mut unread, mut paused, mut feed_mode): (
+        Option<Finding>,
+        Option<Finding>,
+        Option<Finding>,
+    ) = (None, None, None);
     for (n, raw) in lines.iter().enumerate() {
+        if crate::gcode::unreadable(raw) {
+            bump(&mut unread, Kind::Unreadable, n + 1);
+        }
         let ws = words(raw);
         let mut axis = false;
         let mut xy = false;
@@ -334,6 +378,7 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
                     910 => absolute = false,
                     200 => scale = 25.4,
                     210 => scale = 1.0,
+                    930 | 950 => bump(&mut feed_mode, Kind::FeedMode, n + 1),
                     _ => {}
                 },
                 'F' if cfg.max_feed_mm_min > 0.0 && v * scale > cfg.max_feed_mm_min => {
@@ -372,6 +417,7 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
                         ended = true;
                     }
                     6 => bump(&mut change, Kind::ToolChange, n + 1),
+                    0 | 1 if spindle_on => bump(&mut paused, Kind::PauseSpindleOn, n + 1),
                     _ => {}
                 },
                 _ => {}
@@ -446,6 +492,9 @@ pub fn lint(lines: &[String], cfg: &LintCfg) -> Vec<Finding> {
         too_small,
         reversal.filter(|_| cfg.reversal),
         zero_feed.filter(|_| cfg.zero_feed),
+        unread,
+        paused,
+        feed_mode,
     ]
     .into_iter()
     .flatten()

@@ -1328,7 +1328,9 @@ impl Session {
                 break;
             };
             let trimmed = line.trim();
-            if trimmed.starts_with('$') && !self.allow_system_lines {
+            // a comment in front of it does not hide it: the comments are taken out before the line is sent
+            let code = crate::gcode::code_of(trimmed);
+            if code.trim_start().starts_with('$') && !self.allow_system_lines {
                 let n = at + 1;
                 self.say(format!(
                     "line {n} ({trimmed}): a line that starts with $ would change the controller itself, so the program stops here (program_system_commands in the settings file allows it)"
