@@ -4,7 +4,9 @@
 //! The work is done by the functions of the command `project` (`eh3dfile`); here it is decided what the window holds, what goes into
 //! the branch and what the operator has to agree to first. Only the branch `cnc` is written. A project that was not opened here, a
 //! branch that changed since it was read and a signature that a write removes are asked about before anything is written. The table of
-//! tools and the motion file of a project are kept in it and never applied to the machine, and nothing here moves it.
+//! tools and the motion file of a project are kept in it and never applied to the machine, and nothing here moves it. A project that
+//! another program saved since it was read here is not written over: the window says so and offers to read it again or to save under
+//! another name.
 
 use super::*;
 use crate::eh3dfile::{self, Contents, Held, Identity, Opened, BRANCH, CREDENTIAL_KEY};
@@ -25,6 +27,8 @@ pub(super) enum Action {
 pub(super) struct Pending {
     action: Action,
     pub warnings: Vec<Said>,
+    /// The mark of the project that was asked about, looked at again after the answer.
+    seen: Option<String>,
 }
 
 /// How an entry ended.
@@ -56,7 +60,9 @@ pub(super) struct SuiteState {
     notes: Vec<Said>,
     extra: Vec<String>,
     pub pending: Option<Pending>,
-    /// The content hash of the branch of the program when it was read or written.
+    /// The project a write was refused for because another program saved it meanwhile, until the operator chooses what to do.
+    pub changed: Option<PathBuf>,
+    /// The mark of the project of the window when it was read or written here.
     seen: Option<String>,
     /// The name the program has in the project.
     program_name: Option<String>,
@@ -207,6 +213,7 @@ impl App {
             .cloned()
             .collect();
         self.suite.pending = None;
+        self.suite.changed = None;
         self.suite.put_tools = false;
         self.suite.put_motion = false;
         self.suite.seen = found.own_hash.clone();
@@ -369,10 +376,20 @@ impl App {
 
     /// The operator agreed to the write that was waiting.
     pub(super) fn suite_confirm(&mut self) -> Step {
-        match self.suite.pending.take() {
-            Some(pending) => self.suite_run(pending.action, true),
-            None => Step::Refused,
+        let Some(pending) = self.suite.pending.take() else {
+            return Step::Refused;
+        };
+        let target = match &pending.action {
+            Action::Save(target) => Some(target.clone()),
+            _ => self.suite.file.clone(),
+        };
+        // the operator may have taken long to answer: another program may have saved the project meanwhile
+        if let (Some(target), Some(seen)) = (target, pending.seen.as_deref()) {
+            if let Err(why) = suitecore::check_unchanged(&target, seen) {
+                return self.suite_refused(&target, why);
+            }
         }
+        self.suite_run(pending.action, true)
     }
 
     /// The operator did not agree: nothing was written and nothing is.
@@ -402,8 +419,51 @@ impl App {
         }
     }
 
+    /// Reads again the project that another program saved: its program replaces the one of the window. Refused while the machine
+    /// is not at rest, and then the offer stays.
+    pub(super) fn suite_reopen(&mut self) -> bool {
+        if !self.machine_idle() {
+            self.suite_refuse(S::Busy);
+            return false;
+        }
+        match self.suite.changed.take() {
+            Some(file) => self.suite_open(&file),
+            None => false,
+        }
+    }
+
+    /// The operator closed the notice of a project that another program saved: nothing is read and nothing is written.
+    pub(super) fn suite_dismiss_changed(&mut self) {
+        self.suite.changed = None;
+    }
+
+    /// A write that failed. When the reason is that another program saved the project, it is said in the language of the window and
+    /// the window offers to read it again or to save under another name.
+    fn suite_refused(&mut self, target: &Path, why: String) -> Step {
+        if !suitecore::is_changed_refusal(&why) {
+            return self.suite_fail(why);
+        }
+        self.suite.changed = Some(target.to_path_buf());
+        self.suite_refresh();
+        self.suite_tell(&Said(S::ChangedOnDisk, vec![name_of(target)]));
+        Step::Refused
+    }
+
     /// Asks for the agreement of the operator when there is something to agree to.
     fn suite_ask(&mut self, target: &Path, action: &Action) -> Option<Step> {
+        // the mark of what is asked about: the one taken when the project of the window was read, or the file as it is now
+        let ours = self
+            .suite
+            .file
+            .as_deref()
+            .is_some_and(|c| suitecore::same_file(c, target));
+        let mark = if ours {
+            self.suite.seen.clone()
+        } else {
+            suitecore::view(target, BRANCH)
+                .ok()
+                .and_then(|v| v.own_hash)
+        };
         let found = suitecore::warnings(
             target,
             self.suite.file.as_deref(),
@@ -416,15 +476,17 @@ impl App {
                 self.suite.pending = Some(Pending {
                     action: action.clone(),
                     warnings,
+                    seen: mark,
                 });
                 Some(Step::Asked)
             }
-            Err(e) => Some(self.suite_fail(e)),
+            Err(e) => Some(self.suite_refused(target, e)),
         }
     }
 
     fn suite_run(&mut self, action: Action, agreed: bool) -> Step {
         self.suite.pending = None;
+        self.suite.changed = None;
         match &action {
             Action::Save(target) => self.suite_write(target, &action, agreed),
             Action::Import(source) => self.suite_bring(&action, agreed, |app, file| {
@@ -478,7 +540,7 @@ impl App {
                 self.suite_tell(&done);
                 Step::Done
             }
-            Err(e) => self.suite_fail(e),
+            Err(e) => self.suite_refused(&file, e),
         }
     }
 
@@ -547,7 +609,7 @@ impl App {
                     if copy_from.is_some() {
                         let _ = std::fs::remove_file(target);
                     }
-                    return self.suite_fail(e);
+                    return self.suite_refused(target, e);
                 }
             }
         };
@@ -636,6 +698,42 @@ impl App {
     pub(super) fn suite_windows(&mut self, ctx: &egui::Context) {
         self.suite_list_window(ctx);
         self.suite_confirm_window(ctx);
+        self.suite_changed_window(ctx);
+    }
+
+    /// What is offered when a write is refused because another program saved the project: read it again, or save under another name.
+    fn suite_changed_window(&mut self, ctx: &egui::Context) {
+        let Some(file) = &self.suite.changed else {
+            return;
+        };
+        let code = self.suite_code();
+        let line = Said(S::ChangedOnDisk, vec![name_of(file)]).text(code);
+        let danger = col(self.theme.danger);
+        let mut again = false;
+        let mut save_as = false;
+        let mut close = false;
+        self.window(S::Menu.tr(code))
+            .id(egui::Id::unique("suite-changed"))
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.set_max_width(420.0);
+                ui.label(RichText::new(line.as_str()).color(danger));
+                ui.horizontal_wrapped(|ui| {
+                    again = ui.button(S::ReadAgain.tr(code)).clicked();
+                    save_as = ui.button(S::MenuSaveAs.tr(code)).clicked();
+                    close = ui.button(S::Close.tr(code)).clicked();
+                });
+            });
+        // Escape closes it; nothing is read and nothing is written
+        close |= ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        if again {
+            self.suite_reopen();
+        } else if save_as {
+            self.suite_dismiss_changed();
+            self.suite_browse(Mode::Save, Purpose::SuiteSaveAs);
+        } else if close {
+            self.suite_dismiss_changed();
+        }
     }
 
     fn suite_list_window(&mut self, ctx: &egui::Context) {
@@ -820,6 +918,26 @@ mod tests {
         project
             .save_branch(&writer, update, &SaveOptions::default())
             .unwrap();
+    }
+
+    /// Saves the project the way another program does: the change is made on a copy and the file is replaced with it, so this
+    /// process has no memory of that write.
+    fn saved_by_another(path: &Path) {
+        static TIMES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let times = TIMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let made = format!("saved meanwhile {times}");
+        let copy = path.with_file_name("another.eh3d");
+        fs::copy(path, &copy).unwrap();
+        write_branch(&copy, "x-vendor", &[("blob", made.as_bytes())]);
+        fs::copy(&copy, path).unwrap();
+        fs::remove_file(&copy).unwrap();
+    }
+
+    fn said_changed(a: &App) -> bool {
+        a.session
+            .log
+            .iter()
+            .any(|l| l.contains("changed on disk since it was read"))
     }
 
     /// A made-up project with the branches of other programs and none of this one.
@@ -1106,6 +1224,67 @@ mod tests {
         assert!(logged(&a, S::Busy));
         a.open(&project);
         assert_eq!(a.session.program, lines);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_project_another_program_saved_is_not_written_over_and_can_be_read_again_or_saved_apart() {
+        let d = folder("changed");
+        let project = d.join("job.eh3d");
+        foreign(&project);
+        let mut a = window();
+        assert!(a.suite_open(&project));
+        a.open(&file(&d, "part.nc", PROGRAM));
+        saved_by_another(&project);
+        // looking at it again for the bar is not reading it again
+        a.suite_refresh();
+        let bytes = fs::read(&project).unwrap();
+        assert_eq!(a.suite_save(), Step::Refused);
+        assert!(said_changed(&a));
+        assert_eq!(a.suite.changed.as_deref(), Some(project.as_path()));
+        assert!(a.suite.pending.is_none());
+        assert_eq!(a.suite_take("cad", "face.nc"), Step::Refused);
+        assert_eq!(a.suite_import(&file(&d, "other.nc", OTHER)), Step::Refused);
+        assert_eq!(fs::read(&project).unwrap(), bytes);
+        // under another name the work is saved beside what the other program saved
+        let apart = d.join("mine.eh3d");
+        assert_eq!(a.suite_save_as(&apart), Step::Done);
+        assert!(a.suite.changed.is_none());
+        assert_eq!(others(&apart), others(&project));
+        assert_eq!(fs::read(&project).unwrap(), bytes);
+        // the notice is drawn, and reading the project again takes it away
+        saved_by_another(&apart);
+        a.session.load(OTHER);
+        assert_eq!(a.suite_save(), Step::Refused);
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            a.suite_windows(ui.ctx());
+        });
+        out.textures_delta.clear();
+        assert!(a.suite.changed.is_some());
+        assert!(a.suite_reopen());
+        assert!(a.suite.changed.is_none());
+        assert!(!a.suite_reopen());
+        a.session.load(OTHER);
+        assert_eq!(a.suite_save(), Step::Done);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_save_by_another_program_while_a_question_waits_refuses_the_agreed_write() {
+        let d = folder("while");
+        let theirs = d.join("theirs.eh3d");
+        foreign(&theirs);
+        let mut a = window();
+        a.open(&file(&d, "part.nc", PROGRAM));
+        assert_eq!(a.suite_save_as(&theirs), Step::Asked);
+        saved_by_another(&theirs);
+        let bytes = fs::read(&theirs).unwrap();
+        assert_eq!(a.suite_confirm(), Step::Refused);
+        assert!(said_changed(&a));
+        assert_eq!(fs::read(&theirs).unwrap(), bytes);
+        a.suite_dismiss_changed();
+        assert!(a.suite.changed.is_none());
         let _ = fs::remove_dir_all(&d);
     }
 

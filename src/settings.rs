@@ -1200,11 +1200,12 @@ server_jog_confirm_mm = 0
     #[test]
     fn the_lines_of_the_limits_of_the_attachments_are_kept_and_give_the_limits() {
         let s = Settings::parse(
-            "attachments.max_mb = 16\nviewer.max_pdf_mb = 4\nviewer.max_pdf_mb = 8\nviewer.max_text_mb = no\n",
+            "attachments.max_mb = 16\nviewer.max_pdf_mb = 4\nviewer.max_pdf_mb = 8\nviewer.max_text_mb = no\nviewer.max_preview_mb = 32\n",
         );
         let limits = s.panel_limits();
         assert_eq!(limits.attachments.max_attachment_bytes, 16 << 20);
         assert_eq!(limits.viewer.max_pdf_bytes, 8 << 20);
+        assert_eq!(limits.viewer.max_preview_bytes, 32 << 20);
         assert_eq!(Settings::parse(&s.to_text()).panel_lines, s.panel_lines);
         assert_eq!(
             Settings::default().panel_limits(),

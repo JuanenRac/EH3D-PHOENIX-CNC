@@ -253,9 +253,13 @@ impl App {
     pub(super) fn shortcut(&mut self, s: Shortcut) {
         // the question before a project is written is a window too: Esc says no and nothing is started behind it. While something
         // runs the keys do what they always do, so that Esc still stops it.
-        if self.suite.pending.is_some() && !self.can_stop() {
+        // the notice of a project saved by another program is such a window as well
+        if (self.suite.pending.is_some() || self.suite.changed.is_some()) && !self.can_stop() {
             match s {
-                Shortcut::Stop => self.suite_cancel(),
+                Shortcut::Stop => {
+                    self.suite_cancel();
+                    self.suite_dismiss_changed();
+                }
                 Shortcut::Quit => self.quit = true,
                 _ => {}
             }
