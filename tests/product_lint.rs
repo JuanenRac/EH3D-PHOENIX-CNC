@@ -323,3 +323,14 @@ fn what_cannot_be_read_or_judged_is_said() {
     }
     assert!(run(&["M3 S1000", "G0 X1", "M5", "M0", "M30"]).is_empty());
 }
+
+#[test]
+fn a_post_processor_keeps_the_words_after_a_comment() {
+    use eh3d_phoenix_cnc::post::Post;
+    let (post, problems) = Post::parse("comments = strip\n");
+    assert!(problems.is_empty());
+    assert_eq!(
+        post.apply(&l(&["G0 (to the corner) X5 Y6", "G1 (a;b) X7 ; end"])),
+        l(&["G0 X5 Y6", "G1 X7"])
+    );
+}

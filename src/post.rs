@@ -155,7 +155,7 @@ impl Post {
     fn line(&self, raw: &str) -> String {
         let (code, comment) = split_comment(raw);
         let mut words: Vec<String> = Vec::new();
-        for w in words_of(code) {
+        for w in words_of(&code) {
             let head = w.to_ascii_uppercase();
             if self.drop.contains(&head) {
                 continue;
@@ -200,15 +200,29 @@ fn is_word(s: &str) -> bool {
         && s.len() > 1
 }
 
-/// The code of a line and its comment (a `;` to the end, or text in parentheses).
-fn split_comment(line: &str) -> (&str, &str) {
-    if let Some(i) = line.find(';') {
-        return (&line[..i], &line[i..]);
+/// The code of a line and its comments (a `;` to the end, or text in parentheses). The words after a comment in parentheses are code, and a `;` inside one is part of it.
+fn split_comment(line: &str) -> (String, String) {
+    let (mut code, mut comments) = (String::new(), String::new());
+    let mut in_comment = false;
+    for (at, c) in line.char_indices() {
+        match c {
+            ';' if !in_comment => {
+                comments.push_str(line.get(at..).unwrap_or(""));
+                break;
+            }
+            '(' => {
+                in_comment = true;
+                comments.push(c);
+            }
+            ')' if in_comment => {
+                in_comment = false;
+                comments.push(c);
+            }
+            _ if in_comment => comments.push(c),
+            _ => code.push(c),
+        }
     }
-    match line.find('(') {
-        Some(i) => (&line[..i], &line[i..]),
-        None => (line, ""),
-    }
+    (code, comments)
 }
 
 /// The words of the code of a line: a letter and what follows it up to the next letter (`G1X5Y-2.5` is `G1`, `X5`, `Y-2.5`).
