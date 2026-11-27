@@ -13,12 +13,12 @@
   <img src="https://img.shields.io/badge/Languages-8-00E5FF.svg" alt="Languages">
   <img src="https://img.shields.io/badge/Version-0.2.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-4CAF50.svg" alt="Maturity">
-  <img src="https://img.shields.io/badge/Tests-1248-0f6cbd.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1249-0f6cbd.svg" alt="Tests">
 </p>
 
 ---
 
-**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano, in pianta o in 3D, con le righe eseguite segnate, e si ferma su ciò che il controllore rifiuta. Inoltre controlla, misura e prepara programmi (archi, cicli fissi, compensazione del raggio, aree vietate, un tastatore, una mappa delle altezze, un cambio utensile, una tabella utensili e una dei materiali), importa disegni e i file Gerber ed Excellon delle schede e invia un programma al server EH3D. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) è pilotata per GRBL, grblHAL, Marlin e Klipper contro simulatori dei loro dialetti su cavi simulati; le altre famiglie che elenca non sono pilotate. 1248 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**: una porta seriale si apre solo per GRBL, grblHAL o Marlin e una connessione di rete solo quando un programma è inviato al server o si raggiunge Klipper con `--klipper`. Le macchine simulate accettano solo movimenti rettilinei e rifiutano archi, cicli fissi e tastatura, quindi questi sono misurati, controllati e cronometrati sulla carta, il percorso disegnato mostra un arco come la sua corda, e un programma che li contiene si ferma a quella riga sul simulatore. La finestra porta undici temi e offre otto lingue, quelle della vista condivisa di EH3D-COMMON: le sue parole esistono in inglese, spagnolo, tedesco, francese, italiano, giapponese, cinese e portoghese europeo.
+**Verifica di onestà - cosa funziona oggi:** un programma Rust con una finestra (`phoenix-cnc`) che pilota una macchina **simulata**: mostra la posizione della macchina (pezzo e macchina), la sposta a mano con un tastierino di jog, imposta lo zero, esegue l'origine, accetta i comandi digitati dall'operatore, esegue un programma G-code riga per riga (con pausa, stop e arresto di emergenza), disegna il percorso del programma sul piano, in pianta o in 3D, con le righe eseguite segnate, e si ferma su ciò che il controllore rifiuta. Inoltre controlla, misura e prepara programmi (archi, cicli fissi, compensazione del raggio, aree vietate, un tastatore, una mappa delle altezze, un cambio utensile, una tabella utensili e una dei materiali), importa disegni e i file Gerber ed Excellon delle schede e invia un programma al server EH3D. L'interfaccia dei controllori (`eh3d-controller`, in EH3D-COMMON) è pilotata per GRBL, grblHAL, Marlin e Klipper contro simulatori dei loro dialetti su cavi simulati; le altre famiglie che elenca non sono pilotate. 1249 test girano su un computer. **Nulla di qui è stato eseguito su una macchina reale**: una porta seriale si apre solo per GRBL, grblHAL o Marlin e una connessione di rete solo quando un programma è inviato al server o si raggiunge Klipper con `--klipper`. Le macchine simulate accettano solo movimenti rettilinei e rifiutano archi, cicli fissi e tastatura, quindi questi sono misurati, controllati e cronometrati sulla carta, il percorso disegnato mostra un arco come la sua corda, e un programma che li contiene si ferma a quella riga sul simulatore. La finestra porta undici temi e offre otto lingue, quelle della vista condivisa di EH3D-COMMON: le sue parole esistono in inglese, spagnolo, tedesco, francese, italiano, giapponese, cinese e portoghese europeo.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|
 | Versione | `0.2.5` |
 | Maturità | Funzionale |
-| Test | 1248 |
+| Test | 1249 |
 | Stack tecnologico | Rust |
 | Su hardware reale | No: per impostazione predefinita pilota una macchina simulata; un vero controllore GRBL (`--grbl`) non è mai stato provato |
 
@@ -47,7 +47,7 @@ Ogni riga è una parte di questo repository e la luce dice a che punto è oggi. 
 | Libreria di base | 🟡 | Un crate Rust che riesporta `scene`, `texts` e `theme` di `eh3d-view` con il nome di questo programma; richiede la cartella di EH3D-COMMON accanto. |
 | Scena e viste | 🟡 | Scritta e provata in EH3D-COMMON; la finestra di questo programma disegna il percorso di un programma sul piano e la posizione dell'utensile (vista su un computer). |
 | Temi e testi | 🟡 | Undici temi e le parole dell'interfaccia: la finestra offre le otto lingue della vista condivisa, e le parole dei pannelli e degli strumenti propri di questo programma sono nelle stesse otto; viste nella finestra di questo programma. |
-| Test | 🟡 | 1248 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
+| Test | 🟡 | 1249 test passano su un computer (`cargo test --features gui`): la sessione (jog, zero, origine, un programma, pausa, allarme, arresto di emergenza), il percorso di un programma e la riga di comando; il controllore simulato è provato in EH3D-COMMON. |
 | Finestra e jog | 🟡 | Funziona su un computer con il controllore simulato: posizione, tastierino di jog, passi, avanzamento, origine, zero, sblocco, una riga di comandi e un registro; nessuna macchina reale. |
 | Controllo della macchina | 🟠 | Solo simulatori: un programma gira riga per riga con pausa, stop e arresto di emergenza sulla macchina simulata o su un GRBL, grblHAL, Marlin o Klipper simulato; la porta seriale per GRBL, grblHAL e Marlin è dietro una funzione di compilazione, il collegamento HTTP di Klipper ha incontrato solo un Moonraker sostitutivo e nessun controllore reale è stato collegato. |
 | Documentazione | 🟡 | README in otto lingue, le due immagini, tre programmi di esempio e il changelog. |
@@ -184,7 +184,7 @@ cargo run --release --features gui -- examples/02_frame_and_pocket.nc
 
 ## 🧪 Test
 
-`cargo test --features gui` esegue 1248 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
+`cargo test --features gui` esegue 1249 test: la sessione (jog e zero, un programma riga per riga, pausa e ripresa, una riga rifiutata, l'arresto di emergenza e l'allarme, il registro dei comandi, l'origine), il percorso di un programma e la riga di comando; la vista e il controllore simulato sono provati in EH3D-COMMON. La CI esegue anche `cargo fmt --check` e `cargo clippy` con gli avvisi come errori, e `python -I tools/ci_validate.py` controlla manifesto, versioni, changelog e gli otto README.
 
 ## 🏗️ Compilazione e rilascio
 

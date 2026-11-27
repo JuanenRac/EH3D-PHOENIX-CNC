@@ -195,7 +195,8 @@ impl App {
 
     /// The run (start, pause, stop, send to the server), where the program is, and its lines.
     pub(super) fn panel_job(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+        // the buttons go to a further row when their words do not fit in the panel
+        ui.horizontal_wrapped(|ui| {
             if ui
                 .add_enabled(self.can_start(), egui::Button::new(self.t(Text::Start)))
                 .clicked()
@@ -868,6 +869,21 @@ mod layout_tests {
             let texts = painted(size, |ui| a.panel_jog(ui));
             for label in ["X-", "X+", "Y-", "Y+", "Z-", "Z+", "A-", "A+"] {
                 whole(&texts, label, size);
+            }
+        }
+    }
+
+    #[test]
+    fn the_buttons_of_the_program_are_whole_in_a_narrow_panel_in_every_language() {
+        let mut a = App::isolated();
+        for lang in Lang::ALL {
+            a.lang = lang;
+            for width in [260.0, 300.0, 412.0] {
+                let size = Vec2::new(width, 700.0);
+                let texts = painted(size, |ui| a.panel_job(ui));
+                for label in [Text::Start, Text::Pause, Text::Stop, Text::McSendServer] {
+                    whole(&texts, a.t(label), size);
+                }
             }
         }
     }
