@@ -144,7 +144,7 @@ impl App {
         let lang = self.lang.code();
         for event in g.take_events() {
             if let Some(words) = crate::guard::event_text(&event, lang) {
-                self.session.log.push(format!("guard: {words}"));
+                self.log_tell(crate::logwords::Lg::GuardSays, &[words.to_string()]);
             }
         }
         if let Some(trip) = g.try_tripped() {

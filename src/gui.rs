@@ -473,7 +473,9 @@ impl App {
         tr(self.lang, text)
     }
 
-    /// Keeps the line the program has reached in a file while it runs, and takes the file away when the program is over: a crash leaves it for the next start.
+    /// Keeps the line the program has reached in a file while it runs, and takes the file away when the program is over and the machine has
+    /// stopped moving: the controller still runs the last lines it took, and a crash or a link that goes down then leaves the file for the
+    /// next start.
     fn track_recovery(&mut self) {
         let path = recovery::recovery_path(&self.settings_path);
         let s = &self.session;
@@ -491,13 +493,18 @@ impl App {
                     total: s.program.len(),
                     job: String::new(),
                     sha256: recovery::program_hash(&s.program),
+                    shifted: s.hand_shift,
                 };
                 if r.save(&path).is_ok() {
                     self.recovery_saved = Some(s.next);
                 }
             }
-        } else if self.recovery_saved.is_some() && s.next >= s.program.len() {
-            // the program reached its end
+        } else if self.recovery_saved.is_some()
+            && s.next >= s.program.len()
+            && !s.busy()
+            && s.status.state == eh3d_controller::State::Idle
+        {
+            // the program reached its end and the machine stands still
             Recovery::clear(&path);
             self.recovery_saved = None;
         }

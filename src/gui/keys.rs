@@ -449,6 +449,7 @@ mod tests {
             total: 9,
             job: String::new(),
             sha256: String::new(),
+            shifted: false,
         }));
         a.shortcut(Shortcut::Stop);
         assert!(matches!(a.win, Some(Win::Resume(_))));

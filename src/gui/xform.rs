@@ -81,6 +81,7 @@ impl App {
             Why::Cycle => Msg::TfWhyCycle,
             Why::Zero => Msg::TfWhyZero,
             Why::AbsoluteCentre => Msg::TfWhyCentre,
+            Why::Unreadable => Msg::TfWhyUnreadable,
         };
         self.ws(msg, &[r.line.to_string()])
     }

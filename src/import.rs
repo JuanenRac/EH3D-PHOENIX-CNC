@@ -176,6 +176,72 @@ fn read_hpgl(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
                 down = false;
             }
             "SP" | "LT" | "VS" | "FS" | "PW" | "IP" | "IW" | "PG" | "NR" => {}
+            // arcs about a centre (`AA` absolute, `AR` from the pen) move the pen; a circle (`CI`) is drawn about it and leaves it there
+            "AA" | "AR" | "CI" => {
+                let written = args
+                    .split(|c: char| c == ',' || c.is_whitespace())
+                    .filter(|t| !t.is_empty())
+                    .count();
+                let needed = if mn == "CI" { 1 } else { 3 };
+                if nums.len() != written || !(needed..=needed + 1).contains(&written) {
+                    return Err(Fail::Syntax);
+                }
+                if mn == "CI" {
+                    let r = nums[0].abs() * HPGL_UNIT_MM;
+                    if r > 0.0 {
+                        if r > MAX_COORD_MM {
+                            return Err(Fail::Syntax);
+                        }
+                        let centre = (x * HPGL_UNIT_MM, y * HPGL_UNIT_MM);
+                        let mut pts = flatten_arc(
+                            centre,
+                            r,
+                            0.0,
+                            std::f64::consts::TAU,
+                            cfg.curve_tolerance_mm,
+                        );
+                        pts.pop();
+                        s.path(pts, true)?;
+                    }
+                    continue;
+                }
+                let centre = if mn == "AA" {
+                    (nums[0], nums[1])
+                } else {
+                    (x + nums[0], y + nums[1])
+                };
+                let r = (x - centre.0).hypot(y - centre.1);
+                let start = (y - centre.1).atan2(x - centre.0);
+                // a turn of more than a circle goes over the same path again
+                let sweep = nums[2].clamp(-360.0, 360.0).to_radians();
+                if !(r.is_finite() && r * HPGL_UNIT_MM <= MAX_COORD_MM) {
+                    return Err(Fail::Syntax);
+                }
+                if r > 0.0 && sweep != 0.0 {
+                    let pts = flatten_arc(
+                        (centre.0 * HPGL_UNIT_MM, centre.1 * HPGL_UNIT_MM),
+                        r * HPGL_UNIT_MM,
+                        start,
+                        sweep,
+                        cfg.curve_tolerance_mm,
+                    );
+                    if down {
+                        if run.is_empty() {
+                            run.push((x * HPGL_UNIT_MM, y * HPGL_UNIT_MM));
+                        }
+                        run.extend(pts.iter().skip(1));
+                        if run.len() > cfg.max_points {
+                            return Err(Fail::TooManyPoints);
+                        }
+                    }
+                    (x, y) = (
+                        centre.0 + r * (start + sweep).cos(),
+                        centre.1 + r * (start + sweep).sin(),
+                    );
+                }
+            }
+            // a scaling or a turn of the whole drawing, and the commands that move the pen in ways that are not read
+            "SC" | "RO" | "PE" | "AT" | "BZ" | "BR" | "PM" => return Err(Fail::Unmeasured),
             "PA" | "PR" | "PU" | "PD" => {
                 // a number left out would pair the ones after it the wrong way round, so the drawing is not taken
                 let written = args
@@ -315,12 +381,22 @@ fn read_dxf(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
     for w in pairs.windows(2) {
         if w[0] == (9, "$INSUNITS") && w[1].0 == 70 {
             said_units = true;
-            scale = match w[1].1.parse::<i32>().unwrap_or(4) {
+            scale = match w[1].1.parse::<i32>().map_err(|_| Fail::Syntax)? {
+                0 => {
+                    said_units = false;
+                    1.0
+                }
                 1 => 25.4,
                 2 => 304.8,
+                4 => 1.0,
                 5 => 10.0,
                 6 => 1000.0,
-                _ => 1.0,
+                8 => 0.000_025_4,
+                9 => 0.025_4,
+                10 => 914.4,
+                13 => 0.001,
+                14 => 100.0,
+                _ => return Err(Fail::Unmeasured),
             };
         }
     }
@@ -350,84 +426,105 @@ fn read_dxf(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
             j += 1;
         }
         let body = &pairs[i + 1..j];
-        let get = |code: i32| {
-            body.iter()
-                .find(|p| p.0 == code)
-                .and_then(|p| p.1.parse::<f64>().ok())
-                .filter(|v| v.is_finite())
+        // what is drawn on a sheet of paper (a frame, a title) is not part of the work
+        if body.iter().any(|p| p.0 == 67 && p.1 == "1") {
+            s.note(Note::UnsupportedCommand);
+            i = j;
+            continue;
+        }
+        let get = |code: i32| value(body, code);
+        let need = |code: i32| value(body, code)?.ok_or(Fail::Syntax);
+        let bulged = matches!(kind, "CIRCLE" | "ARC" | "LWPOLYLINE" | "POLYLINE");
+        // a shape seen from behind (extrusion -Z) is mirrored in X; one in a tilted plane is not read
+        let mut flip = 1.0;
+        if bulged {
+            let (nx, ny, nz) = (get(210)?, get(220)?, get(230)?);
+            if nx.unwrap_or(0.0).abs() > 1e-6 || ny.unwrap_or(0.0).abs() > 1e-6 {
+                return Err(Fail::Unmeasured);
+            }
+            if nz.is_some_and(|z| z < 0.0) {
+                flip = -1.0;
+            }
+        }
+        let seen = move |pts: Vec<(f64, f64)>| -> Vec<(f64, f64)> {
+            pts.into_iter().map(|(x, y)| (x * flip, y)).collect()
         };
         match kind {
             "LINE" => {
-                if let (Some(x0), Some(y0), Some(x1), Some(y1)) =
-                    (get(10), get(20), get(11), get(21))
-                {
-                    s.path(
-                        vec![(x0 * scale, y0 * scale), (x1 * scale, y1 * scale)],
-                        false,
-                    )?;
-                }
+                let (x0, y0, x1, y1) = (need(10)?, need(20)?, need(11)?, need(21)?);
+                s.path(
+                    vec![(x0 * scale, y0 * scale), (x1 * scale, y1 * scale)],
+                    false,
+                )?;
                 i = j;
             }
             "CIRCLE" => {
-                if let (Some(x), Some(y), Some(r)) = (get(10), get(20), get(40)) {
-                    if r > 0.0 {
-                        let mut pts = flatten_arc(
-                            (x * scale, y * scale),
-                            r * scale,
-                            0.0,
-                            std::f64::consts::TAU,
-                            cfg.curve_tolerance_mm,
-                        );
-                        pts.pop();
-                        s.path(pts, true)?;
-                    }
+                let (x, y, r) = (need(10)?, need(20)?, need(40)?);
+                if r > 0.0 {
+                    let mut pts = flatten_arc(
+                        (x * scale, y * scale),
+                        r * scale,
+                        0.0,
+                        std::f64::consts::TAU,
+                        cfg.curve_tolerance_mm,
+                    );
+                    pts.pop();
+                    s.path(seen(pts), true)?;
                 }
                 i = j;
             }
             "ARC" => {
-                if let (Some(x), Some(y), Some(r), Some(a0), Some(a1)) =
-                    (get(10), get(20), get(40), get(50), get(51))
-                {
-                    if r > 0.0 {
-                        let pts = arc_points(
-                            (x * scale, y * scale),
-                            r * scale,
-                            a0.to_radians(),
-                            a1.to_radians(),
-                            cfg.curve_tolerance_mm,
-                        );
-                        s.path(pts, false)?;
-                    }
+                let (x, y, r) = (need(10)?, need(20)?, need(40)?);
+                let (a0, a1) = (need(50)?, need(51)?);
+                if r > 0.0 {
+                    let pts = arc_points(
+                        (x * scale, y * scale),
+                        r * scale,
+                        a0.to_radians(),
+                        a1.to_radians(),
+                        cfg.curve_tolerance_mm,
+                    );
+                    s.path(seen(pts), false)?;
                 }
                 i = j;
             }
             "LWPOLYLINE" => {
-                let closed = get(70).is_some_and(|f| (f as i64) & 1 == 1);
+                let closed = get(70)?.is_some_and(|f| (f as i64) & 1 == 1);
                 let mut verts: Vec<((f64, f64), f64)> = Vec::new();
                 let mut pending_x: Option<f64> = None;
                 for &(code, v) in body {
-                    let n = v.parse::<f64>().ok().filter(|v| v.is_finite());
-                    match (code, n) {
-                        (10, Some(x)) => pending_x = Some(x),
-                        (20, Some(y)) => {
-                            if let Some(x) = pending_x.take() {
-                                verts.push(((x * scale, y * scale), 0.0));
+                    if !matches!(code, 10 | 20 | 42) {
+                        continue;
+                    }
+                    let number = number_of(v)?;
+                    match code {
+                        10 => {
+                            if pending_x.replace(number).is_some() {
+                                return Err(Fail::Syntax);
                             }
                         }
-                        (42, Some(b)) => {
+                        20 => {
+                            let x = pending_x.take().ok_or(Fail::Syntax)?;
+                            verts.push(((x * scale, number * scale), 0.0));
+                        }
+                        _ => {
                             if let Some(last) = verts.last_mut() {
-                                last.1 = b;
+                                last.1 = number;
                             }
                         }
-                        _ => {}
                     }
                 }
-                s.path(polyline(&verts, closed, cfg.curve_tolerance_mm), closed)?;
+                if pending_x.is_some() {
+                    return Err(Fail::Syntax);
+                }
+                s.path(
+                    seen(polyline(&verts, closed, cfg.curve_tolerance_mm)),
+                    closed,
+                )?;
                 i = j;
             }
             "POLYLINE" => {
-                // the vertices follow as their own entities up to SEQEND
-                let closed = get(70).is_some_and(|f| (f as i64) & 1 == 1);
+                let closed = get(70)?.is_some_and(|f| (f as i64) & 1 == 1);
                 let mut verts: Vec<((f64, f64), f64)> = Vec::new();
                 let mut k = j;
                 while k < pairs.len() && pairs[k] != (0, "SEQEND") {
@@ -437,21 +534,19 @@ fn read_dxf(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
                             e += 1;
                         }
                         let vb = &pairs[k + 1..e];
-                        let g = |code: i32| {
-                            vb.iter()
-                                .find(|p| p.0 == code)
-                                .and_then(|p| p.1.parse::<f64>().ok())
-                                .filter(|v| v.is_finite())
-                        };
-                        if let (Some(x), Some(y)) = (g(10), g(20)) {
-                            verts.push(((x * scale, y * scale), g(42).unwrap_or(0.0)));
-                        }
+                        let x = value(vb, 10)?.ok_or(Fail::Syntax)?;
+                        let y = value(vb, 20)?.ok_or(Fail::Syntax)?;
+                        let bulge = value(vb, 42)?.unwrap_or(0.0);
+                        verts.push(((x * scale, y * scale), bulge));
                         k = e;
                     } else {
                         k += 1;
                     }
                 }
-                s.path(polyline(&verts, closed, cfg.curve_tolerance_mm), closed)?;
+                s.path(
+                    seen(polyline(&verts, closed, cfg.curve_tolerance_mm)),
+                    closed,
+                )?;
                 i = k;
             }
             "VERTEX" | "SEQEND" => i = j,
@@ -462,6 +557,22 @@ fn read_dxf(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
         }
     }
     s.finish()
+}
+
+/// A number of a DXF group; one that cannot be read refuses the file, so no shape is drawn from what is left.
+fn number_of(text: &str) -> Result<f64, Fail> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
+        .ok_or(Fail::Syntax)
+}
+
+/// The number of the first group `code` of an entity, if it has one.
+fn value(body: &[(i32, &str)], code: i32) -> Result<Option<f64>, Fail> {
+    body.iter()
+        .find(|p| p.0 == code)
+        .map(|p| number_of(p.1))
+        .transpose()
 }
 
 fn polyline(verts: &[((f64, f64), f64)], closed: bool, tol: f64) -> Vec<(f64, f64)> {
@@ -763,6 +874,7 @@ fn path_data(d: &str, tol: f64, budget: &mut usize) -> Result<Vec<Shape>, Fail> 
     let mut last_quad: Option<(f64, f64)> = None;
     let bad = || Fail::Syntax;
     let mut first = true;
+    let mut moved = false;
     loop {
         if n.at_end() {
             break;
@@ -788,6 +900,16 @@ fn path_data(d: &str, tol: f64, budget: &mut usize) -> Result<Vec<Shape>, Fail> 
         *budget -= 1;
         let rel = cmd.is_ascii_lowercase();
         let (ox, oy) = if rel { (x, y) } else { (0.0, 0.0) };
+        if !cmd.eq_ignore_ascii_case(&b'M') {
+            if !moved {
+                return Err(bad());
+            }
+            // after a close (`Z`) the next piece begins where the closed one did
+            if cur.is_empty() {
+                cur.push((x, y));
+            }
+        }
+        moved = true;
         let before = cur.len();
         let mut new_ctrl = None;
         let mut new_quad = None;
@@ -876,6 +998,135 @@ fn path_data(d: &str, tol: f64, budget: &mut usize) -> Result<Vec<Shape>, Fail> 
     Ok(out)
 }
 
+/// A transformation of SVG: `[a, b, c, d, e, f]` takes `(x, y)` to `(a x + c y + e, b x + d y + f)`.
+type Matrix = [f64; 6];
+
+const IDENTITY: Matrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+fn apply(m: Matrix, p: (f64, f64)) -> (f64, f64) {
+    (
+        m[0] * p.0 + m[2] * p.1 + m[4],
+        m[1] * p.0 + m[3] * p.1 + m[5],
+    )
+}
+
+/// The transformation that does `inner` first and then `outer`.
+fn compose(outer: Matrix, inner: Matrix) -> Matrix {
+    let (ax, ay) = (
+        outer[0] * inner[0] + outer[2] * inner[1],
+        outer[1] * inner[0] + outer[3] * inner[1],
+    );
+    let (cx, cy) = (
+        outer[0] * inner[2] + outer[2] * inner[3],
+        outer[1] * inner[2] + outer[3] * inner[3],
+    );
+    let (ex, ey) = apply(outer, (inner[4], inner[5]));
+    [ax, ay, cx, cy, ex, ey]
+}
+
+/// The value of a `transform` attribute: `translate`, `scale`, `rotate`, `matrix`, `skewX` and `skewY`, the one written first outermost.
+/// Anything else refuses the file, which would otherwise be cut in another place.
+fn transform_of(text: &str) -> Result<Matrix, Fail> {
+    let mut out = IDENTITY;
+    let mut rest = text.trim_matches(|c: char| c.is_whitespace() || c == ',');
+    while !rest.is_empty() {
+        let opening = rest.find('(').ok_or(Fail::Unmeasured)?;
+        let closing = rest
+            .find(')')
+            .filter(|c| *c > opening)
+            .ok_or(Fail::Unmeasured)?;
+        let name = rest[..opening].trim();
+        let mut numbers = Numbers {
+            b: rest[opening + 1..closing].as_bytes(),
+            i: 0,
+        };
+        let mut v: Vec<f64> = Vec::new();
+        while !numbers.at_end() {
+            v.push(numbers.number().ok_or(Fail::Unmeasured)?);
+            if v.len() > 6 {
+                return Err(Fail::Unmeasured);
+            }
+        }
+        let one: Matrix = match (name, v.as_slice()) {
+            ("matrix", &[a, b, c, d, e, f]) => [a, b, c, d, e, f],
+            ("translate", &[x]) => [1.0, 0.0, 0.0, 1.0, x, 0.0],
+            ("translate", &[x, y]) => [1.0, 0.0, 0.0, 1.0, x, y],
+            ("scale", &[k]) => [k, 0.0, 0.0, k, 0.0, 0.0],
+            ("scale", &[x, y]) => [x, 0.0, 0.0, y, 0.0, 0.0],
+            ("rotate", &[a]) => {
+                let (sin, cos) = a.to_radians().sin_cos();
+                [cos, sin, -sin, cos, 0.0, 0.0]
+            }
+            ("rotate", &[a, x, y]) => {
+                let (sin, cos) = a.to_radians().sin_cos();
+                [
+                    cos,
+                    sin,
+                    -sin,
+                    cos,
+                    x - cos * x + sin * y,
+                    y - sin * x - cos * y,
+                ]
+            }
+            ("skewX", &[a]) => [1.0, 0.0, a.to_radians().tan(), 1.0, 0.0, 0.0],
+            ("skewY", &[a]) => [1.0, a.to_radians().tan(), 0.0, 1.0, 0.0, 0.0],
+            _ => return Err(Fail::Unmeasured),
+        };
+        out = compose(out, one);
+        rest = rest[closing + 1..].trim_start_matches(|c: char| c.is_whitespace() || c == ',');
+    }
+    Ok(out)
+}
+
+/// Whether an element says it is not shown, by its attributes or by its style.
+fn is_hidden(a: &[(String, String)]) -> bool {
+    let style: String = attr(a, "style")
+        .unwrap_or("")
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    attr(a, "display").is_some_and(|v| v.trim() == "none")
+        || attr(a, "visibility").is_some_and(|v| v.trim() == "hidden")
+        || style
+            .split(';')
+            .any(|d| d == "display:none" || d == "visibility:hidden")
+}
+
+/// The outline of a rectangle `[x, y, width, height]`, with its corners rounded by the radii when both are above zero.
+fn rect_points(r: [f64; 4], rx: f64, ry: f64, tol: f64) -> Vec<(f64, f64)> {
+    let [x, y, w, h] = r;
+    if rx <= 0.0 || ry <= 0.0 {
+        return vec![(x, y), (x + w, y), (x + w, y + h), (x, y + h)];
+    }
+    let big = rx.max(ry);
+    let piece = if tol >= big {
+        std::f64::consts::FRAC_PI_2
+    } else {
+        2.0 * (1.0 - tol / big).clamp(-1.0, 1.0).acos()
+    };
+    let n = if piece > 1e-9 {
+        ((std::f64::consts::FRAC_PI_2 / piece).ceil() as usize).clamp(1, 1024)
+    } else {
+        1024
+    };
+    // the centres of the corners, clockwise on the screen from the top right one, and the angle each begins at
+    let corners = [
+        (x + w - rx, y + ry, -1.0),
+        (x + w - rx, y + h - ry, 0.0),
+        (x + rx, y + h - ry, 1.0),
+        (x + rx, y + ry, 2.0),
+    ];
+    let mut out = Vec::with_capacity(4 * (n + 1));
+    for (cx, cy, quarter) in corners {
+        for k in 0..=n {
+            let angle = std::f64::consts::FRAC_PI_2 * (quarter + k as f64 / n as f64);
+            out.push((cx + rx * angle.cos(), cy + ry * angle.sin()));
+        }
+    }
+    out
+}
+
 fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
     let mut s = Sink::new(cfg);
     let tol = cfg.curve_tolerance_mm;
@@ -885,6 +1136,8 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
     let mut skip_depth = 0usize;
     let mut budget = cfg.max_points;
     let mut shapes: Vec<(Vec<(f64, f64)>, bool)> = Vec::new();
+    // the elements that are open: the transformation in force inside each one and whether it is hidden
+    let mut open: Vec<(Matrix, bool)> = Vec::new();
     let mut rest = text;
     let mut tags = 0usize;
     while let Some(lt) = rest.find('<') {
@@ -939,18 +1192,40 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
             }
             continue;
         }
-        if closing || skip_depth > 0 {
+        if skip_depth > 0 {
+            continue;
+        }
+        if closing {
+            open.pop();
             continue;
         }
         let a = attributes(inner);
-        if attr(&a, "transform").is_some() {
-            s.note(Note::TransformIgnored);
-        }
-        let f = |name: &str| {
-            attr(&a, name)
-                .and_then(|v| v.trim().parse::<f64>().ok())
-                .filter(|v| v.is_finite())
+        let (outer, outer_hidden) = open.last().copied().unwrap_or((IDENTITY, false));
+        let matrix = match attr(&a, "transform") {
+            Some(t) => compose(outer, transform_of(t)?),
+            None => outer,
         };
+        // what is not shown (a hidden layer) is not cut
+        let hidden = outer_hidden || is_hidden(&a);
+        if !selfclosing {
+            open.push((matrix, hidden));
+        }
+        if hidden {
+            continue;
+        }
+        let f = |name: &str| -> Result<Option<f64>, Fail> {
+            attr(&a, name)
+                .map(|v| {
+                    let v = v.trim();
+                    number_of(v.strip_suffix("px").unwrap_or(v).trim_end())
+                })
+                .transpose()
+        };
+        let stretch = matrix[0]
+            .hypot(matrix[1])
+            .max(matrix[2].hypot(matrix[3]))
+            .max(1e-9);
+        let first_new = shapes.len();
         match name.as_str() {
             "svg" if !have_root => {
                 have_root = true;
@@ -976,29 +1251,34 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
             }
             "line" => {
                 if let (Some(x1), Some(y1), Some(x2), Some(y2)) =
-                    (f("x1"), f("y1"), f("x2"), f("y2"))
+                    (f("x1")?, f("y1")?, f("x2")?, f("y2")?)
                 {
                     shapes.push((vec![(x1, y1), (x2, y2)], false));
                 }
             }
             "rect" => {
-                if let (Some(w), Some(h)) = (f("width"), f("height")) {
-                    let (x, y) = (f("x").unwrap_or(0.0), f("y").unwrap_or(0.0));
+                if let (Some(w), Some(h)) = (f("width")?, f("height")?) {
+                    let (x, y) = (f("x")?.unwrap_or(0.0), f("y")?.unwrap_or(0.0));
                     if w > 0.0 && h > 0.0 {
-                        shapes.push((vec![(x, y), (x + w, y), (x + w, y + h), (x, y + h)], true));
+                        let (rx, ry) = (f("rx")?, f("ry")?);
+                        let rx = rx.or(ry).unwrap_or(0.0).clamp(0.0, w / 2.0);
+                        let ry = ry.unwrap_or(rx).clamp(0.0, h / 2.0);
+                        let pts = rect_points([x, y, w, h], rx, ry, tol / scale / stretch);
+                        budget = budget.checked_sub(pts.len()).ok_or(Fail::TooManyPoints)?;
+                        shapes.push((pts, true));
                     }
                 }
             }
             "circle" | "ellipse" => {
-                let (cx, cy) = (f("cx").unwrap_or(0.0), f("cy").unwrap_or(0.0));
+                let (cx, cy) = (f("cx")?.unwrap_or(0.0), f("cy")?.unwrap_or(0.0));
                 let (rx, ry) = if name == "circle" {
-                    let r = f("r").unwrap_or(0.0);
+                    let r = f("r")?.unwrap_or(0.0);
                     (r, r)
                 } else {
-                    (f("rx").unwrap_or(0.0), f("ry").unwrap_or(0.0))
+                    (f("rx")?.unwrap_or(0.0), f("ry")?.unwrap_or(0.0))
                 };
                 if rx > 0.0 && ry > 0.0 {
-                    let u = tol / scale;
+                    let u = tol / scale / stretch;
                     let r = rx.max(ry);
                     let piece = if u >= r {
                         1.0
@@ -1032,7 +1312,10 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
                         i: 0,
                     };
                     let mut pts = Vec::new();
-                    while let (Some(px), Some(py)) = (n.number(), n.number()) {
+                    while !n.at_end() {
+                        // a point that cannot be read, or half a point, refuses the file
+                        let px = n.number().ok_or(Fail::Syntax)?;
+                        let py = n.number().ok_or(Fail::Syntax)?;
                         pts.push((px, py));
                         if pts.len() > budget {
                             return Err(Fail::TooManyPoints);
@@ -1044,7 +1327,7 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
             }
             "path" => {
                 if let Some(d) = attr(&a, "d") {
-                    shapes.extend(path_data(d, tol / scale, &mut budget)?);
+                    shapes.extend(path_data(d, tol / scale / stretch, &mut budget)?);
                 }
             }
             "g" | "a" | "switch" | "use" | "image" | "text" | "tspan" | "linearGradient"
@@ -1054,6 +1337,11 @@ fn read_svg(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
                 }
             }
             _ => {}
+        }
+        for (pts, _) in shapes.iter_mut().skip(first_new) {
+            for p in pts.iter_mut() {
+                *p = apply(matrix, *p);
+            }
         }
     }
     // the picture is upside down for a machine: Y grows up
@@ -1296,6 +1584,201 @@ mod tests {
             path_data("M0 0 L1 1 L2 2 L3 3 L4 4", 0.01, &mut b),
             Err(Fail::TooManyPoints)
         );
+    }
+
+    fn near(a: (f64, f64), b: (f64, f64)) -> bool {
+        (a.0 - b.0).abs() < 1e-6 && (a.1 - b.1).abs() < 1e-6
+    }
+
+    /// A DXF file with these entities, in millimetres unless another unit code is given.
+    fn dxf(unit: &str, entities: &str) -> String {
+        format!("0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n{unit}\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n{entities}0\nENDSEC\n0\nEOF\n")
+    }
+
+    const LINE: &str = "0\nLINE\n10\n0\n20\n0\n11\n1000\n21\n0\n";
+
+    #[test]
+    fn dxf_units_are_taken_as_they_are_said_or_the_file_is_refused() {
+        for (unit, mm) in [
+            ("4", 1000.0),
+            ("9", 25.4),
+            ("13", 1.0),
+            ("14", 100_000.0),
+            ("8", 0.0254),
+        ] {
+            let d = read(Format::Dxf, dxf(unit, LINE).as_bytes(), &cfg()).unwrap();
+            assert!((d.paths[0].points[1].0 - mm).abs() < 1e-9, "{unit}");
+        }
+        // no unit: millimetres are taken and said
+        let d = read(Format::Dxf, dxf("0", LINE).as_bytes(), &cfg()).unwrap();
+        assert!(d.notes.contains(&Note::UnitsAssumedMm));
+        for unit in ["3", "7", "11", "99"] {
+            let e = read(Format::Dxf, dxf(unit, LINE).as_bytes(), &cfg());
+            assert_eq!(e, Err(Fail::Unmeasured), "{unit}");
+        }
+    }
+
+    #[test]
+    fn dxf_shapes_seen_from_behind_are_mirrored_and_paper_is_not_cut() {
+        let arc = "0\nARC\n10\n10\n20\n0\n40\n5\n50\n0\n51\n90\n230\n-1\n";
+        let d = read(Format::Dxf, dxf("4", arc).as_bytes(), &cfg()).unwrap();
+        assert!(
+            near(d.paths[0].points[0], (-15.0, 0.0)),
+            "{:?}",
+            d.paths[0].points[0]
+        );
+        assert!(near(*d.paths[0].points.last().unwrap(), (-10.0, 5.0)));
+        let paper = format!("{LINE}0\nLINE\n67\n1\n10\n0\n20\n0\n11\n9\n21\n9\n");
+        let d = read(Format::Dxf, dxf("4", &paper).as_bytes(), &cfg()).unwrap();
+        assert_eq!(d.paths.len(), 1);
+        assert!(d.notes.contains(&Note::UnsupportedCommand));
+        let tilted = "0\nCIRCLE\n10\n0\n20\n0\n40\n5\n210\n0.5\n";
+        let e = read(Format::Dxf, dxf("4", tilted).as_bytes(), &cfg());
+        assert_eq!(e, Err(Fail::Unmeasured));
+    }
+
+    #[test]
+    fn a_dxf_shape_with_a_number_that_cannot_be_read_refuses_the_file() {
+        for bad in [
+            "0\nLINE\n10\n0\n20\n0\n11\nx\n21\n0\n",
+            "0\nLINE\n10\n0\n20\n0\n11\n5\n",
+            "0\nCIRCLE\n10\n0\n20\n0\n40\n5,5\n",
+            "0\nLWPOLYLINE\n10\n0\n20\n0\n10\n5\n10\n5\n20\n5\n",
+            "0\nLWPOLYLINE\n10\n0\n20\n0\n10\n5\n",
+            "0\nPOLYLINE\n0\nVERTEX\n10\n0\n0\nSEQEND\n",
+        ] {
+            let text = dxf("4", &format!("{LINE}{bad}"));
+            assert_eq!(
+                read(Format::Dxf, text.as_bytes(), &cfg()),
+                Err(Fail::Syntax),
+                "{bad}"
+            );
+        }
+    }
+
+    /// An SVG drawing 100 mm square whose user units are millimetres.
+    fn square(body: &str) -> String {
+        format!(r#"<svg width="100mm" height="100mm" viewBox="0 0 100 100">{body}</svg>"#)
+    }
+
+    fn points(body: &str) -> Vec<Vec<(f64, f64)>> {
+        let d = read(Format::Svg, square(body).as_bytes(), &cfg()).unwrap();
+        d.paths.into_iter().map(|p| p.points).collect()
+    }
+
+    #[test]
+    fn svg_transformations_of_groups_and_shapes_are_applied() {
+        let line = r#"<line x1="0" y1="0" x2="10" y2="0"/>"#;
+        let moved = points(&format!(
+            r#"<g transform="translate(5, 10)">{line}</g>{line}"#
+        ));
+        assert!(
+            near(moved[0][0], (5.0, 90.0)) && near(moved[0][1], (15.0, 90.0)),
+            "{moved:?}"
+        );
+        // the group is over: the next line is where it was written
+        assert!(near(moved[1][0], (0.0, 100.0)), "{moved:?}");
+        // the one written first is outermost: the line is turned, then scaled, then moved
+        let both = points(&format!(
+            r#"<g transform="translate(10,0)"><g transform="scale(2)"><line transform="rotate(90)" x1="0" y1="0" x2="10" y2="0"/></g></g>"#
+        ));
+        assert!(near(both[0][1], (10.0, 80.0)), "{both:?}");
+        let about =
+            points(r#"<line transform="rotate(180 10 10)" x1="0" y1="10" x2="10" y2="10"/>"#);
+        assert!(near(about[0][0], (20.0, 90.0)), "{about:?}");
+        let matrix =
+            points(r#"<line transform="matrix(1 0 0 1 3 4)" x1="0" y1="0" x2="1" y2="0"/>"#);
+        assert!(near(matrix[0][0], (3.0, 96.0)), "{matrix:?}");
+        for bad in ["perspective(3)", "translate(a)", "scale(1,2,3)", "rotate"] {
+            let svg = square(&format!(r#"<g transform="{bad}">{line}</g>"#));
+            assert_eq!(
+                read(Format::Svg, svg.as_bytes(), &cfg()),
+                Err(Fail::Unmeasured),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn what_an_svg_does_not_show_is_not_cut() {
+        let line = r#"<line x1="0" y1="0" x2="10" y2="0"/>"#;
+        let body = format!(
+            r#"<g style="display: none">{line}<g>{line}</g></g><g display="none">{line}</g><line visibility="hidden" x1="0" y1="0" x2="1" y2="0"/><line style="stroke:red;visibility:hidden" x1="0" y1="0" x2="1" y2="0"/>{line}"#
+        );
+        assert_eq!(points(&body).len(), 1);
+    }
+
+    #[test]
+    fn an_svg_path_goes_on_from_its_start_after_a_close_and_a_round_rectangle_is_round() {
+        let p = points(r#"<path d="M10 10 L20 10 L20 20 Z L0 0"/>"#);
+        assert_eq!(p.len(), 2);
+        assert!(
+            near(p[1][0], (10.0, 90.0)) && near(p[1][1], (0.0, 100.0)),
+            "{p:?}"
+        );
+        let r = points(r#"<rect x="10" y="10" width="20" height="10" rx="3"/>"#);
+        // no point is on a corner of the sharp rectangle, and the sides keep their places
+        assert!(r[0].len() > 8);
+        assert!(r[0]
+            .iter()
+            .all(|q| !near(*q, (10.0, 90.0)) && !near(*q, (30.0, 80.0))));
+        assert!(r[0].iter().any(|q| near(*q, (13.0, 90.0))));
+        assert!(r[0].iter().any(|q| near(*q, (30.0, 87.0))));
+        let d = read(
+            Format::Svg,
+            square(r#"<path d="L1 1 L2 2"/>"#).as_bytes(),
+            &cfg(),
+        );
+        assert_eq!(d, Err(Fail::Syntax));
+    }
+
+    #[test]
+    fn an_svg_shape_with_a_size_that_cannot_be_read_refuses_the_file() {
+        for bad in [
+            r#"<rect width="10mm" height="5"/>"#,
+            r#"<circle cx="x" cy="0" r="5"/>"#,
+            r#"<line x1="0" y1="0" x2="50%" y2="0"/>"#,
+            r#"<polyline points="0,0 5,5 10"/>"#,
+            r#"<polygon points="0,0 5,five 10,0"/>"#,
+        ] {
+            let svg = square(&format!(r#"<line x1="0" y1="0" x2="1" y2="0"/>{bad}"#));
+            assert_eq!(
+                read(Format::Svg, svg.as_bytes(), &cfg()),
+                Err(Fail::Syntax),
+                "{bad}"
+            );
+        }
+        assert_eq!(points(r#"<rect width="10px" height="5 px"/>"#).len(), 1);
+    }
+
+    #[test]
+    fn plotter_arcs_and_circles_are_drawn_and_the_pen_ends_where_they_end() {
+        // 400 units are 10 mm: a quarter turn about (0, 0) from (10, 0), then a straight line from where it ended
+        let d = read(Format::Hpgl, b"PU400,0;PD;AA0,0,90;PD0,0;PU;", &cfg()).unwrap();
+        let p = &d.paths[0].points;
+        assert!(near(p[0], (10.0, 0.0)));
+        assert!(p.iter().any(|q| near(*q, (0.0, 10.0))), "{p:?}");
+        assert!(near(*p.last().unwrap(), (0.0, 0.0)));
+        // the relative centre is the same arc
+        let r = read(Format::Hpgl, b"PU400,0;PD;AR-400,0,90;PD0,0;PU;", &cfg()).unwrap();
+        assert_eq!(r.paths[0].points.len(), p.len());
+        let c = read(Format::Hpgl, b"PU400,400;CI200;PU;", &cfg()).unwrap();
+        assert!(c.paths[0].closed);
+        assert!(c.paths[0]
+            .points
+            .iter()
+            .all(|q| ((q.0 - 10.0).hypot(q.1 - 10.0) - 5.0).abs() < 1e-6));
+        for bad in ["AA0,0;", "CI;", "AA0,x,90;"] {
+            assert_eq!(
+                read(Format::Hpgl, bad.as_bytes(), &cfg()),
+                Err(Fail::Syntax),
+                "{bad}"
+            );
+        }
+        for scaled in ["SC0,100,0,100;PD1,1;", "RO90;PD1,1;", "PE=;", "PM0;PD1,1;"] {
+            let e = read(Format::Hpgl, scaled.as_bytes(), &cfg());
+            assert_eq!(e, Err(Fail::Unmeasured), "{scaled}");
+        }
     }
 
     #[test]

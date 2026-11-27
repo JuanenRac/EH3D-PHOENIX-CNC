@@ -17,6 +17,7 @@ use std::time::Duration;
 use eh3d_serverclient as sc;
 use serde_json::{json, Value};
 
+use crate::logwords::Lg;
 use crate::serverlink::LoginStore;
 use crate::settings::Settings;
 
@@ -219,14 +220,31 @@ fn safe_segment(s: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-fn checked_id(id: &str) -> Result<&str, Failure> {
+fn checked_id(id: &str, lang: sc::Lang) -> Result<&str, Failure> {
     if safe_segment(id) {
         Ok(id)
     } else {
-        Err(Failure::plain(
-            "the id of the job has characters that cannot go into a request",
-        ))
+        Err(Failure::plain(said(lang, Lg::SrvBadId)))
     }
+}
+
+/// The code the tables of the log use for a language of the client.
+fn log_code(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "en",
+        sc::Lang::Es => "es",
+        sc::Lang::It => "it",
+        sc::Lang::De => "de",
+        sc::Lang::Fr => "fr",
+        sc::Lang::Pt => "pt",
+        sc::Lang::Zh => "zh",
+        sc::Lang::Ja => "ja",
+    }
+}
+
+/// A message of the log with no holes in the language of the client.
+fn said(lang: sc::Lang, message: Lg) -> &'static str {
+    crate::logwords::text(log_code(lang), message)
 }
 
 impl Client {
@@ -359,8 +377,8 @@ impl Conn {
         let made = self.json("POST", &path, Some(request))?;
         let id = made["id"]
             .as_str()
-            .ok_or_else(|| Failure::plain("the server did not give the job an id"))?;
-        let id = checked_id(id)?.to_string();
+            .ok_or_else(|| Failure::plain(said(self.lang, Lg::SrvNoId)))?;
+        let id = checked_id(id, self.lang)?.to_string();
         match self.json("POST", &format!("/api/v1/jobs/{id}/start"), None) {
             Ok(v) => Ok(JobInfo::from_json(&v)),
             Err(why) => {
@@ -372,7 +390,7 @@ impl Conn {
 
     /// Asks for a job that was followed before, telling apart a server that no longer has it from one that could not be asked.
     fn ask(&mut self, id: &str) -> Asked {
-        let id = match checked_id(id) {
+        let id = match checked_id(id, self.lang) {
             Ok(id) => id,
             Err(why) => return Asked::Unknown(why),
         };
@@ -408,7 +426,7 @@ impl Conn {
     }
 
     pub fn job(&mut self, id: &str) -> Result<JobInfo, Failure> {
-        let id = checked_id(id)?;
+        let id = checked_id(id, self.lang)?;
         Ok(JobInfo::from_json(&self.json(
             "GET",
             &format!("/api/v1/jobs/{id}"),
@@ -424,7 +442,7 @@ impl Conn {
                 return Ok(());
             }
         }
-        let id = checked_id(id)?;
+        let id = checked_id(id, self.lang)?;
         self.json("POST", &format!("/api/v1/jobs/{id}/{}", what.word()), None)
             .map(|_| ())
     }
@@ -555,9 +573,7 @@ fn set(shared: &Mutex<Snapshot>, f: impl FnOnce(&mut Snapshot)) {
 fn go_on(conn: &mut Conn, again: Result<Value, String>) -> Result<JobInfo, Failure> {
     match again {
         Ok(again) if again["skip"].as_u64().is_some_and(|n| n > 0) => conn.send(&again),
-        Ok(_) => Err(Failure::plain(
-            "the job is not on the server any more and no line of it is known to be done: send the program again yourself",
-        )),
+        Ok(_) => Err(Failure::plain(said(conn.lang, Lg::SrvNotThere))),
         Err(why) => Err(Failure::plain(&why)),
     }
 }
@@ -573,9 +589,9 @@ fn follow(
         Start::Send(request) => conn.send(&request),
         Start::Attach { id, again } => match conn.ask(&id) {
             Asked::Job(info) if info.active() || info.state == "ready" => Ok(info),
-            Asked::Job(info) if info.state == "done" => Err(Failure::plain(
-                "the job on the server had finished: nothing is sent again",
-            )),
+            Asked::Job(info) if info.state == "done" => {
+                Err(Failure::plain(said(conn.lang, Lg::SrvFinished)))
+            }
             // it ended, or the server says it does not have it: the program goes on from the line the server reached (or from the line it knew)
             Asked::Job(info) if info.finished() => go_on(&mut conn, again),
             Asked::Gone => go_on(&mut conn, again),
@@ -648,10 +664,7 @@ fn follow(
                         s.error = Some(if why.needs_login {
                             why.text.clone()
                         } else {
-                            format!(
-                                "lost the server ({}); the job may still be running on it",
-                                why.text
-                            )
+                            crate::logwords::say(log_code(conn.lang), Lg::SrvLost, &[&why.text])
                         });
                         s.link = Some(conn.link());
                         s.over = true;

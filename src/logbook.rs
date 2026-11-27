@@ -193,19 +193,55 @@ pub fn classify(line: &str) -> Kind {
     if l.eq_ignore_ascii_case("ok") {
         return Kind::Received;
     }
-    let low = l.to_ascii_lowercase();
-    if ["error", "alarm", "emergency", "failed", "refused", "cannot"]
-        .iter()
-        .any(|w| low.contains(w))
-    {
+    let low = l.to_lowercase();
+    if ERROR_WORDS.iter().any(|w| low.contains(w)) {
         return Kind::Error;
     }
-    if l.contains(':') {
+    if l.contains(':') || l.contains('：') {
         Kind::Warning
     } else {
         Kind::Note
     }
 }
+
+/// The words that make a line of the log an error, in the eight languages the log is written in (a controller answers in English).
+const ERROR_WORDS: &[&str] = &[
+    "error",
+    "alarm",
+    "emergency",
+    "failed",
+    "refused",
+    "cannot",
+    "emergencia",
+    "no se puede",
+    "fehler",
+    "fehlgeschlagen",
+    "kann nicht",
+    "not-halt",
+    "erreur",
+    "urgence",
+    "échoué",
+    "ne peut pas",
+    "errore",
+    "allarme",
+    "emergenza",
+    "fallito",
+    "non si può",
+    "erro",
+    "emergência",
+    "falhou",
+    "não pode",
+    "エラー",
+    "アラーム",
+    "非常停止",
+    "実行できません",
+    "失敗",
+    "错误",
+    "报警",
+    "紧急停止",
+    "失败",
+    "无法",
+];
 
 fn json_escape(s: &str) -> String {
     let mut o = String::with_capacity(s.len());
@@ -238,6 +274,23 @@ mod tests {
         assert_eq!(classify("queue: all programs are done"), Kind::Warning);
         assert_eq!(classify("hello"), Kind::Note);
         assert_eq!(classify(""), Kind::Note);
+        // the lines the log writes in the other languages are errors too
+        for code in crate::words::LANGS {
+            use crate::logwords::{say, Lg};
+            let none: [&str; 0] = [];
+            for line in [
+                say(code, Lg::Estop, &none),
+                say(code, Lg::InAlarm, &["x"]),
+                say(code, Lg::QueueCannotRun, &["a.nc"]),
+            ] {
+                assert_eq!(classify(&line), Kind::Error, "{code}: {line}");
+            }
+            assert_ne!(
+                classify(&say(code, Lg::QueueAllDone, &none)),
+                Kind::Error,
+                "{code}"
+            );
+        }
     }
 
     fn demo() -> Logbook {

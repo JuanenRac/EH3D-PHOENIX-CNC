@@ -36,6 +36,7 @@ pub mod life;
 pub mod link;
 pub mod lint;
 pub mod logbook;
+pub mod logwords;
 pub mod lookahead;
 pub mod macrocheck;
 pub mod macros;

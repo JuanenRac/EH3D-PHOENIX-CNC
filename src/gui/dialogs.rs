@@ -316,6 +316,10 @@ impl App {
                     // operator before the first move
                     self.recovery_saved = Some(r.next);
                     self.attach_to_server(r.job.clone(), r.next);
+                } else if same_program && r.shifted {
+                    // a shift of the zero given by hand is gone with the reset, and nothing gives it back
+                    self.log_note(crate::logwords::Lg::ResHandShift);
+                    self.forget_recovery();
                 } else if let Some(why) = self
                     .session
                     .recovery_refusal(r.next, self.settings.resume_backoff_lines as usize)
@@ -1061,6 +1065,27 @@ fn about_brand() -> AboutBrand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_point_to_go_on_from_stays_until_the_machine_stands_still_at_the_end() {
+        let mut a = App::isolated();
+        let path = crate::recovery::recovery_path(&a.settings_path);
+        std::fs::write(&path, "file=a.nc\nnext=0\ntotal=2\n").unwrap();
+        a.session.load("G0 X1\nG0 X2");
+        a.recovery_saved = Some(0);
+        // every line was taken, but the controller still moves, or is in alarm
+        a.session.next = 2;
+        a.session.running = false;
+        for state in [eh3d_controller::State::Run, eh3d_controller::State::Alarm] {
+            a.session.status.state = state;
+            a.track_recovery();
+            assert!(path.is_file(), "{state:?}");
+        }
+        a.session.status.state = eh3d_controller::State::Idle;
+        a.track_recovery();
+        assert!(!path.is_file());
+        assert_eq!(a.recovery_saved, None);
+    }
 
     #[test]
     fn the_files_the_window_opens_are_told_apart_from_the_ones_of_the_attachments() {

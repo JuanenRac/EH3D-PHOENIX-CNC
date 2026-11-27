@@ -210,6 +210,12 @@ impl Macro {
     }
 
     /// Whether any line moves an axis.
+    /// Whether a line of the macro moves the machine or starts something that can hurt, read as the guard reads it: the spindle (`M3`, `M4`),
+    /// the coolant, a tool change, a homing or a macro of the controller with a name of its own, which need no axis word.
+    pub fn starts_something(&self) -> bool {
+        self.lines.iter().any(|l| crate::guard::line_moves(l))
+    }
+
     pub fn moves(&self) -> bool {
         self.lines.iter().any(|l| {
             words(l)
@@ -224,6 +230,7 @@ impl Macro {
         t.macros_confirm
             || self.confirm
             || self.moves()
+            || self.starts_something()
             || self.preflight(t).iter().any(|f| f.level >= Level::Warning)
     }
 
@@ -294,6 +301,32 @@ mod tests {
             ..Tuning::default()
         };
         assert!(m.needs_confirmation(&off));
+    }
+
+    #[test]
+    fn a_macro_that_starts_the_spindle_or_changes_the_tool_asks_even_without_an_axis() {
+        let lax = Tuning {
+            macros_confirm: false,
+            progcheck: false,
+            ..Tuning::default()
+        };
+        for line in [
+            "M3 S12000",
+            "M4",
+            "S900 M3",
+            "T2 M6",
+            "M8",
+            "M7",
+            "G28",
+            "G30",
+        ] {
+            let lib = Library::parse(&format!("[m]\nconfirm = no\n{line}\n"), 200);
+            assert!(lib.get("m").unwrap().needs_confirmation(&lax), "{line}");
+        }
+        for line in ["M5", "M9", "S900", "G90", "G54", "(M3 in a comment)"] {
+            let lib = Library::parse(&format!("[m]\nconfirm = no\n{line}\n"), 200);
+            assert!(!lib.get("m").unwrap().needs_confirmation(&lax), "{line}");
+        }
     }
 
     #[test]

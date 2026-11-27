@@ -105,21 +105,26 @@ impl App {
                 let said = self.ws(Msg::MapSaved, &[path.display().to_string()]);
                 self.session.log.push(said);
             }
-            Err(e) => self
-                .session
-                .log
-                .push(format!("heightmap: {}: {e}", path.display())),
+            Err(e) => self.log_file_fault("heightmap", path, &e.to_string()),
         }
+    }
+
+    /// A file that could not be written or read, for the log: what it is, its path and what the system or the reader said.
+    fn log_file_fault(&mut self, what: &str, path: &Path, why: &str) {
+        let what = crate::logwords::what(self.lang.code(), what);
+        self.session
+            .log
+            .push(format!("{what}: {}: {why}", path.display()));
     }
 
     /// Takes a height map from a file. What is not a map, or does not fit its grid, changes nothing and the reason goes to the log.
     pub(super) fn load_height_map(&mut self, path: &Path) {
         let text = match std::fs::metadata(path) {
             Ok(m) if m.len() > MAX_MAP_BYTES => {
-                self.session.log.push(format!(
-                    "heightmap: {} is too big for a height map",
-                    path.display()
-                ));
+                self.log_tell(
+                    crate::logwords::Lg::MapTooBig,
+                    &[path.display().to_string()],
+                );
                 return;
             }
             Ok(_) => std::fs::read_to_string(path),
@@ -137,10 +142,7 @@ impl App {
                 self.session.height_map = Some(map);
                 self.session.log.push(said);
             }
-            Err(e) => self
-                .session
-                .log
-                .push(format!("heightmap: {}: {e}", path.display())),
+            Err(e) => self.log_file_fault("heightmap", path, &e),
         }
     }
 
@@ -157,10 +159,7 @@ impl App {
                 let said = self.ws(Msg::LogExists, &[path.display().to_string()]);
                 self.session.log.push(said);
             }
-            Err(e) => self
-                .session
-                .log
-                .push(format!("log: {}: {e}", path.display())),
+            Err(e) => self.log_file_fault("log", path, &e.to_string()),
         }
     }
 
@@ -195,10 +194,7 @@ impl App {
                 let said = self.ws(Msg::RepExists, &[path.display().to_string()]);
                 self.session.log.push(said);
             }
-            Err(e) => self
-                .session
-                .log
-                .push(format!("work report: {}: {e}", path.display())),
+            Err(e) => self.log_file_fault("work report", path, &e.to_string()),
         }
     }
 

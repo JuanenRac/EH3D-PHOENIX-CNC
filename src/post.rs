@@ -136,6 +136,11 @@ impl Post {
         out.extend(self.header.iter().cloned());
         let mut n = self.numbers.map(|(s, _)| s);
         for raw in lines.iter().take(MAX_PROGRAM_LINES) {
+            // the marks of a program (`%`, `O1000`) and the lines of the controller (`$`) are neither rewritten nor numbered
+            if stands_alone(raw) {
+                out.push(raw.trim().to_string());
+                continue;
+            }
             let line = self.line(raw);
             if line.trim().is_empty() {
                 continue;
@@ -157,7 +162,8 @@ impl Post {
         let mut words: Vec<String> = Vec::new();
         for w in words_of(&code) {
             let head = w.to_ascii_uppercase();
-            if self.drop.contains(&head) {
+            // the numbers the lines had give way to the new ones: a line cannot have two
+            if self.drop.contains(&head) || (self.numbers.is_some() && is_line_number(&head)) {
                 continue;
             }
             let mut w = match self.replace.iter().find(|(a, _)| *a == head) {
@@ -190,6 +196,20 @@ impl Post {
             (Some(_), true) => Err(crate::notes::Label::NoEngine),
         }
     }
+}
+
+fn is_line_number(word: &str) -> bool {
+    word.strip_prefix('N')
+        .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+}
+
+fn stands_alone(line: &str) -> bool {
+    let line = line.trim();
+    line.starts_with(['%', '$'])
+        || line
+            .strip_prefix(['O', 'o'])
+            .and_then(|rest| rest.chars().next())
+            .is_some_and(|c| c.is_ascii_digit())
 }
 
 fn is_word(s: &str) -> bool {
@@ -341,6 +361,30 @@ decimals = 2\ncomments = strip\ncase = upper\n";
                 "M30",
             ]
         );
+    }
+
+    #[test]
+    fn new_line_numbers_replace_the_old_ones_and_the_marks_of_a_program_stay_alone() {
+        let (p, problems) = Post::parse("line_numbers = on\ncase = upper\n");
+        assert!(problems.is_empty());
+        let out = p.apply(&lines(
+            "%\nO1000\nN5 G21\nn900G0 X1\n$J=G91 X1 F100\nG4 P1\n%",
+        ));
+        assert_eq!(
+            out,
+            [
+                "%",
+                "O1000",
+                "N10 G21",
+                "N20 G0 X1",
+                "$J=G91 X1 F100",
+                "N30 G4 P1",
+                "%"
+            ]
+        );
+        // with no new numbers the old ones are kept
+        let (keep, _) = Post::parse("case = upper\n");
+        assert_eq!(keep.apply(&lines("N5 g21")), ["N5 G21"]);
     }
 
     #[test]
