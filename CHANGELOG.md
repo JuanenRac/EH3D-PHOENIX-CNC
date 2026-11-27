@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A project saved by another program is not written over:** the window keeps the mark of the project from the moment it opens or saves it, looks at it again after a question, and refuses to save, import or take when another program wrote the file meanwhile. It says so in the eight languages and offers to read it again, to save under another name or to close. 2 new tests.
+- **What the tag v0.3.7 of EH3D-COMMON brings to the window:** the panel «Attachments» refuses the same writes and reads its list again, and `viewer.max_preview_mb` (16 by default) in the settings says how much text a whole preview keeps.
+
 ## [0.2.5] - Safer resume of a stopped program (not tried on a machine)
 
 - **Going on after a failure is refused where it cannot be made right, and takes back the moves the controller may not have made:** a program that shifted the zero with `G92` (a reset of the controller takes the shift away), that has a canned cycle or a cutter compensation still on, or that last moved an axis with `G28`, `G30` or `G53` is not resumed, and neither is one whose lines that may have run set an offset with `G10`; the log says the line and why. The `resume_backoff` margin now counts lines that move, not comments or blank lines, and applies to a job on the server too. A tool length offset given in inches is given back in inches. A job on the server that finished, or one that would start again from the first line, is not sent again by itself. Tried against stand-ins only, never on a machine.

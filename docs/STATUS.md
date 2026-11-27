@@ -8,7 +8,7 @@ EH3D-PHOENIX-CNC works on a computer against simulated machines: a docking windo
 
 The window has a panel «Attachments» (the shared `eh3d-attachpanel`): the data sheets, manuals and other files of the project are listed, attached, linked to a part, extracted and removed after a question, and shown beside the list (`eh3d-project.md`). The panel itself is tested in EH3D-COMMON; it has not been tried on a screen by a person.
 
-The menu File of the window opens, saves, imports, takes and extracts an `.eh3d` project and asks before it writes one that is not its own. The command `project` keeps the work in the branch `cnc/` of an `.eh3d` project (`eh3d-project.md`): the other branches keep their bytes, copies taken from them are told as out of date and imported files keep their original with a report. The window became a docking window of thirteen panels with four workspaces; the guard that fails closed is in the session and in the window; grblHAL, Marlin and Klipper (through Moonraker over HTTP) are driven like GRBL; the Gerber and Excellon files of a board are cut as isolation, profile and drill programs; and a record decides the engine of the scripts of the post-processors. The README files, this page and the register of requirements agree on what exists and what is missing; the register is the one that says it.
+The menu File of the window opens, saves, imports, takes and extracts an `.eh3d` project and asks before it writes one that is not its own. The command `project` keeps the work in the branch `cnc/` of an `.eh3d` project (`eh3d-project.md`): the other branches keep their bytes, copies taken from them are told as out of date and imported files keep their original with a report. The window became a docking window of thirteen panels with four workspaces; the guard that fails closed is in the session and in the window; grblHAL, Marlin and Klipper (through Moonraker over HTTP) are driven like GRBL; the Gerber and Excellon files of a board are cut as isolation, profile and drill programs; and a record decides the engine of the scripts of the post-processors. The README files, this page and the register of requirements agree on what exists and what is missing; the register is the one that says it. It does not write over a project another program saved since it was read, and offers to read it again or to save under another name.
 
 ## Capabilities
 
@@ -22,7 +22,7 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 
 ## What it needs from other repositories
 
-* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.6.
+* EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.7.
 * EH3D-CORE-LIBS: the readers of Gerber and Excellon files.
 * A real machine with GRBL, grblHAL, Marlin or Klipper, a probe, a tool setter and a changer, for the proofs that no simulator can give.
 
