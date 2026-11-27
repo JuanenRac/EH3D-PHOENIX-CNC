@@ -26,7 +26,7 @@ impl App {
             0 => {}
             1 => self.open(&paths[0]),
             _ => {
-                if self.session.running || self.server_busy() {
+                if !self.machine_idle() {
                     self.session
                         .log
                         .push("queue: a program is running; stop it first".into());
@@ -73,6 +73,10 @@ impl App {
 
     /// The program that is loaded runs once more (its file is read again, so a change is seen).
     pub(super) fn queue_rerun(&mut self) {
+        // a program started by hand, or a job on the server, is never loaded over
+        if self.session.running || self.server_busy() {
+            return;
+        }
         self.queue_seen = false;
         self.queue_gate = None;
         if let Some(i) = self.queue.current() {
@@ -93,6 +97,7 @@ impl App {
     /// A run of the program `i` ended and it has more: the operator confirms, a wait runs out, or the next run begins at once.
     fn queue_between(&mut self, i: usize) {
         self.queue_seen = false;
+        self.queue_halts = self.session.halts();
         match self.queue_rules().between() {
             After::Confirm => self.win = Some(Win::Between(i)),
             After::Wait(s) => {
@@ -127,19 +132,37 @@ impl App {
         let Some(i) = self.queue.current() else {
             return;
         };
-        // a wait between two runs: nothing else happens until it runs out
+        // a wait between two runs: it ends the queue after a stop, an alarm or a job sent to the server, and it never starts over another action
         if let Some(until) = self.queue_gate {
-            if Instant::now() >= until {
+            if self.session.halts() != self.queue_halts
+                || self.session.alarm()
+                || self.server_busy()
+            {
+                self.queue_gate = None;
+                self.queue.unstart();
+                self.session
+                    .log
+                    .push("queue: stopped before the next run".into());
+            } else if self.session.running {
+                // the operator started the run by hand: it is that run
+                self.queue_gate = None;
+            } else if Instant::now() >= until && !self.session.busy() {
                 self.queue_rerun();
             }
             return;
         }
         if self.session.running {
+            if !self.queue_seen {
+                self.queue_halts = self.session.halts();
+            }
             self.queue_seen = true;
             return;
         }
         if self.queue_seen {
-            let ok = self.session.next >= self.session.program.len();
+            // a stop or an alarm on the last lines is not a program that finished
+            let ok = self.session.next >= self.session.program.len()
+                && self.session.halts() == self.queue_halts
+                && !self.session.alarm();
             if ok && self.queue.next_round() {
                 self.queue_between(i);
                 return;
@@ -193,6 +216,9 @@ impl App {
 
     /// Goes on with the queue after it stopped.
     pub(super) fn queue_continue(&mut self) {
+        if !self.may_change_program() {
+            return;
+        }
         self.queue.resume();
         self.queue_next();
     }
@@ -403,7 +429,12 @@ impl App {
         }
         // a queue that stopped, was left before it started or was kept from the last run waits for the operator
         if self.queue.current().is_none() && !self.queue.active && self.queue.waiting() > 0 {
-            cont = ui.button(self.t(Text::McQueueContinue)).clicked();
+            cont = ui
+                .add_enabled(
+                    self.machine_idle(),
+                    egui::Button::new(self.t(Text::McQueueContinue)),
+                )
+                .clicked();
         }
         if ui.button(self.t(Text::McQueueClear)).clicked() {
             clear = true;
@@ -676,6 +707,86 @@ mod tests {
         a.queue_continue();
         assert_eq!(a.queue.round_of_current(), Some((2, 3)));
         assert!(a.session.running);
+    }
+
+    fn in_a_wait(tag: &str) -> App {
+        let mut a = repeated(tag, 2, &["G1 X1 F600\n"]);
+        a.settings.tuning.confirm_between = false;
+        a.settings.tuning.pause_s = 30.0;
+        run_to_the_end(&mut a);
+        assert!(a.queue_gate.is_some() && !a.session.running);
+        a
+    }
+
+    #[test]
+    fn a_stop_or_an_emergency_stop_during_the_wait_ends_it_and_nothing_starts() {
+        for (tag, estop) in [("waitstop", false), ("waitestop", true)] {
+            let mut a = in_a_wait(tag);
+            if estop {
+                a.emergency_stop();
+                // even once the controller is unlocked again
+                a.session.unlock();
+            } else {
+                a.session.stop();
+            }
+            a.queue_gate = Some(std::time::Instant::now());
+            a.queue_tick();
+            assert!(a.queue_gate.is_none() && !a.session.running, "{tag}");
+            assert_eq!(states(&a), vec![State::Waiting], "{tag}");
+            assert!(!a.queue.active, "{tag}");
+        }
+    }
+
+    #[test]
+    fn the_wait_never_loads_the_program_again_over_a_run_started_by_hand() {
+        let mut a = in_a_wait("byhand");
+        a.session.start();
+        a.queue_gate = Some(std::time::Instant::now());
+        a.queue_tick();
+        assert!(a.queue_gate.is_none() && a.session.running);
+        assert_eq!(a.queue.round_of_current(), Some((2, 2)));
+        a.queue_tick();
+        run_to_the_end(&mut a);
+        assert!(a.queue.finished());
+    }
+
+    #[test]
+    fn a_stop_after_the_last_line_went_out_stops_the_queue() {
+        let mut a = app();
+        a.settings.confirm_start = false;
+        a.start_queue(jobs("lastline", &["G1 X1 F600\n", "G1 X2 F600\n"]));
+        a.queue_tick();
+        // every line is out, and the operator stops before the window sees the end
+        a.session.pump(1);
+        assert_eq!(a.session.next, a.session.program.len());
+        a.program_stop();
+        a.queue_tick();
+        assert_eq!(states(&a), vec![State::Failed, State::Waiting]);
+        assert!(!a.session.running);
+    }
+
+    #[test]
+    fn a_running_program_is_not_replaced_cleared_rewound_or_overtaken_by_the_queue() {
+        let mut a = app();
+        a.settings.confirm_start = false;
+        let files = jobs("busy", &["G1 X1 F600\nG1 X2\n", "G1 X5 F600\n"]);
+        a.open(&files[0]);
+        a.request_start();
+        assert!(a.session.running);
+        let program = a.session.program.clone();
+        a.open(&files[1]);
+        a.start_queue(vec![files[1].clone()]);
+        a.clear_program();
+        a.rewind_program();
+        a.queue = Queue::new(files.clone());
+        a.queue_continue();
+        assert!(a.session.running && a.session.program == program);
+        assert!(a.queue.current().is_none());
+        assert!(a
+            .session
+            .log
+            .iter()
+            .any(|l| l.contains("A program is running")));
     }
 
     #[test]

@@ -184,6 +184,9 @@ impl App {
 
     /// The program is taken out of the window (and the bookmarks, the path and the picture that went with it).
     pub(super) fn clear_program(&mut self) {
+        if !self.may_change_program() {
+            return;
+        }
         self.session.clear_program();
         self.bookmarks.clear();
         self.path_toolpath.clear();
@@ -243,14 +246,14 @@ impl App {
             Cmd::Pause => self.program_pause(),
             Cmd::Stop => self.program_stop(),
             Cmd::SendToServer => self.request_send(),
-            Cmd::Rewind => self.session.rewind(),
+            Cmd::Rewind => self.rewind_program(),
             Cmd::ClearProgram => self.clear_program(),
             Cmd::Check => self.open_window("check"),
             Cmd::KeepOut => self.open_window("keepout"),
             Cmd::Stats => self.open_window("stats"),
             Cmd::LookAhead => self.show_panel(pid::PLAN),
             Cmd::Macros => self.open_window("macros"),
-            Cmd::EmergencyStop => self.session.estop(),
+            Cmd::EmergencyStop => self.emergency_stop(),
             Cmd::Unlock => self.session.unlock(),
             Cmd::Home => self.session.home(),
             Cmd::ZeroXyz => self.session.zero_axes(&[0, 1, 2]),

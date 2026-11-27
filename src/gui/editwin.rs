@@ -38,7 +38,7 @@ impl App {
     /// written while a program runs or when the program has no file.
     pub(super) fn save_edit_here(&mut self, st: &mut EditState) {
         st.cancel_save();
-        if self.session.running || self.path.is_empty() {
+        if !self.machine_idle() || self.path.is_empty() {
             return;
         }
         self.apply_edit(st);
@@ -68,7 +68,7 @@ impl App {
             let n = self.notes_of_text(&st);
             st.set_notes(n);
         }
-        let running = self.session.running;
+        let running = !self.machine_idle();
         let mut close = false;
         let mut apply = false;
         let mut save_here = false;

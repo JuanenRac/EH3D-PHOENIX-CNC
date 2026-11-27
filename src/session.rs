@@ -105,6 +105,8 @@ pub struct Session {
     inflight: Option<InFlight>,
     /// A stop or an emergency stop was asked while a batch was in flight: the line it cuts short is not a failure.
     aborted: bool,
+    /// How many times a stop or an emergency stop was asked.
+    halts: u64,
     pub status: Status,
     pub program: Vec<String>,
     /// The next line of the program to send.
@@ -251,6 +253,7 @@ impl Session {
             progress: Arc::new(AtomicUsize::new(0)),
             inflight: None,
             aborted: false,
+            halts: 0,
             status: Status::default(),
             program: Vec::new(),
             next: 0,
@@ -597,8 +600,14 @@ impl Session {
         }
     }
 
+    /// How many times a stop or an emergency stop was asked since the session began.
+    pub fn halts(&self) -> u64 {
+        self.halts
+    }
+
     /// Stops everything at once; the controller stays in alarm until it is unlocked. It does not wait for the line that is waiting for its `ok`.
     pub fn estop(&mut self) {
+        self.halts += 1;
         self.homed = false;
         self.running = false;
         self.paused = false;
@@ -658,22 +667,9 @@ impl Session {
     /// relative distances here: [`Session::resume_at_safe`] does not resume one.
     pub fn preamble_for(&self, next: usize, safe_z_mm: f64, spindle_wait_s: f64) -> Vec<String> {
         let m = &self.modal;
-        // the tool length offset is given in the units of the line that set it, not in the ones the preamble starts with
-        let mut units = Modal::default();
-        let mut offset_in_inches = false;
-        for line in self.program.iter().take(next) {
-            let t = line.trim();
-            if t.is_empty() || t.starts_with(';') {
-                continue;
-            }
-            units.apply(t);
-            if words(t)
-                .iter()
-                .any(|&(l, v)| l == 'G' && (v * 10.0).round() as i32 == 431)
-            {
-                offset_in_inches = units.inches;
-            }
-        }
+        // the tool length offset and the feed are written in the units of the lines that set them, not in the ones in force now
+        let (feed_in_inches, offset_in_inches) =
+            crate::startline::units_of_values(&self.program, next);
         let mut out = vec!["G21".to_string(), "G90".to_string()];
         if m.plane != 17 {
             out.push(format!("G{}", m.plane));
@@ -709,7 +705,12 @@ impl Session {
             out.push("G20".to_string());
         }
         if let Some(f) = m.feed {
-            out.push(format!("F{f}"));
+            let units = |inches: bool| if inches { "G20" } else { "G21" }.to_string();
+            if feed_in_inches == m.inches {
+                out.push(format!("F{f}"));
+            } else {
+                out.extend([units(feed_in_inches), format!("F{f}"), units(m.inches)]);
+            }
         }
         if m.motion == 1 {
             out.push("G1".to_string());
@@ -732,7 +733,11 @@ impl Session {
         let m = &self.modal;
         // the lines are in the units the preamble puts back
         let unit = if m.inches { 25.4 } else { 1.0 };
-        let feed = m.feed.unwrap_or(self.resume_plunge_feed_mm_min / unit);
+        let (feed_in_inches, _) = crate::startline::units_of_values(&self.program, next);
+        let given = if feed_in_inches { 25.4 } else { 1.0 };
+        let feed = m
+            .feed
+            .map_or(self.resume_plunge_feed_mm_min / unit, |f| f * given / unit);
         let z_cmd = z / unit;
         let mut lines = vec![format!("G1 Z{z_cmd:.4} F{feed}")];
         if m.motion == 0 {
@@ -821,7 +826,19 @@ impl Session {
                 "resume: line {l} moved the machine in its own coordinates (G28, G30 or G53), so where the tool was at line {line} is not known; the program is not resumed"
             ));
         }
-        None
+        use crate::startline::Refusal;
+        match crate::startline::state_refusal(&self.program, next) {
+            Some(Refusal::Motion(l)) => Some(format!(
+                "resume: line {line} goes on in the way of moving of line {l} (an arc, a probe or G80) without saying it again; the program is not resumed there"
+            )),
+            Some(Refusal::FeedMode(l)) => Some(format!(
+                "resume: line {l} sets the feed by inverse time or per revolution (G93, G95), which cannot be restored; the program is not resumed at line {line}"
+            )),
+            Some(Refusal::TableLength(l)) => Some(format!(
+                "resume: line {l} takes a tool length offset from the table of the controller (G43), which cannot be restored; the program is not resumed at line {line}"
+            )),
+            _ => None,
+        }
     }
 
     /// As [`Session::resume_refusal`], for a program that was cut short by a failure and saved: lines past `next` may have run already, so an offset
@@ -1297,6 +1314,7 @@ impl Session {
 
     /// Stops the program. While a line waits for its `ok` the stop goes to the controller out of turn (a hold, and a reset once the machine stands still).
     pub fn stop(&mut self) {
+        self.halts += 1;
         self.running = false;
         self.paused = false;
         self.resume_preamble.clear();
@@ -1394,6 +1412,44 @@ mod tests {
         texts.sort_unstable();
         texts.dedup();
         assert_eq!(texts.len(), 8, "eight languages, eight texts");
+    }
+
+    #[test]
+    fn a_resume_is_refused_where_an_arc_a_feed_mode_or_a_table_offset_cannot_be_written_back() {
+        for (program, at, want) in [
+            (
+                "G21 G90 F100\nG2 X2 Y0 I1 J0\nX4 I1 J0",
+                2,
+                "goes on in the way of moving of line 2",
+            ),
+            ("G93\nG1 X1 F2\nG1 X2 F2", 2, "G93, G95"),
+            ("G43 H1\nG0 Z5\nG0 X1", 2, "(G43)"),
+        ] {
+            let mut s = Session::new(Box::new(SimController::new()));
+            s.load(program);
+            let why = s.resume_refusal(at).unwrap();
+            assert!(why.contains(want), "{why}");
+            assert!(!s.resume_at_safe(at, 5.0, 0.0) && !s.running, "{program}");
+        }
+    }
+
+    #[test]
+    fn a_resume_writes_the_feed_in_the_units_it_was_given_in_and_stops_are_counted() {
+        let mut s = Session::new(Box::new(SimController::new()));
+        s.load("G20 G90 F10\nG21\nG1 X1\nG1 X2");
+        assert!(s.resume_at_safe(3, 5.0, 0.0));
+        let at = s.resume_preamble.iter().position(|l| l == "F10").unwrap();
+        assert_eq!(
+            (
+                s.resume_preamble[at - 1].as_str(),
+                s.resume_preamble[at + 1].as_str()
+            ),
+            ("G20", "G21")
+        );
+        assert_eq!(s.halts(), 0);
+        s.stop();
+        s.estop();
+        assert_eq!(s.halts(), 2);
     }
 
     #[test]

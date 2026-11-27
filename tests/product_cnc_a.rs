@@ -498,12 +498,13 @@ fn the_new_program_puts_the_controller_back_and_goes_on_from_the_line() {
             "S12000",
             "(restart: the tool in use was T2)",
             "(restart: the spindle was on, M3 S12000, start it first)",
-            "(restart: the tool was at X20.000 Y5.000 before this line, move there at a safe height)",
+            "(restart: the tool was at X20.000 Y5.000 mm before this line, move there at a safe height)",
             "M0 (restart: check the machine, then resume)",
+            "G1",
             "G1 X30"
         ]
     );
-    assert_eq!(r.preamble, 11);
+    assert_eq!(r.preamble, 12);
 }
 
 #[test]
@@ -533,10 +534,12 @@ fn the_lines_of_the_original_after_the_start_are_all_kept_in_order() {
 fn the_new_program_always_ends_its_head_with_a_stop() {
     let p = lines("G0 X1\nG0 X2");
     let r = plan(&p, 1).unwrap();
+    // the stop, and after it only the way of moving, which moves nothing
     assert_eq!(
-        r.program[r.preamble - 1],
+        r.program[r.preamble - 2],
         "M0 (restart: check the machine, then resume)"
     );
+    assert_eq!(r.program[r.preamble - 1], "G0");
     assert_eq!(r.program[0], "(restart at line 1 of the program)");
 }
 

@@ -241,6 +241,9 @@ pub enum Msg {
     SlRefRelative,
     SlRefCycle,
     SlRefComp,
+    SlRefMotion,
+    SlRefFeedMode,
+    SlRefTable,
     SlConfirm,
     SlPrepare,
     SlBack,
@@ -477,7 +480,7 @@ pub enum Msg {
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 466] = [
+pub const ALL: [Msg; 469] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -711,6 +714,9 @@ pub const ALL: [Msg; 466] = [
     Msg::SlRefRelative,
     Msg::SlRefCycle,
     Msg::SlRefComp,
+    Msg::SlRefMotion,
+    Msg::SlRefFeedMode,
+    Msg::SlRefTable,
     Msg::SlConfirm,
     Msg::SlPrepare,
     Msg::SlBack,
@@ -3279,6 +3285,36 @@ fn table(m: Msg) -> [&'static str; 8] {
             "第 {0} 行开始的刀具半径补偿仍然有效：程序不能从这里开始",
             "Uma compensação do raio da ferramenta iniciada na linha {0} ainda está ativa: o programa não pode começar aí",
         ],
+        Msg::SlRefMotion => [
+            "The program goes on in the way of moving of line {0} (an arc, a probe or G80) without saying it again: start at a line that has its own G0, G1, G2 or G3",
+            "El programa sigue con el modo de movimiento de la línea {0} (un arco, un palpado o G80) sin repetirlo: empieza en una línea que lleve su propio G0, G1, G2 o G3",
+            "Das Programm fährt in der Bewegungsart von Zeile {0} (Bogen, Antasten oder G80) weiter, ohne sie zu wiederholen: in einer Zeile mit eigenem G0, G1, G2 oder G3 beginnen",
+            "Le programme continue dans le mode de déplacement de la ligne {0} (arc, palpage ou G80) sans le répéter : démarrez à une ligne qui a son propre G0, G1, G2 ou G3",
+            "Il programma prosegue nel modo di movimento della riga {0} (arco, tastatura o G80) senza ripeterlo: parti da una riga che ha il proprio G0, G1, G2 o G3",
+            "プログラムは {0} 行目の移動モード（円弧、プローブ、G80）を指定し直さずに続きます。G0、G1、G2、G3 を持つ行から開始してください",
+            "程序沿用第 {0} 行的运动方式（圆弧、探测或 G80）而未再次指定：请从带有自身 G0、G1、G2 或 G3 的行开始",
+            "O programa continua no modo de movimento da linha {0} (arco, apalpação ou G80) sem o repetir: comece numa linha com o seu próprio G0, G1, G2 ou G3",
+        ],
+        Msg::SlRefFeedMode => [
+            "The feed of line {0} is by inverse time or per revolution (G93, G95), which cannot be restored: the program cannot start there",
+            "El avance de la línea {0} es por tiempo inverso o por vuelta (G93, G95) y no se puede restaurar: el programa no puede empezar ahí",
+            "Der Vorschub aus Zeile {0} ist zeitreziprok oder je Umdrehung (G93, G95) und lässt sich nicht wiederherstellen: das Programm kann dort nicht starten",
+            "L'avance de la ligne {0} est en temps inverse ou par tour (G93, G95) et ne peut pas être rétablie : le programme ne peut pas démarrer là",
+            "L'avanzamento della riga {0} è a tempo inverso o per giro (G93, G95) e non si può ripristinare: il programma non può partire da lì",
+            "{0} 行目の送りは逆時間または毎回転指定（G93、G95）で復元できません。そこから開始できません",
+            "第 {0} 行的进给为反时限或每转进给（G93、G95），无法恢复：程序不能从这里开始",
+            "O avanço da linha {0} é por tempo inverso ou por rotação (G93, G95) e não pode ser reposto: o programa não pode começar aí",
+        ],
+        Msg::SlRefTable => [
+            "The tool length offset of line {0} comes from the table of the controller (G43) and cannot be restored: the program cannot start there",
+            "La compensación de longitud de la línea {0} viene de la tabla de la controladora (G43) y no se puede restaurar: el programa no puede empezar ahí",
+            "Die Längenkorrektur aus Zeile {0} stammt aus der Tabelle der Steuerung (G43) und lässt sich nicht wiederherstellen: das Programm kann dort nicht starten",
+            "La correction de longueur de la ligne {0} vient de la table de la commande (G43) et ne peut pas être rétablie : le programme ne peut pas démarrer là",
+            "La compensazione di lunghezza della riga {0} viene dalla tabella del controllore (G43) e non si può ripristinare: il programma non può partire da lì",
+            "{0} 行目の工具長補正は制御装置の表（G43）から取るため復元できません。そこから開始できません",
+            "第 {0} 行的刀具长度补偿取自控制器的刀具表（G43），无法恢复：程序不能从这里开始",
+            "A compensação de comprimento da linha {0} vem da tabela do controlador (G43) e não pode ser reposta: o programa não pode começar aí",
+        ],
         Msg::SlConfirm => [
             "I checked the tool, the spindle and the zero of the machine, and I know it moves after I press Resume",
             "He comprobado la herramienta, el husillo y el cero de la máquina, y sé que se mueve cuando pulso Continuar",
@@ -5672,7 +5708,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 466);
+        assert_eq!(seen.len(), 469);
     }
 
     #[test]

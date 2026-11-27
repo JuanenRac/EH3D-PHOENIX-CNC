@@ -177,6 +177,14 @@ fn read_hpgl(text: &str, cfg: &ImportCfg) -> Result<Drawing, Fail> {
             }
             "SP" | "LT" | "VS" | "FS" | "PW" | "IP" | "IW" | "PG" | "NR" => {}
             "PA" | "PR" | "PU" | "PD" => {
+                // a number left out would pair the ones after it the wrong way round, so the drawing is not taken
+                let written = args
+                    .split(|c: char| c == ',' || c.is_whitespace())
+                    .filter(|t| !t.is_empty())
+                    .count();
+                if nums.len() != written || written % 2 != 0 {
+                    return Err(Fail::Syntax);
+                }
                 match mn.as_str() {
                     "PA" => absolute = true,
                     "PR" => absolute = false,
@@ -1153,6 +1161,23 @@ mod tests {
         );
         assert!(d.notes.contains(&Note::UnitsPlotter));
         assert_eq!(read(Format::Hpgl, b"IN;SP1;", &cfg()), Err(Fail::Empty));
+    }
+
+    #[test]
+    fn a_plotter_file_with_a_number_that_cannot_be_read_is_not_drawn_from_what_is_left() {
+        for bad in [
+            "PU0,0;PD10,x,20,20;",
+            "PU0,0;PD10,10,20;",
+            "PU0,0PD10,10;",
+            "PA1e999,0;PD1,1;",
+        ] {
+            assert_eq!(
+                read(Format::Hpgl, bad.as_bytes(), &cfg()).err(),
+                Some(Fail::Syntax),
+                "{bad}"
+            );
+        }
+        assert!(read(Format::Hpgl, b"PU 0 0;PD 10,10,;\r\n", &cfg()).is_ok());
     }
 
     #[test]

@@ -148,6 +148,8 @@ pub struct PcbCfg {
     pub zero_origin: bool,
     /// A change of drill is `T1 M6` (off: a pause with the diameter in its comment, `M0`).
     pub tool_change_m6: bool,
+    /// A drill file that does not say its coordinate format, its zeros or its units is drilled with what is supposed (off: it is refused).
+    pub allow_assumed_drill: bool,
     /// The most cells of the grid of the isolation.
     pub max_cells: u64,
 }
@@ -175,6 +177,7 @@ impl Default for PcbCfg {
             mirror_bottom: true,
             zero_origin: false,
             tool_change_m6: false,
+            allow_assumed_drill: false,
             max_cells: 16_000_000,
         }
     }
@@ -546,6 +549,7 @@ impl MotionCfg {
             "pcb_mirror_bottom" => b.mirror_bottom = flag(v)?,
             "pcb_zero_origin" => b.zero_origin = flag(v)?,
             "pcb_tool_change_m6" => b.tool_change_m6 = flag(v)?,
+            "pcb_allow_assumed_drill" => b.allow_assumed_drill = flag(v)?,
             "pcb_max_cells" => b.max_cells = ranged(v, 1000.0, 1_000_000_000.0)? as u64,
             "wire_seed" => w.seed = ranged(v, 0.0, 9_007_199_254_740_991.0)? as u64,
             "wire_chunk_max" => w.chunk_max = ranged(v, 0.0, 512.0)? as usize,
@@ -649,6 +653,10 @@ impl MotionCfg {
         t.push_str(&format!("pcb_mirror_bottom = {}\n", f(b.mirror_bottom)));
         t.push_str(&format!("pcb_zero_origin = {}\n", f(b.zero_origin)));
         t.push_str(&format!("pcb_tool_change_m6 = {}\n", f(b.tool_change_m6)));
+        t.push_str(&format!(
+            "pcb_allow_assumed_drill = {}\n",
+            f(b.allow_assumed_drill)
+        ));
         t.push_str(&format!("pcb_max_cells = {}\n", b.max_cells));
         t.push_str(&format!("wire_seed = {}\n", w.seed));
         t.push_str(&format!("wire_chunk_max = {}\n", w.chunk_max));

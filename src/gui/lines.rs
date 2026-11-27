@@ -154,6 +154,9 @@ impl App {
             Refusal::Relative => self.w(Msg::SlRefRelative).to_string(),
             Refusal::Cycle(l) => self.ws(Msg::SlRefCycle, &[l.to_string()]),
             Refusal::Compensation(l) => self.ws(Msg::SlRefComp, &[l.to_string()]),
+            Refusal::Motion(l) => self.ws(Msg::SlRefMotion, &[l.to_string()]),
+            Refusal::FeedMode(l) => self.ws(Msg::SlRefFeedMode, &[l.to_string()]),
+            Refusal::TableLength(l) => self.ws(Msg::SlRefTable, &[l.to_string()]),
         }
     }
 
@@ -517,8 +520,52 @@ mod tests {
                 Refusal::Relative,
                 Refusal::Cycle(1),
                 Refusal::Compensation(1),
+                Refusal::Motion(1),
+                Refusal::FeedMode(1),
+                Refusal::TableLength(1),
             ] {
                 assert!(!a.start_refusal_text(&r).is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn the_longest_refusals_stay_inside_the_window_in_the_eight_languages() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1280.0, 720.0));
+        for lang in eh3d_view::texts::Lang::ALL {
+            for program in [
+                "G2 X2 Y0 I1 J0 F100\nX4 I1 J0",
+                "G93\nG1 X1 F2",
+                "G43 H1\nG0 X1",
+            ] {
+                let mut a = app_with(program);
+                a.lang = lang;
+                a.open_window("bookmarks");
+                if let Some(Win::Lines(st)) = a.win.as_mut() {
+                    st.check = Some(startline::check(&a.session.program, 1));
+                    assert!(st.check.as_ref().unwrap().refusal.is_some(), "{program}");
+                }
+                let mut widest = 0.0f32;
+                for _ in 0..3 {
+                    let input = egui::RawInput {
+                        screen_rect: Some(screen),
+                        ..Default::default()
+                    };
+                    let mut out = ctx.run_ui(input, |ui| {
+                        let ctx = ui.ctx().clone();
+                        a.windows(&ctx);
+                    });
+                    out.textures_delta.clear();
+                    // the window is anchored at the centre: half of it lies to the right of the middle
+                    let right = ctx.globally_used_rect().right();
+                    widest = 2.0 * (right - screen.center().x);
+                }
+                // the window is 520 wide: a sentence that did not wrap would stretch it
+                assert!(
+                    widest > 0.0 && widest <= 700.0,
+                    "{lang:?} {program}: {widest}"
+                );
             }
         }
     }
