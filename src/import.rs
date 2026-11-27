@@ -1037,7 +1037,7 @@ fn transform_of(text: &str) -> Result<Matrix, Fail> {
             .ok_or(Fail::Unmeasured)?;
         let name = rest[..opening].trim();
         let mut numbers = Numbers {
-            b: rest[opening + 1..closing].as_bytes(),
+            b: &rest.as_bytes()[opening + 1..closing],
             i: 0,
         };
         let mut v: Vec<f64> = Vec::new();
@@ -1679,9 +1679,9 @@ mod tests {
         // the group is over: the next line is where it was written
         assert!(near(moved[1][0], (0.0, 100.0)), "{moved:?}");
         // the one written first is outermost: the line is turned, then scaled, then moved
-        let both = points(&format!(
-            r#"<g transform="translate(10,0)"><g transform="scale(2)"><line transform="rotate(90)" x1="0" y1="0" x2="10" y2="0"/></g></g>"#
-        ));
+        let both = points(
+            r#"<g transform="translate(10,0)"><g transform="scale(2)"><line transform="rotate(90)" x1="0" y1="0" x2="10" y2="0"/></g></g>"#,
+        );
         assert!(near(both[0][1], (10.0, 80.0)), "{both:?}");
         let about =
             points(r#"<line transform="rotate(180 10 10)" x1="0" y1="10" x2="10" y2="10"/>"#);
