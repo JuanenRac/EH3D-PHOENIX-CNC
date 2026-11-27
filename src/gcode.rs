@@ -997,8 +997,8 @@ mod tests {
             words("G1 X5 (a) Y6 (b) Z7"),
             vec![('G', 1.0), ('X', 5.0), ('Y', 6.0), ('Z', 7.0)]
         );
-        // a semicolon cuts the line even inside a bracket
-        assert_eq!(words("G1 (a ; b) X5"), vec![('G', 1.0)]);
+        // a semicolon inside a bracket is part of the comment, as for the controller
+        assert_eq!(words("G1 (a ; b) X5"), vec![('G', 1.0), ('X', 5.0)]);
     }
 
     #[test]
