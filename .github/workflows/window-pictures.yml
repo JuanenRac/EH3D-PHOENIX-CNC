@@ -17,7 +17,7 @@ concurrency:
 env:
   # The tags of the sibling repositories the window is built against.
   COMMON_REF: "v0.3.7"
-  CORE_LIBS_REF: "551aea3fcf793867b2503fff76823b24513a5f50"
+  CORE_LIBS_REF: "v0.1.4"
 
 jobs:
   pictures:

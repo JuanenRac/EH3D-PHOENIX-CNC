@@ -4,6 +4,7 @@
 //! counter-clockwise one), and a program that the change could make wrong is refused, saying the line: relative distances, planes other
 //! than XY, canned cycles and probing moves, and codes that take machine positions or shift the zero. Nothing here moves a machine.
 
+use crate::gcode::{code_of, unreadable};
 use crate::heightmap::num;
 
 /// The change to make. The order is: mirror, scale and rotate about the centre, then shift.
@@ -89,6 +90,8 @@ pub enum Why {
     Zero,
     /// Absolute centres of the arcs (`G90.1`).
     AbsoluteCentre,
+    /// A word of the line cannot be read (an expression, a variable), so it would stay where it was.
+    Unreadable,
 }
 
 /// A refusal: the reason and the line (from 1; 0 when it is not about a line).
@@ -239,6 +242,20 @@ impl Transform {
         let mut motion: Option<u8> = None;
         for (n, raw) in lines.iter().enumerate() {
             let refuse = |why| Refusal { why, line: n + 1 };
+            // a line the controller takes for itself (`$`, `%`) is not G-code; one that cannot be read would be left where it was
+            let code = code_of(raw);
+            let code = code.trim_start();
+            let upper = code.to_ascii_uppercase();
+            if upper.starts_with(['$', '%'])
+                || upper.starts_with("M117")
+                || upper.starts_with("M118")
+            {
+                out.push(raw.clone());
+                continue;
+            }
+            if unreadable(raw) {
+                return Err(refuse(Why::Unreadable));
+            }
             let ws = scan(raw);
             let mut edits: Vec<(usize, usize, String)> = Vec::new();
             let mut explicit_arc: Option<&Word> = None;
@@ -250,6 +267,18 @@ impl Transform {
                 match (w.value * 10.0).round() as i32 {
                     0 => line_motion = Some(0),
                     10 => line_motion = Some(1),
+                    800 => line_motion = None,
+                    // a mirrored shape is cut from the other side of the tool
+                    410 | 420 | 411 | 421 if self.flips() => {
+                        let tenths = (w.value * 10.0).round() as i32;
+                        let other = match tenths {
+                            410 => "42",
+                            420 => "41",
+                            411 => "42.1",
+                            _ => "41.1",
+                        };
+                        edits.push((w.start, w.end, other.to_string()));
+                    }
                     20 => {
                         line_motion = Some(2);
                         explicit_arc = Some(w);
@@ -337,7 +366,9 @@ impl Transform {
                 if let Some(w) = wr {
                     put(&mut edits, w, w.value * self.scale);
                 }
-                if self.flips() {
+                // only a line that moves along the arc says its way round: a comment, a speed or a spindle order says nothing of it
+                let moves = ws.iter().any(|w| "XYZIJKR".contains(w.letter));
+                if self.flips() && (moves || explicit_arc.is_some()) {
                     let now = if line_motion == Some(2) { "3" } else { "2" };
                     match explicit_arc {
                         Some(g) => edits.push((g.start, g.end, now.to_string())),
@@ -577,6 +608,68 @@ mod tests {
                 );
                 assert!((q.2 - (p.2 * 1.5 + 2.0)).abs() < 1e-3, "{p:?} {q:?}");
             }
+        }
+    }
+
+    #[test]
+    fn a_mirror_adds_no_arc_word_to_a_line_that_does_not_move_along_the_arc() {
+        let t = Transform {
+            mirror_x: true,
+            ..Transform::default()
+        };
+        let src = "G2 X2 Y0 I1 J0 F100\n(done)\n\nM5\nS500\nF200\nM9\n; end\nM30";
+        assert_eq!(
+            run(&t, src),
+            [
+                "G3 X-2 Y0 I-1 J0 F100",
+                "(done)",
+                "",
+                "M5",
+                "S500",
+                "F200",
+                "M9",
+                "; end",
+                "M30"
+            ]
+        );
+        // after G80 a line is not an arc any more
+        assert_eq!(run(&t, "G2 X2 Y0 I1 J0\nG80\nG4 P1")[2], "G4 P1");
+        // the lines of the controller and the text of a message are left alone
+        assert_eq!(
+            run(&t, "$J=G91 X1 F100\nM117 go to X5\n%"),
+            ["$J=G91 X1 F100", "M117 go to X5", "%"]
+        );
+    }
+
+    #[test]
+    fn a_mirrored_shape_is_cut_from_the_other_side_of_the_tool() {
+        let one = Transform {
+            mirror_y: true,
+            ..Transform::default()
+        };
+        assert_eq!(
+            run(&one, "G41 D1\nG42 D2\nG41.1 D3\nG42.1 D3\nG40"),
+            ["G42 D1", "G41 D2", "G42.1 D3", "G41.1 D3", "G40"]
+        );
+        let two = Transform {
+            mirror_x: true,
+            mirror_y: true,
+            ..Transform::default()
+        };
+        assert_eq!(run(&two, "G41 D1\nG1 X1 Y1")[0], "G41 D1");
+        assert_eq!(
+            run(&shifted(1.0, 0.0, 0.0), "G41 D1\nG1 X1 Y1")[0],
+            "G41 D1"
+        );
+    }
+
+    #[test]
+    fn a_line_with_a_word_that_cannot_be_read_is_refused() {
+        let t = shifted(1.0, 1.0, 0.0);
+        for src in ["G1 X[#1] Y1", "G1 X1\nG1 X#2", "G1 X1.2.3"] {
+            let r = refused(&t, src);
+            assert_eq!(r.why, Why::Unreadable, "{src}");
+            assert_eq!(r.line, src.lines().count(), "{src}");
         }
     }
 

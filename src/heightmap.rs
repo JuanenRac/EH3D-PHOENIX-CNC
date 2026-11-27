@@ -7,7 +7,8 @@
 //! window: the readings come in as numbers (the report `[PRB:x,y,z:1]` of GRBL read by [`parse_probe_report`], or a closure in the probe
 //! module), and it is tested on its own.
 
-use crate::gcode::words;
+use crate::gcode::{code_of, unreadable, words};
+use crate::logwords::{self, Lg};
 
 /// The most points of a grid and the most lines a corrected program may have (a bound against a setting typed wrong).
 pub const MAX_POINTS: usize = 10_000;
@@ -17,6 +18,59 @@ pub const MAX_LINES: usize = 2_000_000;
 const OUTSIDE_TOLERANCE_MM: f64 = 0.5;
 
 /// A grid of heights.
+/// Why a program cannot be corrected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MapWhy {
+    Piece,
+    Arc,
+    Inches,
+    Relative,
+    Shift,
+    Leaves,
+    TooLong,
+    Cycle,
+    InverseFeed,
+    SecondWcs,
+    Rotary,
+    Unreadable,
+    UnknownPlace,
+}
+
+/// A refusal to correct a program: the line it is about, counted from 1 (none when it is not about a line), and why.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MapRefusal {
+    pub line: Option<usize>,
+    pub why: MapWhy,
+}
+
+impl MapRefusal {
+    /// The sentence of the refusal in a language of the suite.
+    pub fn text(&self, lang: &str) -> String {
+        let why = logwords::text(
+            lang,
+            match self.why {
+                MapWhy::Piece => Lg::MapPiece,
+                MapWhy::Arc => Lg::MapArc,
+                MapWhy::Inches => Lg::MapInches,
+                MapWhy::Relative => Lg::MapRelative,
+                MapWhy::Shift => Lg::MapShift,
+                MapWhy::Leaves => Lg::MapLeaves,
+                MapWhy::TooLong => Lg::MapTooLong,
+                MapWhy::Cycle => Lg::MapCycle,
+                MapWhy::InverseFeed => Lg::MapInverseFeed,
+                MapWhy::SecondWcs => Lg::MapSecondWcs,
+                MapWhy::Rotary => Lg::MapRotary,
+                MapWhy::Unreadable => Lg::MapUnreadable,
+                MapWhy::UnknownPlace => Lg::MapUnknownPlace,
+            },
+        );
+        match self.line {
+            Some(line) => logwords::say(lang, Lg::MapLine, &[line.to_string(), why.to_string()]),
+            None => why.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeightMap {
     /// The corner with the smallest X and Y, and the distance between points along X and Y, in mm.
@@ -259,100 +313,185 @@ impl HeightMap {
         })
     }
 
-    /// Corrects a program to follow the surface: every cutting move is cut into pieces of at most `segment_mm` and the Z of each piece is
-    /// raised by the height under it; a rapid move that sets a Z is raised by the height under its end. The program must be in absolute
-    /// distances and millimetres, with no arcs and no shift of the zero (the program is refused, saying the line, when it has any of them
-    /// or when a move leaves the probed area), because the correction would not be right.
+    /// Corrects a program to follow the surface; the reason of a refusal is in English (see [`HeightMap::correct`] for the others).
     pub fn compensate(&self, lines: &[String], segment_mm: f64) -> Result<Vec<String>, String> {
+        self.correct(lines, segment_mm).map_err(|e| e.text("en"))
+    }
+
+    /// Corrects a program to follow the surface: every cut is split into pieces of at most `segment_mm` and each point is raised or lowered
+    /// by the map. What cannot be corrected without guessing is refused with its line: arcs, canned cycles, probes, threads and splines,
+    /// inches, relative distances, a shift of the zero (also `G10` on X or Y), a second work system, a feed by inverse time, a rotary axis on
+    /// a cut that would be split, a line that cannot be read, and a cut before the program has said where the tool is (also after `G28`,
+    /// `G30` or a change of the tool length). A program pause or end on a line that is split stays after its last piece.
+    pub fn correct(&self, lines: &[String], segment_mm: f64) -> Result<Vec<String>, MapRefusal> {
         if !segment_mm.is_finite() || segment_mm < 0.01 {
-            return Err("the length of a piece must be at least 0.01 mm".to_string());
+            return Err(MapRefusal {
+                line: None,
+                why: MapWhy::Piece,
+            });
         }
         let mut out: Vec<String> = Vec::with_capacity(lines.len());
-        let mut pos = (0.0, 0.0, 0.0);
-        let mut motion = 0_u8;
+        // where the program has put each axis; `None` while it has not said it
+        let mut known: [Option<f64>; 3] = [None; 3];
+        let mut motion = Some(0_u8);
+        let mut system: Option<i32> = None;
         for (n, raw) in lines.iter().enumerate() {
+            let at = |why: MapWhy| MapRefusal {
+                line: Some(n + 1),
+                why,
+            };
+            let code = code_of(raw);
+            let code = code.trim().to_ascii_uppercase();
             let ws = words(raw);
-            let at = |msg: &str| format!("line {}: {msg}", n + 1);
+            let has_axis = ws.iter().any(|&(l, _)| matches!(l, 'X' | 'Y' | 'Z'));
+            if code.starts_with('/') && has_axis {
+                return Err(at(MapWhy::Unreadable));
+            }
+            if code.starts_with('$') || code.starts_with('%') || code.starts_with("M11") {
+                if code.starts_with("$J") || code.starts_with("$H") {
+                    known = [None; 3];
+                }
+                out.push(raw.clone());
+                continue;
+            }
+            if unreadable(raw) {
+                return Err(at(MapWhy::Unreadable));
+            }
             let mut target: [Option<f64>; 3] = [None; 3];
             let mut feed = None;
             let mut other: Vec<(char, f64)> = Vec::new();
-            let mut skips_move = false;
+            // the program pauses and ends: the controller obeys them after the move of their line
+            let mut after: Vec<(char, f64)> = Vec::new();
+            let (mut skips_move, mut loses_xyz, mut loses_z, mut offsets, mut rotary) =
+                (false, false, false, false, false);
             for &(l, v) in &ws {
                 let tenths = (v * 10.0).round() as i32;
                 match l {
                     'G' => match tenths {
-                        0 => motion = 0,
-                        10 => motion = 1,
-                        20 | 30 => return Err(at("an arc cannot be corrected")),
-                        200 => return Err(at("inches are not supported, use millimetres")),
-                        910 => return Err(at("relative distances are not supported")),
-                        530 | 920 | 921 | 922 | 923 => {
-                            return Err(at("a shift of the zero cannot be corrected"))
+                        0 => motion = Some(0),
+                        10 => motion = Some(1),
+                        20 | 30 => return Err(at(MapWhy::Arc)),
+                        50..=52 | 330 | 382..=385 | 730 | 760 | 810..=890 => {
+                            return Err(at(MapWhy::Cycle))
                         }
-                        // these take axis words that are not a cutting move
-                        100 | 280 | 281 | 300 | 301 | 431 => {
+                        800 => motion = None,
+                        200 => return Err(at(MapWhy::Inches)),
+                        910 => return Err(at(MapWhy::Relative)),
+                        930 => return Err(at(MapWhy::InverseFeed)),
+                        530 | 920..=923 => return Err(at(MapWhy::Shift)),
+                        540 | 550 | 560 | 570 | 580 | 590 => {
+                            if system.is_some_and(|before| before != tenths) {
+                                return Err(at(MapWhy::SecondWcs));
+                            }
+                            system = Some(tenths);
+                            other.push((l, v));
+                        }
+                        100 => {
+                            offsets = true;
+                            skips_move = true;
+                            other.push((l, v));
+                        }
+                        280 | 300 => {
+                            loses_xyz = true;
+                            skips_move = true;
+                            other.push((l, v));
+                        }
+                        281 | 301 => {
+                            skips_move = true;
+                            other.push((l, v));
+                        }
+                        430 | 431 | 490 => {
+                            loses_z = true;
+                            skips_move |= tenths == 431;
+                            other.push((l, v));
+                        }
+                        40 => {
                             skips_move = true;
                             other.push((l, v));
                         }
                         _ => other.push((l, v)),
                     },
+                    'M' if matches!(tenths, 0 | 10 | 20 | 300 | 600) => after.push((l, v)),
                     'X' => target[0] = Some(v),
                     'Y' => target[1] = Some(v),
                     'Z' => target[2] = Some(v),
                     'F' => feed = Some(v),
-                    _ => other.push((l, v)),
-                }
-            }
-            if skips_move || target.iter().all(Option::is_none) {
-                out.push(raw.clone());
-                continue;
-            }
-            let to = (
-                target[0].unwrap_or(pos.0),
-                target[1].unwrap_or(pos.1),
-                target[2].unwrap_or(pos.2),
-            );
-            if motion == 0 {
-                match target[2] {
-                    None => out.push(raw.clone()),
-                    Some(z) => {
-                        if !self.contains(to.0, to.1) {
-                            return Err(at("the move leaves the probed area"));
-                        }
-                        out.push(rebuild(
-                            0,
-                            &other,
-                            [target[0], target[1], Some(z + self.offset_at(to.0, to.1))],
-                            None,
-                        ));
+                    _ => {
+                        rotary |= matches!(l, 'A' | 'B' | 'C' | 'U' | 'V' | 'W');
+                        other.push((l, v));
                     }
                 }
+            }
+            if offsets && (target[0].is_some() || target[1].is_some()) {
+                return Err(at(MapWhy::Shift));
+            }
+            if skips_move || target.iter().all(Option::is_none) || motion.is_none() {
+                out.push(raw.clone());
+                if loses_xyz {
+                    known = [None; 3];
+                } else if loses_z || (offsets && target[2].is_some()) {
+                    known[2] = None;
+                }
+                continue;
+            }
+            if loses_z {
+                known[2] = None;
+            }
+            let to = [0, 1, 2].map(|i| target[i].or(known[i]));
+            if motion == Some(0) {
+                // a rapid that sets no Z, or one before the program has said where it is in X and Y, is left as written
+                match (target[2], to[0], to[1]) {
+                    (Some(z), Some(x), Some(y)) => {
+                        if !self.contains(x, y) {
+                            return Err(at(MapWhy::Leaves));
+                        }
+                        let mut line = rebuild(
+                            0,
+                            &other,
+                            [target[0], target[1], Some(z + self.offset_at(x, y))],
+                            feed,
+                        );
+                        append(&mut line, &after);
+                        out.push(line);
+                    }
+                    _ => out.push(raw.clone()),
+                }
             } else {
-                let flat = (to.0 - pos.0).hypot(to.1 - pos.1);
+                // a cut is split between where the tool was and where it goes: both have to be known
+                let (Some(x0), Some(y0), Some(x1), Some(y1), Some(z1)) =
+                    (known[0], known[1], to[0], to[1], to[2])
+                else {
+                    return Err(at(MapWhy::UnknownPlace));
+                };
+                let z0 = known[2].unwrap_or(z1);
+                let flat = (x1 - x0).hypot(y1 - y0);
                 let pieces = ((flat / segment_mm).ceil() as usize).max(1);
+                if rotary && pieces > 1 {
+                    return Err(at(MapWhy::Rotary));
+                }
                 if out.len().saturating_add(pieces) > MAX_LINES {
-                    return Err(at("the corrected program would be too long"));
+                    return Err(at(MapWhy::TooLong));
                 }
                 for k in 1..=pieces {
                     let f = k as f64 / pieces as f64;
-                    let p = (
-                        pos.0 + (to.0 - pos.0) * f,
-                        pos.1 + (to.1 - pos.1) * f,
-                        pos.2 + (to.2 - pos.2) * f,
-                    );
+                    let p = (x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, z0 + (z1 - z0) * f);
                     if !self.contains(p.0, p.1) {
-                        return Err(at("the move leaves the probed area"));
+                        return Err(at(MapWhy::Leaves));
                     }
                     let first = k == 1;
-                    out.push(rebuild(
+                    let mut line = rebuild(
                         1,
                         if first { &other } else { &[] },
                         [Some(p.0), Some(p.1), Some(p.2 + self.offset_at(p.0, p.1))],
                         if first { feed } else { None },
-                    ));
+                    );
+                    if k == pieces {
+                        append(&mut line, &after);
+                    }
+                    out.push(line);
                 }
             }
-            pos = to;
+            known = to;
         }
         Ok(out)
     }
@@ -366,6 +505,13 @@ pub fn num(v: f64) -> String {
         "0".to_string()
     } else {
         s.to_string()
+    }
+}
+
+/// Puts the words that the controller obeys after the move at the end of a line.
+fn append(line: &mut String, words: &[(char, f64)]) {
+    for &(l, v) in words {
+        line.push_str(&format!(" {l}{}", num(v)));
     }
 }
 
@@ -535,17 +681,98 @@ mod tests {
     fn a_program_that_cannot_be_corrected_is_refused_with_its_line() {
         let m = ramp();
         for (p, why) in [
-            ("G1 X1 F10\nG2 X5 Y5 I1 J1", "line 2"),
+            ("G0 X0 Y0 Z1\nG1 X1 F10\nG2 X5 Y5 I1 J1", "line 3"),
             ("G20\nG1 X1", "line 1"),
             ("G91\nG1 X1", "line 1"),
             ("G92 X0", "line 1"),
-            ("G1 X30 F10", "probed area"),
-            ("G1 X-3 F10", "probed area"),
+            ("G0 X0 Y0 Z1\nG1 X30 F10", "probed area"),
+            ("G0 X0 Y0 Z1\nG1 X-3 F10", "probed area"),
         ] {
             let e = m.compensate(&lines(p), 1.0).unwrap_err();
             assert!(e.contains(why), "{p}: {e}");
         }
         assert!(m.compensate(&lines("G1 X1"), 0.0).is_err());
+    }
+
+    #[test]
+    fn what_would_have_to_be_guessed_is_refused() {
+        let m = ramp();
+        let start = "G0 X0 Y0 Z1\n";
+        for (line, why) in [
+            ("G81 X5 Y0 Z-1 R1 F50", MapWhy::Cycle),
+            ("G73 Z-1 R1 Q1", MapWhy::Cycle),
+            ("G38.2 Z-5 F20", MapWhy::Cycle),
+            ("G33 Z-1 K1", MapWhy::Cycle),
+            ("G5.1 X1 Y1 I1 J1", MapWhy::Cycle),
+            ("G93 G1 X5 F2", MapWhy::InverseFeed),
+            ("G10 L2 P1 X5", MapWhy::Shift),
+            ("G1 X5 A90 F50", MapWhy::Rotary),
+            ("G1 X[#1] F50", MapWhy::Unreadable),
+            ("/G1 X5 F50", MapWhy::Unreadable),
+        ] {
+            let refusal = m
+                .correct(&lines(&format!("{start}{line}")), 1.0)
+                .unwrap_err();
+            assert_eq!((refusal.line, refusal.why), (Some(2), why), "{line}");
+        }
+        let two = lines("G54\nG0 X0 Y0 Z1\nG55");
+        assert_eq!(m.correct(&two, 1.0).unwrap_err().why, MapWhy::SecondWcs);
+        assert!(m
+            .correct(&lines("G55\nG0 X0 Y0 Z1\nG1 X5 F50\nG55"), 1.0)
+            .is_ok());
+        // the reason is told in the language that is asked for
+        let refusal = m.correct(&lines("G20"), 1.0).unwrap_err();
+        assert!(
+            refusal.text("es").starts_with("línea 1:"),
+            "{}",
+            refusal.text("es")
+        );
+        assert!(refusal.text("de").contains("Zoll"));
+    }
+
+    #[test]
+    fn a_cut_from_a_place_the_program_has_not_said_is_refused_and_no_position_is_invented() {
+        let m = ramp();
+        for program in [
+            "G1 Z-1 F100",
+            "G1 X5 Y0 Z-1 F100",
+            "G0 X0 Y0\nG1 X5 F100",
+            "G0 X0 Y0 Z1\nG28 Z0\nG1 X5 F100",
+            "G0 X0 Y0 Z1\nG30\nG1 X5 F100",
+            "G0 X0 Y0 Z1\nG43.1 Z2\nG1 X5 F100",
+            "G0 X0 Y0 Z1\nG10 L20 P1 Z0\nG1 X5 F100",
+        ] {
+            let refusal = m.correct(&lines(program), 1.0).unwrap_err();
+            assert_eq!(refusal.why, MapWhy::UnknownPlace, "{program}");
+        }
+        // a rapid Z before the program has said X and Y is left as it was written
+        let out = m.compensate(&lines("G0 Z5\nG0 X20 Y0"), 1.0).unwrap();
+        assert_eq!(out, lines("G0 Z5\nG0 X20 Y0"));
+        // and one that gives Z again after G28 is cut from there
+        assert!(m
+            .compensate(&lines("G0 X0 Y0 Z1\nG28 Z0\nG0 X0 Y0 Z1\nG1 X5 F100"), 1.0)
+            .is_ok());
+    }
+
+    #[test]
+    fn a_pause_or_an_end_on_a_line_that_is_split_stays_after_its_last_piece() {
+        let m = ramp();
+        let out = m
+            .compensate(&lines("G0 X0 Y0 Z1\nG1 X10 F100 M30"), 5.0)
+            .unwrap();
+        assert_eq!(out[1], "G1 X5 Y0 Z1.5 F100");
+        assert_eq!(out[2], "G1 X10 Y0 Z2 M30");
+        let out = m
+            .compensate(&lines("G0 X0 Y0 Z1\nM3 S900 G1 X10 F100 M0"), 5.0)
+            .unwrap();
+        assert!(
+            out[1].starts_with("M3 S900 G1 X5") && !out[1].contains("M0"),
+            "{out:?}"
+        );
+        assert!(out[2].ends_with(" M0"), "{out:?}");
+        // the feed of a rapid line is not lost
+        let out = m.compensate(&lines("G0 X0 Y0 Z1 F250"), 5.0).unwrap();
+        assert_eq!(out[0], "G0 X0 Y0 Z1 F250");
     }
 
     #[test]

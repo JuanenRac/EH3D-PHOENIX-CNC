@@ -19,8 +19,6 @@ pub enum Note {
     UnitsAssumedPixels,
     /// A plotter file: its units are 0.025 mm.
     UnitsPlotter,
-    /// A transformation of the drawing was not applied.
-    TransformIgnored,
     /// Something of the layer of the board was not drawn (a shape the reader cannot draw), so the cut leaves it out.
     PcbNotDrawn,
     /// The file does not say which layer it is and copper was taken.
@@ -38,12 +36,11 @@ pub enum Note {
 }
 
 impl Note {
-    pub const ALL: [Note; 12] = [
+    pub const ALL: [Note; 11] = [
         Note::UnsupportedCommand,
         Note::UnitsAssumedMm,
         Note::UnitsAssumedPixels,
         Note::UnitsPlotter,
-        Note::TransformIgnored,
         Note::PcbNotDrawn,
         Note::PcbAssumedCopper,
         Note::PcbOutlineOpen,
@@ -94,16 +91,6 @@ impl Note {
                 "プロッターファイルです。単位は 0.025 mm です。",
                 "绘图仪文件：其单位为 0.025 毫米。",
                 "Um ficheiro de plotter: as suas unidades são de 0,025 mm.",
-            ],
-            Note::TransformIgnored => [
-                "A transformation of the drawing was not applied.",
-                "No se aplicó una transformación del dibujo.",
-                "Eine Transformation der Zeichnung wurde nicht angewendet.",
-                "Une transformation du dessin n'a pas été appliquée.",
-                "Una trasformazione del disegno non è stata applicata.",
-                "図面の変換は適用されませんでした。",
-                "图形的某个变换没有被应用。",
-                "Uma transformação do desenho não foi aplicada.",
             ],
             Note::PcbNotDrawn => [
                 "Some shapes of the layer cannot be drawn and are left out of the cut.",
@@ -203,10 +190,12 @@ pub enum Fail {
     BadPcbSetting,
     /// The drill file does not say its format, zeros or units, so a hole could be in another place.
     DrillAssumed,
+    /// The drawing uses a unit, a scaling or a plane that is not read: cut as it stands it could come out at another size or place.
+    Unmeasured,
 }
 
 impl Fail {
-    pub const ALL: [Fail; 10] = [
+    pub const ALL: [Fail; 11] = [
         Fail::TooBig,
         Fail::TooManyPoints,
         Fail::Syntax,
@@ -217,10 +206,21 @@ impl Fail {
         Fail::NotACutLayer,
         Fail::BadPcbSetting,
         Fail::DrillAssumed,
+        Fail::Unmeasured,
     ];
 
     pub fn text(self, lang: &str) -> &'static str {
         let row: [&str; 8] = match self {
+            Fail::Unmeasured => [
+                "The drawing uses a unit, a scaling, a command or a plane that is not read: it could be cut at another size or place, so nothing is imported.",
+                "El dibujo usa una unidad, una escala, un comando o un plano que no se lee: podría cortarse con otro tamaño o en otro sitio, así que no se importa nada.",
+                "Die Zeichnung nutzt eine Einheit, Skalierung, einen Befehl oder eine Ebene, die nicht gelesen werden: sie könnte in anderer Größe oder Lage geschnitten werden, daher wird nichts importiert.",
+                "Le dessin utilise une unité, une échelle, une commande ou un plan non lus : il pourrait être coupé à une autre taille ou ailleurs, rien n'est donc importé.",
+                "Il disegno usa un'unità, una scala, un comando o un piano non letti: potrebbe essere tagliato con un'altra misura o altrove, quindi non si importa nulla.",
+                "図面に読み取れない単位、拡大縮小、コマンド、平面があります。違う大きさや位置で加工される恐れがあるため、何も読み込みません。",
+                "图形使用了无法读取的单位、缩放、命令或平面：可能以错误的尺寸或位置切割，因此不导入任何内容。",
+                "O desenho usa uma unidade, uma escala, um comando ou um plano que não são lidos: poderia ser cortado com outro tamanho ou noutro sítio, por isso nada é importado.",
+            ],
             Fail::TooBig => [
                 "The file is bigger than the limit.",
                 "El archivo supera el límite.",

@@ -47,7 +47,9 @@ impl App {
     pub(super) fn panel_viewer(&mut self, ui: &mut egui::Ui) {
         let t = self.theme.clone();
         {
-            ui.horizontal(|ui| {
+            // the rows go on below in a narrow panel: one that did not fit made the whole panel wider than its place, and the hint and the
+            // size of the table at its foot were cut
+            ui.horizontal_wrapped(|ui| {
                 ui.label(
                     RichText::new(self.t(Text::McToolpath).to_uppercase()).color(col(t.accent)),
                 );
@@ -70,15 +72,13 @@ impl App {
                 {
                     self.reset_view();
                 }
-                ui.label(
-                    RichText::new(if self.settings.view_3d {
-                        self.t(Text::NavHint3d)
-                    } else {
-                        self.t(Text::NavHint2d)
-                    })
-                    .color(col(t.dim)),
-                );
             });
+            let hint = if self.settings.view_3d {
+                self.t(Text::NavHint3d)
+            } else {
+                self.t(Text::NavHint2d)
+            };
+            ui.add(egui::Label::new(RichText::new(hint).color(col(t.dim))).wrap());
             self.viewer_bar(ui);
             let (rect, resp) =
                 ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());

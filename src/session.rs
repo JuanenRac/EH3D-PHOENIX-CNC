@@ -19,6 +19,7 @@ use eh3d_controller::{Command, Controller, Error, Family, State, Status, AXES};
 use crate::gcode::{toolpath, words, Modal};
 use crate::heightmap::HeightMap;
 use crate::jog::{limit_step, Step as JogStep};
+use crate::logwords::{self, Lg};
 use crate::motioncfg::SetterCfg;
 use crate::probe::{grid_script, z_touch_off_lines, Act, ProbeCfg};
 
@@ -82,6 +83,8 @@ struct InFlight {
     /// Each step done is a line of the program.
     advances: bool,
     then: Then,
+    /// The controller was in inches before a probe cycle, which runs in millimetres.
+    inches_before: bool,
 }
 
 /// The last move of a resumed program: lowering the tool to where the program had it, at a cutting feed, once the operator says so.
@@ -152,6 +155,8 @@ pub struct Session {
     pub cancel_crossing_jog: bool,
     /// The length of the tool the last measure on the tool setter gave (mm), until the operator writes it into the table or drops it.
     pub setter_length: Option<f64>,
+    /// The work zero was shifted by hand (`G92`, typed or by the zero button): a reset of the controller would take the shift away.
+    pub hand_shift: bool,
 }
 
 /// The travel the summary and the refusal use: where the settings put it, shortened to the longest travel the controller reports when that is
@@ -280,6 +285,7 @@ impl Session {
             last_jog: None,
             cancel_crossing_jog: true,
             setter_length: None,
+            hand_shift: false,
         };
         s.refresh();
         s
@@ -289,6 +295,29 @@ impl Session {
         self.controller
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// A message of the log in the language of the window.
+    fn tell<S: AsRef<str>>(&mut self, message: Lg, args: &[S]) {
+        let line = logwords::say(&self.lang, message, args);
+        self.say(line);
+    }
+
+    /// A message of the log about something that was asked (`jog`, `probe`...), with both in the language of the window.
+    fn tell_about(&mut self, message: Lg, what: &str) {
+        let what = logwords::what(&self.lang, what);
+        self.tell(message, &[what]);
+    }
+
+    /// A message of the log with no holes.
+    fn note(&mut self, message: Lg) {
+        self.tell(message, &[] as &[&str]);
+    }
+
+    /// The reason of a probe, a tool setter or a height map that failed, after the name of what was asked.
+    fn trouble(&mut self, what: &str, why: &str) {
+        let what = logwords::what(&self.lang, what);
+        self.say(format!("{what}: {why}"));
     }
 
     fn say(&mut self, line: impl Into<String>) {
@@ -301,6 +330,7 @@ impl Session {
 
     /// What went wrong stops a program that is running, and is written in the log.
     fn failed(&mut self, what: &str, e: Error) {
+        let what = logwords::what(&self.lang, what);
         let text = if self.family == Family::Klipper {
             crate::ctltext::explain_error(self.family, &e, &self.lang)
         } else {
@@ -311,7 +341,7 @@ impl Session {
         self.paused = false;
     }
 
-    /// The language the errors of Klipper are told in (the code of the window; English for one the tables do not have).
+    /// The language of the log (the code of the window; English for one the tables do not have).
     pub fn set_lang(&mut self, code: &str) {
         if self.lang != code {
             self.lang = code.to_string();
@@ -326,9 +356,7 @@ impl Session {
     /// Says (in the log) that the controller is busy, and tells so.
     fn refuse_busy(&mut self, what: &str) -> bool {
         if self.inflight.is_some() {
-            self.say(format!(
-                "{what}: the controller is busy sending the program"
-            ));
+            self.tell_about(Lg::Busy, what);
             true
         } else {
             false
@@ -369,7 +397,7 @@ impl Session {
     /// Moves an axis by one step, in the direction `dir` (1 or -1).
     pub fn jog(&mut self, axis: usize, dir: f64) {
         if self.running && !self.paused {
-            self.say("jog: a program is running");
+            self.note(Lg::JogRunning);
             return;
         }
         if self.refuse_busy("jog") {
@@ -382,12 +410,10 @@ impl Session {
                 JogStep::Go(d) => distance_mm = d,
                 JogStep::Shorten(d) => {
                     distance_mm = d;
-                    self.say(format!(
-                        "jog: the step is shortened to {d:.3} mm, where the travel of the axis ends"
-                    ));
+                    self.tell(Lg::JogShortened, &[format!("{d:.3}")]);
                 }
                 JogStep::Refuse => {
-                    self.say("jog: the axis is at the end of its travel (jog_soft_limits in the settings file: always, homing or no)");
+                    self.note(Lg::JogEnd);
                     return;
                 }
             }
@@ -419,15 +445,18 @@ impl Session {
         self.refresh();
     }
 
-    fn order(&mut self, what: &str, command: Command) {
+    /// Gives an order to the controller; says whether it was taken.
+    fn order(&mut self, what: &str, command: Command) -> bool {
         if self.refuse_busy(what) {
-            return;
+            return false;
         }
         let r = self.ctl().command(command);
+        let taken = r.is_ok();
         if let Err(e) = r {
             self.failed(what, e);
         }
         self.refresh();
+        taken
     }
 
     /// Sends a line of the program's own making (a move to a stored position, to the zero) and keeps what it sets.
@@ -437,7 +466,10 @@ impl Session {
         }
         let r = self.ctl().send_line(line);
         match r {
-            Ok(()) => self.modal.apply(line),
+            Ok(()) => {
+                self.modal.apply(line);
+                self.note_shift(line);
+            }
             Err(e) => self.failed(what, e),
         }
         self.refresh();
@@ -465,7 +497,46 @@ impl Session {
 
     /// Makes the work position here zero on these axes only.
     pub fn zero_axes(&mut self, axes: &[usize]) {
-        self.order("zero", Command::ZeroWork(axes.to_vec()));
+        self.zero_work(axes);
+    }
+
+    /// Makes the position here the zero of the work system in use. The order of a GRBL controller writes `G54` only, so with another system
+    /// (`G55` to `G59`) the line that names the one in use (`P0`) is sent instead. On Marlin and Klipper the zero is a shift (`G92`) that a
+    /// reset takes away, which is kept in mind.
+    fn zero_work(&mut self, axes: &[usize]) {
+        let grbl = matches!(
+            self.family,
+            Family::Grbl | Family::GrblHal | Family::FluidNc
+        );
+        if grbl && self.modal.wcs != 54 {
+            let words: String = axes
+                .iter()
+                .filter_map(|&a| ['X', 'Y', 'Z', 'A', 'B', 'C'].get(a))
+                .map(|letter| format!(" {letter}0"))
+                .collect();
+            self.own_line("zero", &format!("G10 L20 P0{words}"));
+            return;
+        }
+        if self.order("zero", Command::ZeroWork(axes.to_vec()))
+            && matches!(self.family, Family::Marlin | Family::Klipper)
+        {
+            self.hand_shift = true;
+        }
+    }
+
+    /// Keeps in mind a shift of the zero (`G92`) given by hand: a reset of the controller takes it away, and no line of the program
+    /// gives it back.
+    fn note_shift(&mut self, line: &str) {
+        for (letter, v) in words(line) {
+            if letter != 'G' {
+                continue;
+            }
+            match (v * 10.0).round() as i32 {
+                920 | 923 => self.hand_shift = true,
+                921 | 922 => self.hand_shift = false,
+                _ => {}
+            }
+        }
     }
 
     /// Makes the operator's position here zero on these axes.
@@ -496,7 +567,7 @@ impl Session {
         all[..3].copy_from_slice(&xyz);
         let ok = self.ctl().set_travel(all);
         if !ok {
-            self.say("travel: the controller keeps its own limits");
+            self.note(Lg::TravelKeeps);
         }
         ok
     }
@@ -512,18 +583,11 @@ impl Session {
         let r = self.ctl().max_travel();
         match r {
             Ok(Some(t)) => {
-                self.say(format!(
-                    "travel: the controller allows X {:.1}, Y {:.1}, Z {:.1} mm; the smaller of that and the settings is used",
-                    t[0], t[1], t[2]
-                ));
+                self.tell(Lg::TravelAllows, &t.map(|v| format!("{v:.1}")));
                 self.controller_travel = Some(t);
             }
-            Ok(None) => self.say(
-                "travel: the controller does not give its travel ($130 to $132); the settings are used",
-            ),
-            Err(e) => self.say(format!(
-                "travel: the controller did not answer ({e}); the settings are used"
-            )),
+            Ok(None) => self.note(Lg::TravelNotGiven),
+            Err(e) => self.tell(Lg::TravelSilent, &[e.to_string()]),
         }
         self.controller_travel
     }
@@ -576,7 +640,7 @@ impl Session {
 
     /// Makes the work position here zero on X, Y and Z.
     pub fn zero(&mut self) {
-        self.order("zero", Command::ZeroWork(vec![0, 1, 2]));
+        self.zero_work(&[0, 1, 2]);
     }
 
     pub fn unlock(&mut self) {
@@ -592,9 +656,7 @@ impl Session {
                 true
             }
             None => {
-                self.say(format!(
-                    "{what}: this controller cannot take it while a line is waiting for its answer"
-                ));
+                self.tell_about(Lg::NoUrgent, what);
                 false
             }
         }
@@ -620,7 +682,7 @@ impl Session {
         } else {
             self.order("emergency stop", Command::EmergencyStop);
         }
-        self.say("EMERGENCY STOP");
+        self.note(Lg::Estop);
     }
 
     /// One line typed by the operator.
@@ -644,6 +706,7 @@ impl Session {
         match r {
             Ok(()) => {
                 self.modal.apply(line);
+                self.note_shift(line);
                 self.say("ok")
             }
             Err(e) => self.failed("mdi", e),
@@ -745,8 +808,10 @@ impl Session {
         }
         Some(Descent {
             lines,
-            text: format!(
-                "resume: the tool is over the point where the program stopped, at the safe height; press Start again to lower it to Z{z:.3} mm at feed {feed} and go on"
+            text: logwords::say(
+                &self.lang,
+                Lg::DescentWait,
+                &[format!("{z:.3}"), feed.to_string()],
             ),
         })
     }
@@ -801,42 +866,37 @@ impl Session {
                 }
             }
         }
+        let why = |message: Lg, first: usize| {
+            Some(logwords::say(
+                &self.lang,
+                message,
+                &[first.to_string(), line.to_string()],
+            ))
+        };
         if !m.absolute {
-            return Some(format!(
-                "resume: the program is in relative distances (G91) at line {line}, so where it was cannot be rebuilt; it is not resumed"
-            ));
+            return why(Lg::ResRelative, line);
         }
         if let Some(l) = cycle {
-            return Some(format!(
-                "resume: the canned cycle of line {l} is still on at line {line}; the program is not resumed"
-            ));
+            return why(Lg::ResCycle, l);
         }
         if let Some(l) = comp {
-            return Some(format!(
-                "resume: the cutter compensation of line {l} is still on at line {line}; the program is not resumed"
-            ));
+            return why(Lg::ResComp, l);
         }
         if let Some(l) = shifted {
-            return Some(format!(
-                "resume: line {l} shifts the zero (G92), a reset of the controller takes the shift away and it cannot be rebuilt; the program is not resumed at line {line}"
-            ));
+            return why(Lg::ResShift, l);
         }
         if let Some(l) = lost.iter().flatten().next() {
-            return Some(format!(
-                "resume: line {l} moved the machine in its own coordinates (G28, G30 or G53), so where the tool was at line {line} is not known; the program is not resumed"
-            ));
+            return why(Lg::ResLost, *l);
         }
         use crate::startline::Refusal;
         match crate::startline::state_refusal(&self.program, next) {
-            Some(Refusal::Motion(l)) => Some(format!(
-                "resume: line {line} goes on in the way of moving of line {l} (an arc, a probe or G80) without saying it again; the program is not resumed there"
+            Some(Refusal::Motion(l)) => Some(logwords::say(
+                &self.lang,
+                Lg::ResMotion,
+                &[line.to_string(), l.to_string()],
             )),
-            Some(Refusal::FeedMode(l)) => Some(format!(
-                "resume: line {l} sets the feed by inverse time or per revolution (G93, G95), which cannot be restored; the program is not resumed at line {line}"
-            )),
-            Some(Refusal::TableLength(l)) => Some(format!(
-                "resume: line {l} takes a tool length offset from the table of the controller (G43), which cannot be restored; the program is not resumed at line {line}"
-            )),
+            Some(Refusal::FeedMode(l)) => why(Lg::ResFeedMode, l),
+            Some(Refusal::TableLength(l)) => why(Lg::ResTable, l),
             _ => None,
         }
     }
@@ -847,10 +907,10 @@ impl Session {
         self.resume_refusal(next).or_else(|| {
             // the recovery file is written every twenty lines, so the program may have gone that much further
             crate::recovery::offset_set_again(&self.program, next, margin, 20).map(|n| {
-                format!(
-                    "resume: line {} sets an offset (G10) that may have been taken already, so the lines before it would run in another place; the program is not resumed at line {}",
-                    n + 1,
-                    next + 1
+                logwords::say(
+                    &self.lang,
+                    Lg::ResOffsetAgain,
+                    &[(n + 1).to_string(), (next + 1).to_string()],
                 )
             })
         })
@@ -912,7 +972,22 @@ impl Session {
             applied: 0,
             advances,
             then,
+            inches_before: false,
         });
+    }
+
+    /// Hands a probe cycle to the emitter: its distances and feeds are millimetres whatever units the program left the controller in, and
+    /// a controller that was in inches goes back to them after it.
+    fn post_cycle(&mut self, mut steps: Vec<Step>, then: Then) {
+        let inches = self.modal.inches;
+        steps.insert(0, Step::Line("G21".to_string()));
+        if inches {
+            steps.push(Step::Line("G20".to_string()));
+        }
+        self.post(steps, false, then);
+        if let Some(f) = self.inflight.as_mut() {
+            f.inches_before = inches;
+        }
     }
 
     /// Takes into account the steps of the batch done up to `done`: the codes they set and the line the program is at.
@@ -951,7 +1026,7 @@ impl Session {
         }
         match outcome {
             None => {
-                self.say("the thread that sends the lines stopped");
+                self.note(Lg::ThreadStopped);
                 self.running = false;
                 self.paused = false;
             }
@@ -965,23 +1040,26 @@ impl Session {
                                 Some(Step::Line(l)) => l.clone(),
                                 _ => String::new(),
                             };
-                            format!("line {n} ({line})")
+                            logwords::say(&self.lang, Lg::LineWhat, &[n.to_string(), line])
                         }
                         Then::Resumed | Then::Positioned => {
                             let line = match f.steps.get(f.applied) {
                                 Some(Step::Line(l)) => l.clone(),
                                 _ => String::new(),
                             };
-                            format!("resume ({line})")
+                            format!("{} ({line})", logwords::what(&self.lang, "resume"))
                         }
                         Then::Probed | Then::Grid { .. } | Then::Setter { .. } => {
                             let line = match f.steps.get(f.applied) {
                                 Some(Step::Line(l)) => l.clone(),
                                 _ => String::new(),
                             };
-                            // a touch that fails leaves the controller in relative distances
+                            // a touch that fails leaves the controller in relative distances, and a cycle is run in millimetres
                             let _ = self.ctl().send_line("G90");
-                            format!("probe ({line})")
+                            if f.inches_before && self.ctl().send_line("G20").is_ok() {
+                                self.modal.apply("G20");
+                            }
+                            format!("{} ({line})", logwords::what(&self.lang, "probe"))
                         }
                     };
                     self.failed(&what, e);
@@ -994,7 +1072,7 @@ impl Session {
                             if ends && self.running {
                                 self.running = false;
                                 self.paused = false;
-                                self.say("program done");
+                                self.note(Lg::ProgramDone);
                             }
                         }
                         Then::Resumed => self.paused = false,
@@ -1004,9 +1082,7 @@ impl Session {
                                 self.say(text);
                             }
                         }
-                        Then::Probed => {
-                            self.say("probe: touched, the zero of Z is set and the head is up")
-                        }
+                        Then::Probed => self.note(Lg::ProbeTouched),
                         Then::Grid { area, nx, ny } => self.finish_grid(area, nx, ny),
                         Then::Setter { cfg } => self.finish_setter(&cfg),
                     }
@@ -1019,17 +1095,15 @@ impl Session {
     /// Whether a probe cannot start now (and why, in the log). A probe moves the machine, so it is only made when the operator confirmed it.
     fn probe_refused(&mut self, what: &str, confirmed: bool) -> bool {
         if !confirmed {
-            self.say(format!(
-                "{what}: the machine would move and it was not confirmed"
-            ));
+            self.tell_about(Lg::NotConfirmed, what);
             return true;
         }
         if self.running {
-            self.say(format!("{what}: a program is running"));
+            self.tell_about(Lg::ProgramRunning, what);
             return true;
         }
         if self.alarm() {
-            self.say(format!("{what}: the controller is in alarm"));
+            self.tell_about(Lg::InAlarm, what);
             return true;
         }
         if self.refuse_busy(what) {
@@ -1037,7 +1111,7 @@ impl Session {
         }
         let has_probe = self.ctl().capabilities().probe;
         if !has_probe {
-            self.say(format!("{what}: this controller has no probe"));
+            self.tell_about(Lg::NoProbe, what);
             return true;
         }
         false
@@ -1051,15 +1125,15 @@ impl Session {
         }
         match z_touch_off_lines(cfg) {
             Ok(lines) => {
-                self.say(format!(
-                    "probe: down up to {} mm at {} mm/min, then Z is set to {} mm",
-                    cfg.depth_mm, cfg.feed_mm_min, cfg.plate_mm
-                ));
-                self.post(Self::steps_of(&lines), false, Then::Probed);
+                self.tell(
+                    Lg::ProbeStart,
+                    &[cfg.depth_mm, cfg.feed_mm_min, cfg.plate_mm].map(|v| v.to_string()),
+                );
+                self.post_cycle(Self::steps_of(&lines), Then::Probed);
                 true
             }
             Err(e) => {
-                self.say(format!("probe: {e}"));
+                self.trouble("probe", &e);
                 false
             }
         }
@@ -1088,12 +1162,12 @@ impl Session {
                         Act::Sample => Step::Sample,
                     })
                     .collect();
-                self.say(format!("probe: a grid of {nx} x {ny} points"));
-                self.post(steps, false, Then::Grid { area, nx, ny });
+                self.tell(Lg::GridStart, &[nx.to_string(), ny.to_string()]);
+                self.post_cycle(steps, Then::Grid { area, nx, ny });
                 true
             }
             Err(e) => {
-                self.say(format!("probe: {e}"));
+                self.trouble("probe", &e);
                 false
             }
         }
@@ -1117,12 +1191,12 @@ impl Session {
                         Act::Sample => Step::Sample,
                     })
                     .collect();
-                self.say("tool setter: the head goes to the setter and touches it");
-                self.post(steps, false, Then::Setter { cfg: *cfg });
+                self.note(Lg::SetterStart);
+                self.post_cycle(steps, Then::Setter { cfg: *cfg });
                 true
             }
             Err(e) => {
-                self.say(format!("tool setter: {e}"));
+                self.trouble("tool setter", &e);
                 false
             }
         }
@@ -1141,10 +1215,10 @@ impl Session {
             .and_then(|z| crate::toolsetter::length_from_touch(z, cfg))
         {
             Ok(length) => {
-                self.say(format!("tool setter: the tool measures {length:.3} mm"));
+                self.tell(Lg::SetterResult, &[format!("{length:.3}")]);
                 self.setter_length = Some(length);
             }
-            Err(e) => self.say(format!("tool setter: {e}")),
+            Err(e) => self.trouble("tool setter", &e),
         }
     }
 
@@ -1158,47 +1232,51 @@ impl Session {
         match HeightMap::from_readings(area, nx, ny, &readings) {
             Ok(map) => {
                 let (lo, hi) = map.span();
-                self.say(format!(
-                    "heightmap: {} points, the surface varies from {lo:.3} to {hi:.3} mm",
-                    readings.len()
-                ));
+                self.tell(
+                    Lg::MapPoints,
+                    &[
+                        readings.len().to_string(),
+                        format!("{lo:.3}"),
+                        format!("{hi:.3}"),
+                    ],
+                );
                 self.height_map = Some(map);
             }
-            Err(e) => self.say(format!("heightmap: {e}")),
+            Err(e) => self.trouble("heightmap", &e),
         }
     }
 
     /// Corrects the loaded program to follow the height map (the program as it was is kept, see [`Session::drop_height_correction`]).
     pub fn apply_height_map(&mut self, segment_mm: f64) -> bool {
         if self.running {
-            self.say("heightmap: a program is running");
+            self.tell_about(Lg::ProgramRunning, "heightmap");
             return false;
         }
         if self.uncorrected.is_some() {
-            self.say("heightmap: the program is corrected already");
+            self.note(Lg::MapAlready);
             return false;
         }
         let Some(result) = self
             .height_map
             .as_ref()
-            .map(|m| m.compensate(&self.program, segment_mm))
+            .map(|m| m.correct(&self.program, segment_mm))
         else {
-            self.say("heightmap: there is no map, probe a grid first");
+            self.note(Lg::MapNone);
             return false;
         };
         match result {
             Ok(out) => {
-                self.say(format!(
-                    "heightmap: the program is corrected ({} lines instead of {})",
-                    out.len(),
-                    self.program.len()
-                ));
+                self.tell(
+                    Lg::MapDone,
+                    &[out.len().to_string(), self.program.len().to_string()],
+                );
                 self.uncorrected = Some(std::mem::replace(&mut self.program, out));
                 self.next = 0;
                 true
             }
             Err(e) => {
-                self.say(format!("heightmap: {e}"));
+                let why = e.text(&self.lang);
+                self.trouble("heightmap", &why);
                 false
             }
         }
@@ -1213,7 +1291,7 @@ impl Session {
             Some(original) => {
                 self.program = original;
                 self.next = 0;
-                self.say("heightmap: the program is as it was");
+                self.note(Lg::MapBack);
                 true
             }
             None => false,
@@ -1239,7 +1317,7 @@ impl Session {
     pub fn start(&mut self) {
         self.collect();
         if self.alarm() {
-            self.say("start: the controller is in alarm");
+            self.tell_about(Lg::InAlarm, "start");
             return;
         }
         if self.paused {
@@ -1296,7 +1374,7 @@ impl Session {
         self.next = next;
         self.running = true;
         self.paused = true;
-        self.say(format!("program resumed at line {}", next + 1));
+        self.tell(Lg::ResumedAt, &[(next + 1).to_string()]);
     }
 
     /// Holds the program. While a line waits for its `ok` the hold goes to the controller out of turn.
@@ -1350,9 +1428,7 @@ impl Session {
             let code = crate::gcode::code_of(trimmed);
             if code.trim_start().starts_with('$') && !self.allow_system_lines {
                 let n = at + 1;
-                self.say(format!(
-                    "line {n} ({trimmed}): a line that starts with $ would change the controller itself, so the program stops here (program_system_commands in the settings file allows it)"
-                ));
+                self.tell(Lg::SystemLine, &[n.to_string(), trimmed.to_string()]);
                 self.running = false;
                 self.paused = false;
                 stopped_here = true;
@@ -1368,7 +1444,7 @@ impl Session {
         if steps.is_empty() {
             if ends && !stopped_here {
                 self.running = false;
-                self.say("program done");
+                self.note(Lg::ProgramDone);
             }
             self.refresh();
             return;
@@ -1405,7 +1481,8 @@ mod tests {
             s.set_lang(lang);
             s.mdi("G1 X1 F100");
             let last = s.log.last().cloned().unwrap_or_default();
-            assert!(last.starts_with("mdi: "), "{last}");
+            let asked = format!("{}: ", crate::logwords::what(lang, "mdi"));
+            assert!(last.starts_with(&asked), "{last}");
             assert!(!last.contains("Must home"), "{lang}: {last}");
             texts.push(last);
         }
@@ -2460,10 +2537,11 @@ G0 X2",
         assert_eq!(
             *sent.lock().unwrap(),
             vec![
+                "G21",
                 "G91",
                 "G38.2 Z-10 F20",
                 "G90",
-                "G10 L20 P1 Z1.2",
+                "G10 L20 P0 Z1.2",
                 "G91",
                 "G0 Z2",
                 "G90"
@@ -2475,6 +2553,115 @@ G0 X2",
             s.log
         );
         assert!(!s.busy());
+    }
+
+    #[test]
+    fn a_probe_cycle_runs_in_millimetres_and_a_controller_in_inches_goes_back_to_them() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        s.mdi("G20");
+        sent.lock().unwrap().clear();
+        assert!(s.probe_z(&ProbeCfg::default(), true));
+        s.wait_idle();
+        {
+            let lines = sent.lock().unwrap();
+            assert_eq!(lines.first().map(String::as_str), Some("G21"), "{lines:?}");
+            assert_eq!(lines.last().map(String::as_str), Some("G20"), "{lines:?}");
+        }
+        assert!(s.modal.inches);
+        sent.lock().unwrap().clear();
+        assert!(s.probe_grid([0.0, 0.0, 10.0, 10.0], 2, 2, &ProbeCfg::default(), true));
+        s.wait_idle();
+        assert_eq!(
+            sent.lock().unwrap().first().map(String::as_str),
+            Some("G21")
+        );
+        assert_eq!(sent.lock().unwrap().last().map(String::as_str), Some("G20"));
+        // a touch that fails puts the distances and the units back too
+        let (mut c, sent) = Touchy::new(|_, _| 0.0);
+        c.miss_at = Some(1);
+        let mut s = Session::new(Box::new(c));
+        s.mdi("G20");
+        assert!(s.probe_z(&ProbeCfg::default(), true));
+        s.wait_idle();
+        let lines = sent.lock().unwrap().clone();
+        assert_eq!(&lines[lines.len() - 2..], ["G90", "G20"], "{lines:?}");
+        assert!(s.modal.inches);
+        // in millimetres nothing else is added at the end
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        assert!(s.probe_z(&ProbeCfg::default(), true));
+        s.wait_idle();
+        assert_eq!(sent.lock().unwrap().last().map(String::as_str), Some("G90"));
+    }
+
+    #[test]
+    fn zero_writes_the_work_system_in_use_and_not_always_the_first() {
+        let (mut s, sent) = touchy_session(|_, _| 0.0);
+        // in G54 the order of the controller is used
+        s.zero();
+        assert!(sent.lock().unwrap().is_empty());
+        s.mdi("G55");
+        s.zero_axes(&[0, 2]);
+        assert_eq!(
+            sent.lock().unwrap().last().map(String::as_str),
+            Some("G10 L20 P0 X0 Z0")
+        );
+        s.zero();
+        assert_eq!(
+            sent.lock().unwrap().last().map(String::as_str),
+            Some("G10 L20 P0 X0 Y0 Z0")
+        );
+        assert!(!s.hand_shift);
+    }
+
+    #[test]
+    fn a_shift_of_the_zero_given_by_hand_is_kept_in_mind_until_it_is_taken_back() {
+        let (mut s, _) = touchy_session(|_, _| 0.0);
+        assert!(!s.hand_shift);
+        s.mdi("G92 X0");
+        assert!(s.hand_shift);
+        s.mdi("G4 P1");
+        assert!(s.hand_shift);
+        s.mdi("G92.1");
+        assert!(!s.hand_shift);
+        s.mdi("G92 Y0");
+        s.mdi("(a note) G92.2");
+        assert!(!s.hand_shift);
+        s.mdi("G92.3");
+        assert!(s.hand_shift);
+    }
+
+    #[test]
+    fn the_log_and_the_reasons_not_to_resume_are_told_in_the_language_of_the_window() {
+        let mut s = session();
+        s.set_lang("es");
+        s.load("G91\nG1 X1 F10\nG1 X2");
+        assert!(!s.resume_at_safe(2, 4.0, 0.0));
+        assert!(
+            s.log
+                .last()
+                .is_some_and(|l| l.starts_with("reanudación:") && l.contains("(G91)")),
+            "{:?}",
+            s.log
+        );
+        s.load("G0 X1\nG92 X0\nG0 X2");
+        let why = s.resume_refusal(2).unwrap();
+        assert!(why.contains("línea 2") && why.contains("línea 3"), "{why}");
+        s.load("G0 X1");
+        s.start();
+        s.jog(0, 1.0);
+        assert!(s
+            .log
+            .iter()
+            .any(|l| l == "desplazamiento manual: hay un programa en marcha"));
+        s.pump(10);
+        assert!(
+            s.log.iter().any(|l| l == "programa terminado"),
+            "{:?}",
+            s.log
+        );
+        s.set_lang("de");
+        s.estop();
+        assert_eq!(s.log.last().map(String::as_str), Some("NOT-HALT"));
     }
 
     #[test]
@@ -2507,7 +2694,7 @@ G0 X2",
         assert!(s.drop_height_correction());
         assert!(!s.corrected() && s.program == original);
         // a program that leaves the probed area is not corrected
-        s.load("G1 X50 F10");
+        s.load("G0 X0 Y0 Z1\nG1 X50 F10");
         assert!(!s.apply_height_map(5.0));
         assert!(
             s.log.iter().any(|l| l.contains("probed area")),
@@ -2515,7 +2702,7 @@ G0 X2",
             s.log
         );
         // loading another program forgets the way back
-        s.load("G1 X1 F10");
+        s.load("G0 X0 Y0 Z1\nG1 X1 F10");
         assert!(s.apply_height_map(5.0));
         s.load("G1 X2 F10");
         assert!(!s.corrected());

@@ -27,17 +27,14 @@ impl App {
             1 => self.open(&paths[0]),
             _ => {
                 if !self.machine_idle() {
-                    self.session
-                        .log
-                        .push("queue: a program is running; stop it first".into());
+                    self.log_note(crate::logwords::Lg::QueueBusy);
                     return;
                 }
                 self.queue = Queue::new(paths);
                 self.queue_seen = false;
                 self.queue_gate = None;
-                self.session
-                    .log
-                    .push(format!("queue: {} programs", self.queue.items.len()));
+                let count = self.queue.items.len().to_string();
+                self.log_tell(crate::logwords::Lg::QueueCount, &[count]);
                 self.queue_next();
             }
         }
@@ -49,7 +46,7 @@ impl App {
         let Some(i) = self.queue.begin_next() else {
             if self.queue.finished() {
                 self.queue.active = false;
-                self.session.log.push("queue: all programs are done".into());
+                self.log_note(crate::logwords::Lg::QueueAllDone);
             }
             return;
         };
@@ -62,10 +59,8 @@ impl App {
         let path = self.queue.items[i].path.clone();
         if !self.load_file(&path) || self.session.program.iter().all(|l| l.trim().is_empty()) {
             self.queue.finish(false);
-            self.session.log.push(format!(
-                "queue: {} cannot be run; the queue stops",
-                self.queue.name_of(i)
-            ));
+            let name = self.queue.name_of(i);
+            self.log_tell(crate::logwords::Lg::QueueCannotRun, &[name]);
             return;
         }
         self.request_start();
@@ -140,9 +135,7 @@ impl App {
             {
                 self.queue_gate = None;
                 self.queue.unstart();
-                self.session
-                    .log
-                    .push("queue: stopped before the next run".into());
+                self.log_note(crate::logwords::Lg::QueueStoppedNext);
             } else if self.session.running {
                 // the operator started the run by hand: it is that run
                 self.queue_gate = None;
@@ -171,24 +164,18 @@ impl App {
             if ok {
                 self.queue_next();
             } else {
-                self.session.log.push(format!(
-                    "queue: {} did not finish; the queue stops",
-                    self.queue.name_of(i)
-                ));
+                let name = self.queue.name_of(i);
+                self.log_tell(crate::logwords::Lg::QueueNotFinished, &[name]);
             }
         } else if !matches!(self.win, Some(Win::Summary(_) | Win::Between(_))) {
             // the start did not happen: a controller in alarm is a failure, a summary that was closed is the operator's choice
             if self.session.alarm() {
                 self.queue.finish(false);
-                self.session.log.push(format!(
-                    "queue: {} could not start; the queue stops",
-                    self.queue.name_of(i)
-                ));
+                let name = self.queue.name_of(i);
+                self.log_tell(crate::logwords::Lg::QueueNotStarted, &[name]);
             } else {
                 self.queue.unstart();
-                self.session
-                    .log
-                    .push("queue: stopped before the start".into());
+                self.log_note(crate::logwords::Lg::QueueStoppedBefore);
             }
         }
     }
@@ -314,9 +301,7 @@ impl App {
             Some(false) => {
                 // the run waits: going on with the queue begins it again
                 self.queue.unstart();
-                self.session
-                    .log
-                    .push("queue: stopped before the next run".into());
+                self.log_note(crate::logwords::Lg::QueueStoppedNext);
                 None
             }
             None => Some(Win::Between(i)),
@@ -460,9 +445,7 @@ impl App {
         if cancel_wait {
             self.queue_gate = None;
             self.queue.unstart();
-            self.session
-                .log
-                .push("queue: stopped before the next run".into());
+            self.log_note(crate::logwords::Lg::QueueStoppedNext);
         }
         if cont {
             self.queue_continue();

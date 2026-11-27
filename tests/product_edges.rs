@@ -265,8 +265,10 @@ fn a_program_that_the_map_cannot_correct_is_refused_naming_the_line() {
 #[test]
 fn a_move_that_leaves_the_probed_area_is_refused() {
     let m = tilted();
-    let e = m.compensate(&l(&["G1 X20"]), 5.0).unwrap_err();
-    assert!(e.starts_with("line 1:") && e.contains("probed area"), "{e}");
+    let e = m
+        .compensate(&l(&["G0 X0 Y0 Z1", "G1 X20"]), 5.0)
+        .unwrap_err();
+    assert!(e.starts_with("line 2:") && e.contains("probed area"), "{e}");
     let rapid = m.compensate(&l(&["G0 X50 Y50 Z5"]), 5.0).unwrap_err();
     assert!(rapid.contains("probed area"), "{rapid}");
     assert_eq!(
@@ -278,7 +280,7 @@ fn a_move_that_leaves_the_probed_area_is_refused() {
 #[test]
 fn the_length_of_a_piece_has_an_exact_minimum() {
     let m = tilted();
-    let prog = l(&["G1 X1"]);
+    let prog = l(&["G0 X0 Y0 Z1", "G1 X1"]);
     assert!(m.compensate(&prog, 0.01).is_ok());
     for bad in [0.009, 0.0, -1.0, f64::NAN, f64::INFINITY] {
         assert!(m.compensate(&prog, bad).is_err(), "{bad}");

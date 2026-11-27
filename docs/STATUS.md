@@ -6,6 +6,8 @@ EH3D-PHOENIX-CNC works on a computer against simulated machines: a docking windo
 
 ## Recent work
 
+A pass over what prepares and drives a program. Probe and tool setter cycles run in millimetres whatever units were left; zero and touch-off write the work system in use; the height map refuses what it cannot correct and invents no position; a mirror and a transformation no longer change what they should not; a macro that starts the spindle asks; the recovery file stays until the machine stands still and a zero shifted by hand refuses a recovery; DXF, SVG and plotter drawings are read with their units, transformations and arcs or refused; the log, the resume refusals and the server and queue lines are in the eight languages; and the head of the path view fits a narrow panel. Decisions taken the cautious way: what cannot be corrected, measured or rebuilt is refused. All of it with simulators and host tests.
+
 A safety pass over the link to the server, the queue and the starts in the middle of a program. The emergency stop of the window also goes to the machine of the server; a running program cannot be replaced; a stop or an alarm stops the queue, also between two runs; a restart says its way of moving; and a start is refused where an arc goes on unsaid, with `G93`, `G95` or `G43`. Decisions taken the cautious way: the emergency stop is sent to the server whenever a job is not known to be over (a latched machine needs an administrator to release it), and what cannot be written back is refused instead of guessed. All of it with simulators and a stand-in server. Board files with an error are refused, and so is a drill file whose format, zeros or units would be supposed (`pcb_allow_assumed_drill`, off).
 
 The window has a panel «Attachments» (the shared `eh3d-attachpanel`): the data sheets, manuals and other files of the project are listed, attached, linked to a part, extracted and removed after a question, and shown beside the list (`eh3d-project.md`). The panel itself is tested in EH3D-COMMON; it has not been tried on a screen by a person.
@@ -14,7 +16,7 @@ The menu File of the window opens, saves, imports, takes and extracts an `.eh3d`
 
 ## Capabilities
 
-The official state of each capability is in `REQUIREMENTS.md`. The register has 167 requirements: 158 implemented, 2 prototype, 7 planned and 0 validated. By progress: 158 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
+The official state of each capability is in `REQUIREMENTS.md`. The register has 191 requirements: 182 implemented, 2 prototype, 7 planned and 0 validated. By progress: 182 done, 2 partial, 1 pending and 6 blocked. This page never states a state that `REQUIREMENTS.md` does not.
 
 ## Open questions
 
@@ -25,12 +27,12 @@ The official state of each capability is in `REQUIREMENTS.md`. The register has 
 ## What it needs from other repositories
 
 * EH3D-COMMON: the controller interface and the simulated controller, the view, the docking frame, the server client and the project container. The workflows take its tag v0.3.7.
-* EH3D-CORE-LIBS: the readers of Gerber and Excellon files. The workflows take its commit 551aea3fcf793867b2503fff76823b24513a5f50, until a release holds the notices of what the drill reader supposes.
+* EH3D-CORE-LIBS: the readers of Gerber and Excellon files. The workflows take its tag v0.1.4, which holds the notices of what the drill reader supposes.
 * A real machine with GRBL, grblHAL, Marlin or Klipper, a probe, a tool setter and a changer, for the proofs that no simulator can give.
 
 ## Known technical debt and omitted tests
 
-* 1249 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
+* 1275 tests (`#[test]` lines of `src/` and `tests/`; nine of them keep this register true); all of them run on a computer against simulated machines, with fixed seeds where chance is involved.
 * No test has driven a real controller: the serial port is built behind a feature and has never been opened on a machine.
 * The look of the window has been seen on a computer by its pictures only; no operator has used it at a machine.
 * The look-ahead and the time estimates are checked for consistency, never against the time a real machine takes.

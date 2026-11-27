@@ -201,6 +201,7 @@ pub enum Msg {
     TfDone,
     TfNothing,
     TfWhyScale,
+    TfWhyUnreadable,
     TfWhyRelative,
     TfWhyPlane,
     TfWhyCycle,
@@ -480,7 +481,7 @@ pub enum Msg {
 }
 
 /// All the messages, so a test can walk through them.
-pub const ALL: [Msg; 469] = [
+pub const ALL: [Msg; 470] = [
     Msg::NoUnits,
     Msg::UnitSwitch,
     Msg::Stored,
@@ -674,6 +675,7 @@ pub const ALL: [Msg; 469] = [
     Msg::TfDone,
     Msg::TfNothing,
     Msg::TfWhyScale,
+    Msg::TfWhyUnreadable,
     Msg::TfWhyRelative,
     Msg::TfWhyPlane,
     Msg::TfWhyCycle,
@@ -2874,6 +2876,16 @@ fn table(m: Msg) -> [&'static str; 8] {
             "変更なし：すべての値が元のままです",
             "无需更改：所有值都保持原样",
             "Nada a alterar: todos os valores estão como estavam",
+        ],
+        Msg::TfWhyUnreadable => [
+            "Line {0}: a word of the line cannot be read, so it cannot be transformed",
+            "Línea {0}: una palabra de la línea no se puede leer, así que no se puede transformar",
+            "Zeile {0}: ein Wort der Zeile ist nicht lesbar, sie lässt sich nicht transformieren",
+            "Ligne {0} : un mot de la ligne est illisible, elle ne peut pas être transformée",
+            "Riga {0}: una parola della riga non è leggibile, quindi non si può trasformare",
+            "{0} 行目：読み取れない語があるため変換できません",
+            "第 {0} 行：该行中有无法读取的字，无法变换",
+            "Linha {0}: uma palavra da linha não pode ser lida, por isso não se pode transformar",
         ],
         Msg::TfWhyScale => [
             "The scale must be a number above 0 (to turn a shape over, use the mirror)",
@@ -5708,7 +5720,7 @@ mod tests {
         for m in ALL {
             assert!(seen.insert(m), "{m:?} twice");
         }
-        assert_eq!(seen.len(), 469);
+        assert_eq!(seen.len(), 470);
     }
 
     #[test]

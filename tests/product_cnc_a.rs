@@ -1322,7 +1322,7 @@ fn the_touch_off_of_z_is_seven_lines_with_the_values_of_the_probe() {
             "G91",
             "G38.2 Z-10 F20",
             "G90",
-            "G10 L20 P1 Z0",
+            "G10 L20 P0 Z0",
             "G91",
             "G0 Z2",
             "G90"
@@ -1334,7 +1334,7 @@ fn the_touch_off_of_z_is_seven_lines_with_the_values_of_the_probe() {
         ..cfg()
     };
     let l = z_touch_off_lines(&plate).unwrap();
-    assert_eq!(l[3], "G10 L20 P1 Z1.5");
+    assert_eq!(l[3], "G10 L20 P0 Z1.5");
     assert_eq!(l[5], "G0 Z3");
 }
 

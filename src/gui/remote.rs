@@ -2,6 +2,7 @@
 //! that stopped is taken up again from the line the server reached, and the server asks the operator before the first move (the job waits, and Start lets it go).
 
 use super::*;
+use crate::logwords::Lg;
 use crate::server::{job_request, Client, Follow, Start};
 
 impl App {
@@ -46,14 +47,26 @@ impl App {
         let Some(client) = self.server_client() else {
             let lang = self.server_lang();
             let said = crate::server::estop_lost_notice(lang);
-            self.session.log.push(format!("server: {said}"));
+            self.log_tell(Lg::SrvSays, &[said.to_string()]);
             return;
         };
         self.server_estops.push(crate::server::emergency_now(
             client,
             self.lang.code().to_string(),
         ));
-        self.session.log.push("server: emergency stop sent".into());
+        self.log_note(Lg::SrvEstopSent);
+    }
+
+    /// A message of the log with no holes, in the language of the window.
+    pub(super) fn log_note(&mut self, message: Lg) {
+        let line = crate::logwords::text(self.lang.code(), message);
+        self.session.log.push(line.to_string());
+    }
+
+    /// A message of the log in the language of the window.
+    pub(super) fn log_tell(&mut self, message: Lg, args: &[String]) {
+        let line = crate::logwords::say(self.lang.code(), message, args);
+        self.session.log.push(line);
     }
 
     fn server_lang(&self) -> eh3d_serverclient::Lang {
@@ -62,10 +75,11 @@ impl App {
 
     /// Writes in the log what the server answered to the emergency stops that were sent.
     fn estop_tick(&mut self, ctx: &egui::Context) {
+        let code = self.lang.code();
         let log = &mut self.session.log;
         self.server_estops.retain(|answer| match answer.try_recv() {
             Ok(Ok(said) | Err(said)) => {
-                log.push(format!("server: {said}"));
+                log.push(crate::logwords::say(code, Lg::SrvSays, &[&said]));
                 false
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => true,
@@ -151,9 +165,7 @@ impl App {
     /// Sends the program to the server and starts it there. `skip` is how many lines are already done.
     pub(super) fn send_to_server(&mut self, skip: usize) {
         let Some(client) = self.server_client() else {
-            self.session
-                .log
-                .push("server: the address and the machine are not set in the settings".into());
+            self.log_note(Lg::SrvNoSettings);
             return;
         };
         if self.session.program.is_empty() {
@@ -161,11 +173,9 @@ impl App {
         }
         let request = self.program_request(skip);
         self.start_following(Follow::start(client, Start::Send(request)));
-        self.session.log.push(format!(
-            "server: sending {} ({} lines)",
-            self.program_name(),
-            self.session.program.len()
-        ));
+        let name = self.program_name();
+        let count = self.session.program.len().to_string();
+        self.log_tell(Lg::SrvSending, &[name, count]);
     }
 
     /// Takes up a job the server already has (the program was closed while it ran); if it ended without finishing, the program goes on from `skip`.
@@ -175,9 +185,7 @@ impl App {
             .session
             .recovery_refusal(skip, self.settings.resume_backoff_lines as usize);
         let Some(client) = self.server_client() else {
-            self.session
-                .log
-                .push("server: the address and the machine are not set in the settings".into());
+            self.log_note(Lg::SrvNoSettings);
             return;
         };
         let again = match refusal {
@@ -185,9 +193,7 @@ impl App {
             None => Ok(self.program_request(skip)),
         };
         self.start_following(Follow::start(client, Start::Attach { id, again }));
-        self.session
-            .log
-            .push(format!("server: following the job (line {})", skip + 1));
+        self.log_tell(Lg::SrvFollowing, &[(skip + 1).to_string()]);
     }
 
     fn start_following(&mut self, f: Follow) {
@@ -209,34 +215,33 @@ impl App {
         let total = self.session.program.len();
         if key != self.server_key {
             if let Some(i) = &snap.info {
-                let pause = if i.pause.is_empty() {
-                    String::new()
-                } else {
-                    format!(" ({})", i.pause)
-                };
-                self.session.log.push(format!(
-                    "server: {}{} - {}%, line {}",
-                    i.state,
-                    pause,
-                    i.percent(),
-                    i.line + 1
-                ));
+                let code = self.lang.code();
+                let mut state = crate::logwords::job_state(code, &i.state);
+                if !i.pause.is_empty() {
+                    let pause = crate::logwords::job_state(code, &i.pause);
+                    state = format!("{state} ({pause})");
+                }
+                self.log_tell(
+                    Lg::SrvState,
+                    &[state, i.percent().to_string(), (i.line + 1).to_string()],
+                );
                 if i.pause == "resume" {
                     let lang = eh3d_serverclient::Lang::from_tag(self.settings.lang.code())
                         .unwrap_or(eh3d_serverclient::Lang::En);
-                    self.session
-                        .log
-                        .push(format!("server: {}", crate::server::resume_notice(lang)));
+                    let notice = crate::server::resume_notice(lang);
+                    self.log_tell(Lg::SrvSays, &[notice.to_string()]);
                 }
                 if !i.message.is_empty() {
-                    self.session.log.push(format!("server: {}", i.message));
+                    let line = crate::logwords::say(self.lang.code(), Lg::SrvSays, &[&i.message]);
+                    self.session.log.push(line);
                 }
             }
             self.server_key = key;
         }
         if snap.error != self.server_err || snap.failed_orders > self.server_snap.failed_orders {
             if let Some(e) = &snap.error {
-                self.session.log.push(format!("server: {e}"));
+                let line = crate::logwords::say(self.lang.code(), Lg::SrvSays, &[e]);
+                self.session.log.push(line);
             }
             self.server_err = snap.error.clone();
         }
@@ -262,6 +267,7 @@ impl App {
                     total,
                     job: i.id.clone(),
                     sha256: recovery::program_hash(&self.session.program),
+                    shifted: false,
                 };
                 if r.save(&path).is_ok() {
                     self.recovery_saved = Some(i.line);
@@ -270,9 +276,9 @@ impl App {
         }
         if snap.link != self.server_snap.link {
             if let Some(link) = snap.link {
-                self.session
-                    .log
-                    .push(format!("server: link {}", crate::server::link_word(link)));
+                let word =
+                    crate::logwords::job_state(self.lang.code(), crate::server::link_word(link));
+                self.log_tell(Lg::SrvLink, &[word]);
             }
         }
         let over = snap.over;

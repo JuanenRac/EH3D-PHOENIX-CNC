@@ -203,6 +203,19 @@
           }
         },
         {
+          "name": "logwords.rs",
+          "desc": {
+            "en": "the words of the log, the resume refusals and the server link",
+            "es": "los textos del registro, de las reanudaciones y del servidor",
+            "de": "die Texte des Protokolls, der Fortsetzung und des Servers",
+            "fr": "les textes du journal, des reprises et du serveur",
+            "it": "i testi del registro, delle riprese e del server",
+            "ja": "ログ、再開、サーバー接続の文言",
+            "zh": "日志、继续运行和服务器连接的文字",
+            "pt": "os textos do registo, das retomas e do servidor"
+          }
+        },
+        {
           "name": "report.rs",
           "desc": {
             "en": "the report of --report: statistics, time, what looks wrong",

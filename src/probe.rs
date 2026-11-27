@@ -57,15 +57,15 @@ impl ProbeCfg {
     }
 }
 
-/// The lines of the Z cycle: down until the probe closes (relative move), the work zero set to the thickness of the plate (`G10 L20 P1`,
-/// the first coordinate system), back to absolute distances and up by the retract.
+/// The lines of the Z cycle: down until the probe closes (relative move), the work zero set to the thickness of the plate (`G10 L20 P0`,
+/// the work system in use, `G54` to `G59`), back to absolute distances and up by the retract.
 pub fn z_touch_off_lines(cfg: &ProbeCfg) -> Result<Vec<String>, String> {
     cfg.check()?;
     Ok(vec![
         "G91".to_string(),
         format!("G38.2 Z-{} F{}", num(cfg.depth_mm), num(cfg.feed_mm_min)),
         "G90".to_string(),
-        format!("G10 L20 P1 Z{}", num(cfg.plate_mm)),
+        format!("G10 L20 P0 Z{}", num(cfg.plate_mm)),
         "G91".to_string(),
         format!("G0 Z{}", num(cfg.retract_mm)),
         "G90".to_string(),
@@ -235,7 +235,7 @@ mod tests {
                 "G91",
                 "G38.2 Z-10 F20",
                 "G90",
-                "G10 L20 P1 Z1.5",
+                "G10 L20 P0 Z1.5",
                 "G91",
                 "G0 Z2",
                 "G90"

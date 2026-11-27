@@ -859,6 +859,32 @@ mod layout_tests {
     }
 
     #[test]
+    fn the_head_of_the_path_view_and_the_size_of_the_table_are_whole_in_every_language() {
+        let mut a = App::isolated();
+        for lang in Lang::ALL {
+            a.lang = lang;
+            for width in [320.0, 412.0, 676.0, 900.0] {
+                let size = Vec2::new(width, 520.0);
+                let texts = painted(size, |ui| a.panel_viewer(ui));
+                for label in [
+                    Text::ViewPlan,
+                    Text::ViewMachine,
+                    Text::ResetView,
+                    Text::NavHint2d,
+                ] {
+                    whole(&texts, a.t(label), size);
+                }
+                let table = texts
+                    .iter()
+                    .find(|t| t.0.ends_with(" mm") && t.0.contains(" x "))
+                    .map(|t| t.0.clone())
+                    .expect("the size of the table is drawn");
+                whole(&texts, &table, size);
+            }
+        }
+    }
+
+    #[test]
     fn the_jog_pad_cuts_no_button_in_a_narrow_panel() {
         let mut a = App::isolated();
         let tall = [220.0, 260.0, 300.0, 360.0, 412.0, 440.0, 520.0, 700.0].map(|w| (w, 700.0));

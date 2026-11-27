@@ -16,6 +16,8 @@ pub struct Recovery {
     pub job: String,
     /// The SHA-256 of the program (its lines joined by line breaks) when it was saved; empty in a file that an older version wrote.
     pub sha256: String,
+    /// The work zero had been shifted by hand (`G92`): a reset of the controller takes the shift away, so the program is not resumed.
+    pub shifted: bool,
 }
 
 /// The SHA-256 of a program, as the recovery file keeps it.
@@ -31,14 +33,18 @@ pub fn program_hash(lines: &[String]) -> String {
 
 impl Recovery {
     pub fn to_text(&self) -> String {
-        format!(
+        let mut text = format!(
             "file={}\nnext={}\ntotal={}\njob={}\nsha256={}\n",
             self.file.replace(['\r', '\n'], " "),
             self.next,
             self.total,
             self.job.replace(['\r', '\n'], " "),
             self.sha256.replace(['\r', '\n'], " ")
-        )
+        );
+        if self.shifted {
+            text.push_str("shifted=yes\n");
+        }
+        text
     }
 
     /// Reads what `to_text` wrote; `None` when it is not one (a file that is cut or from another program).
@@ -58,6 +64,7 @@ impl Recovery {
                 "total" => r.total = v.trim().parse().ok()?,
                 "job" => r.job = v.trim().to_string(),
                 "sha256" => r.sha256 = v.trim().to_string(),
+                "shifted" => r.shifted = v.trim() != "no",
                 _ => {}
             }
         }
@@ -157,6 +164,7 @@ mod tests {
             total: 400,
             job: "j1a2b3c4d".to_string(),
             sha256: program_hash(&["G0 X1".to_string()]),
+            shifted: false,
         };
         assert_eq!(Recovery::parse(&r.to_text()), Some(r));
     }
@@ -191,6 +199,7 @@ mod tests {
             total: 9,
             job: String::new(),
             sha256: String::new(),
+            shifted: false,
         };
         let back = Recovery::parse(&r.to_text()).unwrap();
         assert_eq!(back.next, 5);
@@ -238,11 +247,32 @@ mod tests {
             total: 9,
             job: String::new(),
             sha256: String::new(),
+            shifted: false,
         };
         r.save(&p).unwrap();
         assert_eq!(Recovery::load(&p), Some(r));
         Recovery::clear(&p);
         assert!(Recovery::load(&p).is_none());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_shift_of_the_zero_given_by_hand_goes_with_the_recovery() {
+        let r = Recovery {
+            file: "a.nc".into(),
+            next: 1,
+            total: 4,
+            job: String::new(),
+            sha256: String::new(),
+            shifted: true,
+        };
+        assert!(r.to_text().contains("shifted=yes\n"));
+        assert_eq!(Recovery::parse(&r.to_text()), Some(r));
+        // a file written before says nothing of it
+        assert!(
+            !Recovery::parse("file=a.nc\nnext=1\ntotal=4\n")
+                .unwrap()
+                .shifted
+        );
     }
 }

@@ -192,6 +192,7 @@ fn recovery() -> Recovery {
         total: 100,
         job: "job-7".into(),
         sha256: program_hash(&lines("G0 X1\nG1 X2")),
+        shifted: false,
     }
 }
 
