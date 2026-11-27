@@ -17,6 +17,97 @@ pub enum Refusal {
     Cycle(usize),
     /// A cutter compensation (`G41`, `G42`) is on; the line is the one that started it (from 1).
     Compensation(usize),
+    /// The program goes on in an arc, a probe or after `G80` without saying so again; the line is the one that set that way of moving (from 1).
+    Motion(usize),
+    /// The feed is inverse time or per revolution (`G93`, `G95`); the line is the one that set it (from 1).
+    FeedMode(usize),
+    /// A tool length offset from the table of the controller (`G43`, `G43.2`) is on; the line is the one that set it (from 1).
+    TableLength(usize),
+}
+
+/// Whether the lines from `rest` on move in the way of moving that was in force before them: the first line that moves names axes and no motion code.
+fn relies_on_motion(rest: &[String]) -> bool {
+    for line in rest {
+        let ws = words(line);
+        let has = |codes: &[i32]| {
+            ws.iter()
+                .any(|&(l, v)| l == 'G' && codes.contains(&((v * 10.0).round() as i32)))
+        };
+        let states = ws.iter().any(|&(l, v)| {
+            let t = (v * 10.0).round() as i32;
+            l == 'G'
+                && (matches!(t, 0 | 10 | 20 | 30 | 800)
+                    || (381..=385).contains(&t)
+                    || (810..=890).contains(&t))
+        });
+        let ends = ws
+            .iter()
+            .any(|&(l, v)| l == 'M' && matches!(v as i32, 2 | 30));
+        if states || ends {
+            return false;
+        }
+        // these take the axis words for themselves
+        if has(&[100, 280, 300, 431, 920]) {
+            continue;
+        }
+        if ws
+            .iter()
+            .any(|&(l, _)| matches!(l, 'X' | 'Y' | 'Z' | 'A' | 'B' | 'C' | 'I' | 'J' | 'K'))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// What is in force at `index` (from 0) that a program cannot be given back when it starts there: the feed mode (`G93`, `G95`), a tool length offset
+/// of the table of the controller (`G43`), and a way of moving other than `G0` or `G1` that the lines from there on take without saying it again.
+pub fn state_refusal(program: &[String], index: usize) -> Option<Refusal> {
+    let index = index.min(program.len());
+    let mut modal = Modal::default();
+    let (mut motion, mut feed_mode, mut table) = (0usize, None, None);
+    for (n, line) in program[..index].iter().enumerate() {
+        modal.apply(line);
+        for (letter, v) in words(line) {
+            if letter != 'G' {
+                continue;
+            }
+            match (v * 10.0).round() as i32 {
+                20 | 30 | 381..=385 | 800 => motion = n + 1,
+                930 | 950 => feed_mode = Some(n + 1),
+                940 => feed_mode = None,
+                430 | 432 => table = Some(n + 1),
+                431 | 490 => table = None,
+                _ => {}
+            }
+        }
+    }
+    if let Some(l) = feed_mode {
+        return Some(Refusal::FeedMode(l));
+    }
+    if let Some(l) = table {
+        return Some(Refusal::TableLength(l));
+    }
+    (!matches!(modal.motion, 0 | 1) && relies_on_motion(&program[index..]))
+        .then_some(Refusal::Motion(motion))
+}
+
+/// Whether the feed and the tool length offset in force at `index` (from 0) were given in inches: `(feed, offset)`. A value that is written again has
+/// to be written under the units it was given in, whatever units the program changed to afterwards.
+pub fn units_of_values(program: &[String], index: usize) -> (bool, bool) {
+    let mut modal = Modal::default();
+    let (mut feed, mut offset) = (false, false);
+    for line in &program[..index.min(program.len())] {
+        modal.apply(line);
+        for (letter, v) in words(line) {
+            match letter {
+                'F' if v > 0.0 => feed = modal.inches,
+                'G' if (v * 10.0).round() as i32 == 431 => offset = modal.inches,
+                _ => {}
+            }
+        }
+    }
+    (feed, offset)
 }
 
 /// Something to read before the start; none of them stops it.
@@ -98,6 +189,7 @@ pub fn check(program: &[String], index: usize) -> StartCheck {
         Some(Refusal::Cycle(l))
     } else {
         comp.map(Refusal::Compensation)
+            .or_else(|| state_refusal(program, index))
     };
     let mut notes = Vec::new();
     if modal.inches {
@@ -157,11 +249,8 @@ fn no_feed_before_a_cut(rest: &[String], modal: &Modal) -> bool {
             return false;
         }
         let ws = words(t);
-        let arc = ws
-            .iter()
-            .any(|&(l, v)| l == 'G' && matches!((v * 10.0).round() as i32, 20 | 30));
         let moves = ws.iter().any(|&(l, _)| matches!(l, 'X' | 'Y' | 'Z'));
-        if (m.motion == 1 || arc) && moves {
+        if matches!(m.motion, 1..=3) && moves {
             return true;
         }
     }
@@ -250,6 +339,50 @@ mod tests {
         assert!(check(&lines("G90\nG0 X1\nG2 X2 Y2 I1 J0"), 1)
             .notes
             .contains(&Note::NoFeed));
+    }
+
+    #[test]
+    fn a_line_that_goes_on_in_an_arc_without_saying_so_cannot_be_started_from() {
+        let p = lines("G21 G90 F100\nG1 X0 Y0\nG2 X10 Y0 I5 J0\nX20 Y0 I5 J0\nG1 X30\nM30");
+        assert_eq!(check(&p, 3).refusal, Some(Refusal::Motion(3)));
+        // the line that says its own way of moving is fine, and so is the arc itself
+        assert_eq!(check(&p, 2).refusal, None);
+        assert_eq!(check(&p, 4).refusal, None);
+        // a line that moves nothing comes first: the arc after it is still taken without saying it
+        let q = lines("G3 X1 Y1 I1 J0 F50\nM8\n(note)\nG92 X0\nX2 Y2 I1 J0");
+        assert_eq!(state_refusal(&q, 1), Some(Refusal::Motion(1)));
+        // after G80 a bare move has no way of moving at all
+        let r = lines("G0 X0\nG80\nX5\nM30");
+        assert_eq!(state_refusal(&r, 2), Some(Refusal::Motion(2)));
+        assert_eq!(state_refusal(&r, 99), None);
+    }
+
+    #[test]
+    fn a_feed_mode_and_a_table_offset_that_cannot_be_written_back_refuse_the_start() {
+        let p = lines("G93\nG1 X1 F2\nG1 X2 F2\nG94\nG1 X3 F100");
+        assert_eq!(check(&p, 2).refusal, Some(Refusal::FeedMode(1)));
+        assert_eq!(check(&p, 4).refusal, None);
+        assert_eq!(
+            check(&lines("G95\nG1 X1 F0.1\nG1 X2"), 2).refusal,
+            Some(Refusal::FeedMode(1))
+        );
+        let t = lines("G43 H2\nG0 Z5\nG49\nG0 Z1");
+        assert_eq!(check(&t, 1).refusal, Some(Refusal::TableLength(1)));
+        assert_eq!(check(&t, 3).refusal, None);
+        assert_eq!(
+            check(&lines("G43.2 H1\nG0 X1"), 1).refusal,
+            Some(Refusal::TableLength(1))
+        );
+        assert_eq!(check(&lines("G43.1 Z-1\nG0 X1"), 1).refusal, None);
+    }
+
+    #[test]
+    fn the_units_a_value_was_given_in_are_kept_after_the_program_changes_them() {
+        let p = lines("G20 F10\nG43.1 Z-1\nG21\nG1 X1");
+        assert_eq!(units_of_values(&p, 4), (true, true));
+        assert_eq!(units_of_values(&p, 0), (false, false));
+        let q = lines("G21 F100\nG20\nG43.1 Z-1");
+        assert_eq!(units_of_values(&q, 99), (false, true));
     }
 
     #[test]

@@ -112,6 +112,62 @@ pub fn resume_notice(lang: sc::Lang) -> &'static str {
     }
 }
 
+/// What is said when the order to stop could not be given to the server.
+pub fn stop_lost_notice(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "The order to stop did not reach the server: the machine may still be moving. Use the emergency stop of the machine itself",
+        sc::Lang::Es => "La orden de parar no ha llegado al servidor: la máquina puede seguir moviéndose. Usa la parada de emergencia de la propia máquina",
+        sc::Lang::It => "L'ordine di arresto non è arrivato al server: la macchina può essere ancora in movimento. Usa l'arresto di emergenza della macchina stessa",
+        sc::Lang::De => "Der Stoppbefehl hat den Server nicht erreicht: die Maschine bewegt sich vielleicht noch. Den Not-Halt der Maschine selbst benutzen",
+        sc::Lang::Fr => "L'ordre d'arrêt n'est pas arrivé au serveur : la machine bouge peut-être encore. Utilisez l'arrêt d'urgence de la machine elle-même",
+        sc::Lang::Pt => "A ordem de parar não chegou ao servidor: a máquina pode continuar em movimento. Use a paragem de emergência da própria máquina",
+        sc::Lang::Zh => "停止指令未送达服务器：机床可能仍在运动。请使用机床本身的急停按钮",
+        sc::Lang::Ja => "停止の指示がサーバーに届きませんでした。マシンはまだ動いている可能性があります。マシン本体の非常停止を使ってください",
+    }
+}
+
+/// What is said when the server did not take the emergency stop and the plain stop of the machine was given instead.
+pub fn estop_plain_notice(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "The server did not take the emergency stop; the plain stop was sent instead. The machine is not latched: look at it",
+        sc::Lang::Es => "El servidor no aceptó la parada de emergencia; se envió la parada normal. La máquina no queda bloqueada: compruébala",
+        sc::Lang::It => "Il server non ha accettato l'arresto di emergenza; è stato inviato l'arresto normale. La macchina non è bloccata: controllala",
+        sc::Lang::De => "Der Server hat den Not-Halt nicht angenommen; stattdessen wurde der normale Stopp gesendet. Die Maschine ist nicht verriegelt: nachsehen",
+        sc::Lang::Fr => "Le serveur n'a pas pris l'arrêt d'urgence ; l'arrêt normal a été envoyé à la place. La machine n'est pas verrouillée : vérifiez-la",
+        sc::Lang::Pt => "O servidor não aceitou a paragem de emergência; foi enviada a paragem normal. A máquina não fica bloqueada: verifique-a",
+        sc::Lang::Zh => "服务器未接受急停指令，已改为发送普通停止。机床未被锁定：请查看机床",
+        sc::Lang::Ja => "サーバーは非常停止を受け付けず、代わりに通常の停止を送りました。マシンはロックされていません。確認してください",
+    }
+}
+
+/// What is said when neither the emergency stop nor the plain stop reached the server.
+pub fn estop_lost_notice(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "THE EMERGENCY STOP DID NOT REACH THE SERVER: the machine may still be moving. Use the emergency stop of the machine itself",
+        sc::Lang::Es => "LA PARADA DE EMERGENCIA NO HA LLEGADO AL SERVIDOR: la máquina puede seguir moviéndose. Usa la parada de emergencia de la propia máquina",
+        sc::Lang::It => "L'ARRESTO DI EMERGENZA NON È ARRIVATO AL SERVER: la macchina può essere ancora in movimento. Usa l'arresto di emergenza della macchina stessa",
+        sc::Lang::De => "DER NOT-HALT HAT DEN SERVER NICHT ERREICHT: die Maschine bewegt sich vielleicht noch. Den Not-Halt der Maschine selbst benutzen",
+        sc::Lang::Fr => "L'ARRÊT D'URGENCE N'EST PAS ARRIVÉ AU SERVEUR : la machine bouge peut-être encore. Utilisez l'arrêt d'urgence de la machine elle-même",
+        sc::Lang::Pt => "A PARAGEM DE EMERGÊNCIA NÃO CHEGOU AO SERVIDOR: a máquina pode continuar em movimento. Use a paragem de emergência da própria máquina",
+        sc::Lang::Zh => "急停指令未送达服务器：机床可能仍在运动。请使用机床本身的急停按钮",
+        sc::Lang::Ja => "非常停止がサーバーに届きませんでした。マシンはまだ動いている可能性があります。マシン本体の非常停止を使ってください",
+    }
+}
+
+/// What is said when the server could not be asked about a job that was being followed before.
+pub fn job_unknown_notice(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "The server could not be asked about the job: nothing is sent. The job may still be running on it",
+        sc::Lang::Es => "No se ha podido preguntar al servidor por el trabajo: no se envía nada. El trabajo puede seguir en marcha en él",
+        sc::Lang::It => "Non è stato possibile chiedere al server del lavoro: non si invia nulla. Il lavoro può essere ancora in corso",
+        sc::Lang::De => "Der Server konnte nicht nach dem Auftrag gefragt werden: es wird nichts gesendet. Der Auftrag läuft dort vielleicht noch",
+        sc::Lang::Fr => "Impossible d'interroger le serveur sur le travail : rien n'est envoyé. Le travail y tourne peut-être encore",
+        sc::Lang::Pt => "Não foi possível perguntar ao servidor pelo trabalho: nada é enviado. O trabalho pode continuar a correr nele",
+        sc::Lang::Zh => "无法向服务器查询该任务：不发送任何内容。该任务可能仍在服务器上运行",
+        sc::Lang::Ja => "ジョブについてサーバーに問い合わせできませんでした。何も送信しません。ジョブはまだ実行中の可能性があります",
+    }
+}
+
 /// What a refusal or a failure says to the person, in their language: the text of the code of the server, followed by the detail the server gave when the
 /// text does not already hold it (`bad_gcode` and `line 3: no`).
 pub fn error_message(e: &sc::ClientError, lang: sc::Lang) -> String {
@@ -314,6 +370,43 @@ impl Conn {
         }
     }
 
+    /// Asks for a job that was followed before, telling apart a server that no longer has it from one that could not be asked.
+    fn ask(&mut self, id: &str) -> Asked {
+        let id = match checked_id(id) {
+            Ok(id) => id,
+            Err(why) => return Asked::Unknown(why),
+        };
+        match self
+            .inner
+            .request("GET", &format!("/api/v1/jobs/{id}"), None)
+        {
+            Ok(reply) => Asked::Job(JobInfo::from_json(
+                &serde_json::from_str(&reply.body).unwrap_or(Value::Null),
+            )),
+            Err(sc::ClientError::Server { status: 404, .. }) => Asked::Gone,
+            Err(e) => Asked::Unknown(self.fail(&e)),
+        }
+    }
+
+    /// The emergency stop of the machine on the server, at once. A server that does not take it gets the plain stop; either way the answer says what
+    /// happened, and an `Err` that the machine may not be latched or stopped.
+    pub fn emergency(&mut self, lang: &str) -> Result<String, String> {
+        match crate::cncroutes::emergency_stop(&mut self.inner, lang) {
+            Ok(said) => Ok(said),
+            Err(why) => {
+                let plain = self
+                    .machine_path("/stop")
+                    .and_then(|stop| self.json("POST", &stop, None));
+                let notice = if plain.is_ok() {
+                    estop_plain_notice(self.lang)
+                } else {
+                    estop_lost_notice(self.lang)
+                };
+                Err(format!("{notice} ({})", why.text))
+            }
+        }
+    }
+
     pub fn job(&mut self, id: &str) -> Result<JobInfo, Failure> {
         let id = checked_id(id)?;
         Ok(JobInfo::from_json(&self.json(
@@ -335,6 +428,25 @@ impl Conn {
         self.json("POST", &format!("/api/v1/jobs/{id}/{}", what.word()), None)
             .map(|_| ())
     }
+}
+
+/// What the server said when it was asked for a job that was followed before.
+enum Asked {
+    Job(JobInfo),
+    /// The server answers that it does not have it.
+    Gone,
+    /// It could not be asked, or what it answered is not understood.
+    Unknown(Failure),
+}
+
+/// Sends the emergency stop to the server on a thread of its own, so it does not wait behind the request the follower is making; the answer comes
+/// on the channel.
+pub fn emergency_now(client: Client, lang: String) -> Receiver<Result<String, String>> {
+    let (tx, rx) = channel();
+    thread::spawn(move || {
+        let _ = tx.send(client.connect().emergency(&lang));
+    });
+    rx
 }
 
 /// What the operator can tell a job on the server.
@@ -363,6 +475,8 @@ pub struct Snapshot {
     pub error: Option<String>,
     /// The following is over (the job ended, was refused, or the server was lost).
     pub over: bool,
+    /// How many orders did not reach the job, so that the same failure is told again each time.
+    pub failed_orders: u32,
     /// The state of the link after the last call: nothing until the first one.
     pub link: Option<Link>,
 }
@@ -437,6 +551,17 @@ fn set(shared: &Mutex<Snapshot>, f: impl FnOnce(&mut Snapshot)) {
     }
 }
 
+/// The new job that goes on where the other stopped, when there is a line to go on from.
+fn go_on(conn: &mut Conn, again: Result<Value, String>) -> Result<JobInfo, Failure> {
+    match again {
+        Ok(again) if again["skip"].as_u64().is_some_and(|n| n > 0) => conn.send(&again),
+        Ok(_) => Err(Failure::plain(
+            "the job is not on the server any more and no line of it is known to be done: send the program again yourself",
+        )),
+        Err(why) => Err(Failure::plain(&why)),
+    }
+}
+
 fn follow(
     mut conn: Conn,
     how: Start,
@@ -446,19 +571,20 @@ fn follow(
 ) {
     let first = match how {
         Start::Send(request) => conn.send(&request),
-        Start::Attach { id, again } => match conn.job(&id) {
-            Ok(info) if info.active() || info.state == "ready" => Ok(info),
-            Ok(info) if info.state == "done" => Err(Failure::plain(
+        Start::Attach { id, again } => match conn.ask(&id) {
+            Asked::Job(info) if info.active() || info.state == "ready" => Ok(info),
+            Asked::Job(info) if info.state == "done" => Err(Failure::plain(
                 "the job on the server had finished: nothing is sent again",
             )),
-            // it ended, or the server lost it: the program goes on from the line the server reached (or from the line it knew)
-            _ => match again {
-                Ok(again) if again["skip"].as_u64().is_some_and(|n| n > 0) => conn.send(&again),
-                Ok(_) => Err(Failure::plain(
-                    "the job is not on the server any more and no line of it is known to be done: send the program again yourself",
-                )),
-                Err(why) => Err(Failure::plain(&why)),
-            },
+            // it ended, or the server says it does not have it: the program goes on from the line the server reached (or from the line it knew)
+            Asked::Job(info) if info.finished() => go_on(&mut conn, again),
+            Asked::Gone => go_on(&mut conn, again),
+            // it was not asked or not understood: a second job could be started beside one that still runs
+            Asked::Job(_) => Err(Failure::plain(job_unknown_notice(conn.lang))),
+            Asked::Unknown(why) => Err(Failure {
+                text: format!("{} ({})", job_unknown_notice(conn.lang), why.text),
+                needs_login: why.needs_login,
+            }),
         },
     };
     let mut info = match first {
@@ -479,13 +605,26 @@ fn follow(
     });
     let mut lost = 0u32;
     loop {
-        if detach.load(Ordering::SeqCst) {
-            return;
-        }
+        let leaving = detach.load(Ordering::SeqCst);
         while let Ok(order) = orders.try_recv() {
-            if let Err(why) = conn.order(&id, order) {
-                set(shared, |s| s.error = Some(why.text));
+            // a stop pressed just before the following ends still goes out; a pause or a go-on does not
+            if leaving && order != Order::Cancel {
+                continue;
             }
+            if let Err(why) = conn.order(&id, order) {
+                let text = if order == Order::Cancel {
+                    format!("{} ({})", stop_lost_notice(conn.lang), why.text)
+                } else {
+                    why.text
+                };
+                set(shared, |s| {
+                    s.error = Some(text);
+                    s.failed_orders += 1;
+                });
+            }
+        }
+        if leaving {
+            return;
         }
         match conn.job(&id) {
             Ok(i) => {
@@ -863,6 +1002,147 @@ mod tests {
         )]);
         assert!(conn(stand).order("j2", Order::Cancel).is_ok());
         assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_new_job_is_made_only_when_the_server_says_it_does_not_have_the_old_one() {
+        let again = || Ok(job_request("x", "G0 X1\nG0 X2\nG0 X3", 2, false));
+        // the server could not answer for the job: nothing is sent, whatever it was doing
+        for (status, body) in [(500, "{}"), (503, ""), (200, "not json")] {
+            let (stand, seen) = stand_in(vec![("GET /api/v1/jobs/j1", status, body.to_string())]);
+            let f = Follow::start_over(
+                conn(stand),
+                Start::Attach {
+                    id: "j1".into(),
+                    again: again(),
+                },
+            );
+            let why = wait_over(&f).error.unwrap();
+            assert!(why.contains("nothing is sent"), "{status}: {why}");
+            assert_eq!(seen.lock().unwrap().len(), 1, "{status}");
+        }
+        // it does not have it: the program goes on from the line
+        let (stand, seen) = stand_in(vec![
+            ("GET /api/v1/jobs/j1", 404, "{}".to_string()),
+            ok(
+                "POST /api/v1/machines/router/jobs",
+                r#"{"id":"j2","state":"ready"}"#,
+            ),
+            ok(
+                "POST /api/v1/jobs/j2/start",
+                r#"{"id":"j2","state":"connecting"}"#,
+            ),
+            ok("GET /api/v1/jobs/j2", r#"{"id":"j2","state":"done"}"#),
+        ]);
+        let f = Follow::start_over(
+            conn(stand),
+            Start::Attach {
+                id: "j1".into(),
+                again: again(),
+            },
+        );
+        assert_eq!(wait_over(&f).info.unwrap().id, "j2");
+        assert!(seen
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|l| l.contains("\"skip\":2")));
+    }
+
+    fn until(seen: &Arc<Mutex<Vec<String>>>, what: &str) {
+        for _ in 0..400 {
+            if seen.lock().unwrap().iter().any(|l| l.starts_with(what)) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        panic!("never asked {what}: {:?}", seen.lock().unwrap());
+    }
+
+    fn running_job() -> Vec<(&'static str, u16, String)> {
+        vec![
+            ok(
+                "POST /api/v1/machines/router/jobs",
+                r#"{"id":"j4","state":"ready"}"#,
+            ),
+            ok(
+                "POST /api/v1/jobs/j4/start",
+                r#"{"id":"j4","state":"running"}"#,
+            ),
+            ok("GET /api/v1/jobs/j4", r#"{"id":"j4","state":"running"}"#),
+        ]
+    }
+
+    #[test]
+    fn a_stop_pressed_just_before_the_following_ends_still_goes_to_the_machine() {
+        let mut script = running_job();
+        script.push(ok("POST /api/v1/machines/router/stop", r#"{"ok":true}"#));
+        let (stand, seen) = stand_in(script);
+        let f = Follow::start_over(
+            conn(stand),
+            Start::Send(job_request("x", "G0 X1", 0, false)),
+        );
+        until(&seen, "GET /api/v1/jobs/j4");
+        f.cancel();
+        drop(f);
+        until(&seen, "POST /api/v1/machines/router/stop");
+    }
+
+    #[test]
+    fn a_stop_that_does_not_arrive_says_the_machine_may_still_move_every_time() {
+        // neither the stop of the machine nor the one of the job has a route here
+        let (stand, seen) = stand_in(running_job());
+        let f = Follow::start_over(
+            conn(stand),
+            Start::Send(job_request("x", "G0 X1", 0, false)),
+        );
+        until(&seen, "GET /api/v1/jobs/j4");
+        for times in 1..=2 {
+            f.cancel();
+            let mut snap = f.snapshot();
+            for _ in 0..400 {
+                if snap.failed_orders >= times {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(25));
+                snap = f.snapshot();
+            }
+            assert_eq!(snap.failed_orders, times);
+            assert!(snap.error.unwrap().contains("may still be moving"));
+        }
+    }
+
+    #[test]
+    fn the_emergency_stop_goes_to_the_machine_and_falls_back_to_the_plain_stop() {
+        let (stand, seen) = stand_in(vec![ok(
+            "POST /api/v1/work/machines/router/emergency-stop",
+            r#"{"latched":true}"#,
+        )]);
+        assert!(conn(stand).emergency("en").is_ok());
+        assert_eq!(seen.lock().unwrap().len(), 1);
+        let (stand, seen) = stand_in(vec![ok("POST /api/v1/machines/router/stop", "{}")]);
+        let why = conn(stand).emergency("en").unwrap_err();
+        assert!(why.contains("plain stop was sent"), "{why}");
+        assert_eq!(seen.lock().unwrap().len(), 2);
+        let (stand, _) = stand_in(vec![]);
+        let why = conn(stand).emergency("en").unwrap_err();
+        assert!(why.starts_with("THE EMERGENCY STOP DID NOT REACH"), "{why}");
+    }
+
+    #[test]
+    fn the_notices_of_a_stop_are_told_in_eight_languages() {
+        for notice in [
+            stop_lost_notice,
+            estop_plain_notice,
+            estop_lost_notice,
+            job_unknown_notice,
+        ] {
+            let mut said: Vec<&str> = sc::Lang::ALL.into_iter().map(notice).collect();
+            assert!(said.iter().all(|s| !s.is_empty()));
+            said.sort_unstable();
+            said.dedup();
+            assert_eq!(said.len(), 8);
+        }
     }
 
     #[test]

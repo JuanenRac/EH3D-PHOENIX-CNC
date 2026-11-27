@@ -555,7 +555,7 @@ pub fn words(line: &str) -> Vec<(char, f64)> {
 /// The codes that stay on until another one of their group changes them, as the panel of a machine-control program shows them.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Modal {
-    /// `G0` or `G1`.
+    /// The way of moving that stays on: 0 (`G0`), 1 (`G1`), 2 (`G2`), 3 (`G3`), 38 (a probe, `G38.x`) or 80 (cancelled, `G80`).
     pub motion: u8,
     pub inches: bool,
     pub absolute: bool,
@@ -601,6 +601,10 @@ impl Modal {
             match (l, v as i32) {
                 ('G', _) if tenths == 0 => self.motion = 0,
                 ('G', _) if tenths == 10 => self.motion = 1,
+                ('G', _) if tenths == 20 => self.motion = 2,
+                ('G', _) if tenths == 30 => self.motion = 3,
+                ('G', _) if (381..=385).contains(&tenths) => self.motion = 38,
+                ('G', _) if tenths == 800 => self.motion = 80,
                 ('G', _) if tenths == 200 => self.inches = true,
                 ('G', _) if tenths == 210 => self.inches = false,
                 ('G', _) if tenths == 900 => self.absolute = true,

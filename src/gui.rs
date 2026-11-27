@@ -222,6 +222,8 @@ pub struct App {
     recovery_saved: Option<usize>,
     /// The job on the EH3D server that is followed, what the server said of it the last time, and the last state and error that were written in the log.
     server: Option<crate::server::Follow>,
+    /// The answers still to come of the emergency stops that were sent to the server.
+    server_estops: Vec<std::sync::mpsc::Receiver<Result<String, String>>>,
     server_snap: crate::server::Snapshot,
     server_key: Option<(String, String)>,
     server_err: Option<String>,
@@ -238,6 +240,8 @@ pub struct App {
     queue_seen: bool,
     /// The end of the wait between two runs of a program (None: not waiting), and the text of the queue as it was last written to its file.
     queue_gate: Option<std::time::Instant>,
+    /// The stops the session had counted when the program of the queue was last seen running: one more means somebody stopped it.
+    queue_halts: u64,
     queue_saved: String,
     /// The files picked with Ctrl+click in the Open window.
     open_multi: Vec<PathBuf>,
@@ -357,6 +361,7 @@ impl App {
             start_at: o.start.then_some(4),
             recovery_saved: None,
             server: None,
+            server_estops: Vec::new(),
             server_snap: crate::server::Snapshot::default(),
             server_key: None,
             server_err: None,
@@ -368,6 +373,7 @@ impl App {
             queue: Queue::default(),
             queue_seen: false,
             queue_gate: None,
+            queue_halts: 0,
             queue_saved: String::new(),
             open_multi: Vec::new(),
             focus_line: None,
@@ -503,8 +509,28 @@ impl App {
         self.recovery_saved = None;
     }
 
+    /// Whether the program of the window may be changed now: not while one runs, waits paused, is being sent or runs on the server. The log says why.
+    fn may_change_program(&mut self) -> bool {
+        let free = self.machine_idle();
+        if !free {
+            let why = self.w(crate::words::Msg::EdRunning).to_string();
+            self.session.log.push(why);
+        }
+        free
+    }
+
+    /// The next line to send is the first again; not while a program runs or waits, whose controller nothing would have told.
+    fn rewind_program(&mut self) {
+        if self.may_change_program() {
+            self.session.rewind();
+        }
+    }
+
     /// Takes a G-code file as the program, by itself: a queue that was there is dropped.
     pub fn open(&mut self, path: &Path) {
+        if !self.may_change_program() {
+            return;
+        }
         self.queue = Queue::default();
         self.queue_seen = false;
         self.queue_gate = None;
@@ -634,7 +660,7 @@ impl App {
                     .fill(Color32::from_rgb(200, 30, 40))
                     .min_size(Vec2::new(150.0, 34.0));
                     if ui.add(estop).clicked() {
-                        self.session.estop();
+                        self.emergency_stop();
                     }
                     let alarm = self.session.alarm();
                     let color = if alarm {
@@ -731,7 +757,7 @@ impl App {
                     self.t(Text::McRewind),
                     true,
                 ) {
-                    self.session.rewind();
+                    self.rewind_program();
                 }
                 ui.separator();
                 if tool_button(

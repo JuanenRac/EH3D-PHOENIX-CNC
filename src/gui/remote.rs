@@ -30,6 +30,52 @@ impl App {
         matches!(self.server_state(), Some("connecting" | "running"))
     }
 
+    /// The emergency stop of the window: the controller of this computer at once and, while a job was sent to the server and it is not known to be over,
+    /// the machine of the server too.
+    pub(super) fn emergency_stop(&mut self) {
+        self.session.estop();
+        let may_run = self.server.is_some()
+            && !self
+                .server_snap
+                .info
+                .as_ref()
+                .is_some_and(crate::server::JobInfo::finished);
+        if !may_run {
+            return;
+        }
+        let Some(client) = self.server_client() else {
+            let lang = self.server_lang();
+            let said = crate::server::estop_lost_notice(lang);
+            self.session.log.push(format!("server: {said}"));
+            return;
+        };
+        self.server_estops.push(crate::server::emergency_now(
+            client,
+            self.lang.code().to_string(),
+        ));
+        self.session.log.push("server: emergency stop sent".into());
+    }
+
+    fn server_lang(&self) -> eh3d_serverclient::Lang {
+        eh3d_serverclient::Lang::from_tag(self.lang.code()).unwrap_or(eh3d_serverclient::Lang::En)
+    }
+
+    /// Writes in the log what the server answered to the emergency stops that were sent.
+    fn estop_tick(&mut self, ctx: &egui::Context) {
+        let log = &mut self.session.log;
+        self.server_estops.retain(|answer| match answer.try_recv() {
+            Ok(Ok(said) | Err(said)) => {
+                log.push(format!("server: {said}"));
+                false
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => true,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => false,
+        });
+        if !self.server_estops.is_empty() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(crate::server::POLL_MS));
+        }
+    }
+
     /// The program can be sent: the server is set, there is a program and nothing runs.
     pub(super) fn can_send_to_server(&self) -> bool {
         self.server_client().is_some()
@@ -153,6 +199,7 @@ impl App {
 
     /// Reads how the job on the server goes: logs what changes, keeps the file the program is taken up from, and asks for another frame while it lives.
     pub(super) fn server_tick(&mut self, ctx: &egui::Context) {
+        self.estop_tick(ctx);
         let Some(f) = &self.server else { return };
         let snap = f.snapshot();
         let key = snap
@@ -187,7 +234,7 @@ impl App {
             }
             self.server_key = key;
         }
-        if snap.error != self.server_err {
+        if snap.error != self.server_err || snap.failed_orders > self.server_snap.failed_orders {
             if let Some(e) = &snap.error {
                 self.session.log.push(format!("server: {e}"));
             }

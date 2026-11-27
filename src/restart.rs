@@ -51,6 +51,9 @@ pub fn refusal_text(r: Refusal, lang: &str) -> String {
         Refusal::Relative => say::<&str>(lang, Msg::SlRefRelative, &[]),
         Refusal::Cycle(l) => say(lang, Msg::SlRefCycle, &[l.to_string()]),
         Refusal::Compensation(l) => say(lang, Msg::SlRefComp, &[l.to_string()]),
+        Refusal::Motion(l) => say(lang, Msg::SlRefMotion, &[l.to_string()]),
+        Refusal::FeedMode(l) => say(lang, Msg::SlRefFeedMode, &[l.to_string()]),
+        Refusal::TableLength(l) => say(lang, Msg::SlRefTable, &[l.to_string()]),
     }
 }
 
@@ -92,11 +95,21 @@ pub fn plan(program: &[String], line: usize) -> Result<Plan, Why> {
     head.push("G90".to_string());
     head.push(format!("G{}", m.plane));
     head.push(format!("G{}", m.wcs));
+    // a value given in other units than the ones in force now is written under its own units
+    let (feed_in_inches, offset_in_inches) = startline::units_of_values(program, index);
+    let units = |inches: bool| if inches { "G20" } else { "G21" }.to_string();
+    let restate = |head: &mut Vec<String>, given_in_inches: bool, line: String| {
+        if given_in_inches == m.inches {
+            head.push(line);
+        } else {
+            head.extend([units(given_in_inches), line, units(m.inches)]);
+        }
+    };
     if let Some(z) = m.tool_length {
-        head.push(format!("G43.1 Z{z}"));
+        restate(&mut head, offset_in_inches, format!("G43.1 Z{z}"));
     }
     if let Some(f) = m.feed {
-        head.push(format!("F{f}"));
+        restate(&mut head, feed_in_inches, format!("F{f}"));
     }
     if let Some(s) = m.speed {
         head.push(format!("S{s}"));
@@ -119,10 +132,14 @@ pub fn plan(program: &[String], line: usize) -> Result<Plan, Why> {
     }
     if let Some((x, y)) = check.at {
         head.push(format!(
-            "(restart: the tool was at X{x:.3} Y{y:.3} before this line, move there at a safe height)"
+            "(restart: the tool was at X{x:.3} Y{y:.3} mm before this line, move there at a safe height)"
         ));
     }
     head.push("M0 (restart: check the machine, then resume)".to_string());
+    // after the pause, so that nothing typed while it lasts changes it: a line that names only axes cuts when the program was cutting
+    if matches!(m.motion, 0 | 1) {
+        head.push(format!("G{}", m.motion));
+    }
     let preamble = head.len();
     let mut out = head;
     out.extend(program[index..].iter().cloned());
@@ -177,7 +194,7 @@ mod tests {
             .program
             .iter()
             .any(|l| l == "(restart: the tool in use was T3)"));
-        assert!(p.program[..p.preamble - 1]
+        assert!(p.program[..p.preamble - 2]
             .iter()
             .filter(|l| !l.starts_with('('))
             .all(|l| !l.starts_with('M')));
@@ -187,9 +204,11 @@ mod tests {
             .iter()
             .any(|l| l.starts_with("(restart: the tool was at X")));
         assert_eq!(
-            p.program[p.preamble - 1],
+            p.program[p.preamble - 2],
             "M0 (restart: check the machine, then resume)"
         );
+        // the way of moving the program was in comes last: the next line names only X
+        assert_eq!(p.program[p.preamble - 1], "G1");
         assert_eq!(&p.program[p.preamble..], &prog(JOB)[8..]);
     }
 
@@ -265,9 +284,50 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_line_that_names_only_axes_still_cuts_after_a_restart() {
+        let p = plan(&prog("G21 G90 F100\nG1 Z-1\nX10\nX20\nM30"), 4).unwrap();
+        assert_eq!(p.program[p.preamble - 1], "G1");
+        assert_eq!(startline::check(&p.program, p.preamble).modal.motion, 1);
+        let rapid = plan(&prog("G21 G90\nG0 Z5\nX10\nX20"), 4).unwrap();
+        assert_eq!(rapid.program[rapid.preamble - 1], "G0");
+        let arc = plan(&prog("G21 G90 F100\nG2 X2 Y0 I1 J0\nX4 I1 J0\nM30"), 3).unwrap_err();
+        assert_eq!(arc, Why::Refused(Refusal::Motion(2)));
+        assert!(arc.text("de").contains('2'));
+    }
+
+    #[test]
+    fn the_feed_and_the_offset_are_written_in_the_units_they_were_given_in() {
+        let p = plan(&prog("G20 G90 F10\nG43.1 Z-1\nG21\nG1 X1\nG1 X2"), 5).unwrap();
+        let head = &p.program[..p.preamble];
+        let at = head.iter().position(|l| l == "F10").unwrap();
+        assert_eq!(
+            (head[at - 1].as_str(), head[at + 1].as_str()),
+            ("G20", "G21")
+        );
+        let at = head.iter().position(|l| l == "G43.1 Z-1").unwrap();
+        assert_eq!(
+            (head[at - 1].as_str(), head[at + 1].as_str()),
+            ("G20", "G21")
+        );
+    }
+
     /// The part of the state the new program writes back.
-    fn state(m: &Modal) -> (bool, bool, u8, u8, Option<f64>, Option<f64>, Option<f64>) {
+    #[allow(clippy::type_complexity)]
+    fn state(
+        m: &Modal,
+    ) -> (
+        u8,
+        bool,
+        bool,
+        u8,
+        u8,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+    ) {
         (
+            m.motion,
             m.inches,
             m.absolute,
             m.plane,
