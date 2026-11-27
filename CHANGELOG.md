@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Third-party notices in every package (`docs/THIRD_PARTY_NOTICES`):** the packages of the releases now carry the copyright notices and licence texts of the Rust crates and of the data the program is built with, and the CI fails when a new dependency or licence is not in the file.
+
 - **The CI compiles the build with the serial port** (`--features serial`), which nothing built before.
 - **The position follows the machine while a line waits for its `ok`:** the window asks for a status report out of turn and shows the report that comes back, instead of keeping the last status until the line ends.
 - **An option to stop the spindle on a pause, off by default (not tried on a machine):** `grbl_spindle_stop_on_pause` in Settings and in the settings file makes a pause of a GRBL or grblHAL controller also send the safety door byte (`0x84`), which stops the spindle and the coolant until the program goes on. A door state that is not confirmed is said in the log, a Start gives the resume again while the machine stays in its door state, and it takes effect the next time the program is opened. Tried against the simulated GRBL only.
