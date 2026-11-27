@@ -1067,6 +1067,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_first_lines_of_the_log_are_in_the_language_the_window_starts_in() {
+        let a = App::new(&Options {
+            lang: Some(Lang::from_code("de").unwrap()),
+            ..Options::default()
+        });
+        assert!(
+            a.session.log.iter().all(|l| !l.starts_with("travel:")),
+            "{:?}",
+            a.session.log
+        );
+    }
+
+    #[test]
     fn the_point_to_go_on_from_stays_until_the_machine_stands_still_at_the_end() {
         let mut a = App::isolated();
         let path = crate::recovery::recovery_path(&a.settings_path);

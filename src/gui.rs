@@ -328,6 +328,8 @@ impl App {
         settings.resolve_tool_table(crate::tools::load(&path));
         let settings_log_max = settings.tuning.log_max;
         let mut session = Session::new(controller);
+        // before anything is said: the first lines of the log are in the language of the window too
+        session.set_lang(settings.lang.code());
         session.step_mm = settings.step_mm;
         session.feed_mm_min = settings.feed_mm_min;
         session.cancel_crossing_jog = motion.guard.jog_cancel_crossing;
