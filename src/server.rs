@@ -364,8 +364,12 @@ pub enum Start {
     /// Send this program as a new job.
     Send(Value),
     /// Follow a job the server already has (the program was closed while it ran). If the server no longer holds it, or it ended without finishing, a new job
-    /// is made from `again`, which carries the line it starts from.
-    Attach { id: String, again: Value },
+    /// is made from `again`, which carries the line it starts from; an `Err` there is why the program cannot go on from that line. No new job is made of a
+    /// job that finished, nor from the first line (the server would start it without waiting for the operator).
+    Attach {
+        id: String,
+        again: Result<Value, String>,
+    },
 }
 
 impl Follow {
@@ -429,8 +433,17 @@ fn follow(
         Start::Send(request) => conn.send(&request),
         Start::Attach { id, again } => match conn.job(&id) {
             Ok(info) if info.active() || info.state == "ready" => Ok(info),
+            Ok(info) if info.state == "done" => Err(Failure::plain(
+                "the job on the server had finished: nothing is sent again",
+            )),
             // it ended, or the server lost it: the program goes on from the line the server reached (or from the line it knew)
-            _ => conn.send(&again),
+            _ => match again {
+                Ok(again) if again["skip"].as_u64().is_some_and(|n| n > 0) => conn.send(&again),
+                Ok(_) => Err(Failure::plain(
+                    "the job is not on the server any more and no line of it is known to be done: send the program again yourself",
+                )),
+                Err(why) => Err(Failure::plain(&why)),
+            },
         },
     };
     let mut info = match first {
@@ -810,7 +823,7 @@ mod tests {
             conn(stand.clone()),
             Start::Attach {
                 id: "j1".into(),
-                again,
+                again: Ok(again),
             },
         );
         let s = wait_over(&f);
@@ -829,6 +842,37 @@ mod tests {
         )]);
         assert!(conn(stand).order("j2", Order::Cancel).is_ok());
         assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn no_new_job_is_made_where_going_on_is_not_safe() {
+        let failed = r#"{"id":"j1","state":"failed","line":2}"#;
+        let done = r#"{"id":"j1","state":"done","line":3}"#;
+        let from = |skip| Ok(job_request("x", "G0 X1\nG0 X2\nG0 X3", skip, false));
+        for (job, again, want) in [
+            (
+                failed,
+                Err("resume: not here".to_string()),
+                "resume: not here",
+            ),
+            (failed, from(0), "send the program again yourself"),
+            (done, from(2), "had finished"),
+        ] {
+            let (stand, seen) = stand_in(vec![ok("GET /api/v1/jobs/j1", job)]);
+            let f = Follow::start_over(
+                conn(stand),
+                Start::Attach {
+                    id: "j1".into(),
+                    again,
+                },
+            );
+            let s = wait_over(&f);
+            let why = s.error.unwrap();
+            assert!(why.contains(want), "{why}");
+            // the job was asked about and nothing else went out
+            let seen = seen.lock().unwrap().clone();
+            assert_eq!(seen, ["GET /api/v1/jobs/j1 | "]);
+        }
     }
 
     #[test]

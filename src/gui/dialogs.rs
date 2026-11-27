@@ -316,6 +316,13 @@ impl App {
                     // operator before the first move
                     self.recovery_saved = Some(r.next);
                     self.attach_to_server(r.job.clone(), r.next);
+                } else if let Some(why) = self
+                    .session
+                    .recovery_refusal(r.next, self.settings.resume_backoff_lines as usize)
+                    .filter(|_| same_program)
+                {
+                    self.session.log.push(why);
+                    self.forget_recovery();
                 } else if same_program {
                     // it waits paused: the operator checks the machine and presses Resume; the controller is first brought back to the state of the program
                     if self.session.resume_at_safe(
@@ -325,7 +332,7 @@ impl App {
                     ) {
                         self.recovery_saved = Some(r.next);
                     } else {
-                        // the point it reached cannot be rebuilt (relative distances): nothing is safe to go on from
+                        // the state at that line cannot be rebuilt (the log says why): nothing is safe to go on from
                         self.forget_recovery();
                     }
                 } else {
