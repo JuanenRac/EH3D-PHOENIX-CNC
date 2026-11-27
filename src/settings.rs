@@ -50,7 +50,8 @@ pub struct Settings {
     pub server_retries: u32,
     pub server_mdns: bool,
     pub server_max_answer_mib: u64,
-    /// When a program goes on after a stop, also start the spindle and the coolant again as they were (off: the operator starts them).
+    /// For a job sent to the EH3D server that goes on after a stop: also turn the coolant on again (off: it stays off). The spindle does not depend on
+    /// this: the server starts the one the program had on, after the operator lets the job go.
     pub server_restore_outputs: bool,
     /// The limits of a jog sent to the machine of the server, the same keys and ranges as the machine of the server (`server_jog_max_mm` 0.01 to 500, `server_jog_max_feed` 1 to 30000),
     /// and the length above which the window asks before it sends a jog (`server_jog_confirm_mm`, 0 to 500; 0 asks for every jog).

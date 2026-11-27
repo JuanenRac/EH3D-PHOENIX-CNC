@@ -97,6 +97,21 @@ pub fn job_request(name: &str, gcode: &str, skip: usize, restore_outputs: bool) 
     })
 }
 
+/// What is said when the job on the server waits before its first move because it goes on after a stop (`pause.kind` `resume`): once the operator lets
+/// it go, the server moves the machine back to where it stopped and starts the spindle the program had on, whatever `server_restore_outputs` says.
+pub fn resume_notice(lang: sc::Lang) -> &'static str {
+    match lang {
+        sc::Lang::En => "Check the machine, the work zero and the tool, and keep clear: when you resume, the machine goes back on its own to where it stopped and starts the spindle if the program had it on.",
+        sc::Lang::Es => "Revisa la máquina, el cero de trabajo y la herramienta, y apártate: al reanudar, la máquina vuelve sola al punto donde se paró y arranca el husillo si el programa lo tenía encendido.",
+        sc::Lang::It => "Controlla la macchina, lo zero pezzo e l'utensile, e tieniti lontano: alla ripresa la macchina torna da sola al punto in cui si era fermata e avvia il mandrino se il programma lo aveva acceso.",
+        sc::Lang::De => "Maschine, Werkstücknullpunkt und Werkzeug prüfen und Abstand halten: Beim Fortsetzen fährt die Maschine selbst zur Haltestelle zurück und startet die Spindel, wenn das Programm sie eingeschaltet hatte.",
+        sc::Lang::Fr => "Vérifiez la machine, le zéro pièce et l'outil, et restez à distance : à la reprise, la machine revient seule là où elle s'était arrêtée et démarre la broche si le programme l'avait mise en marche.",
+        sc::Lang::Pt => "Verifique a máquina, o zero de trabalho e a ferramenta, e afaste-se: ao retomar, a máquina volta sozinha ao ponto onde parou e arranca o fuso se o programa o tinha ligado.",
+        sc::Lang::Zh => "请检查机床、工件零点和刀具，并远离机床：继续后机床会自行回到停止处，如果程序原先开着主轴，还会启动主轴。",
+        sc::Lang::Ja => "マシン、ワークのゼロ点、工具を確認し、離れてください。再開するとマシンは自動で停止位置に戻り、プログラムがスピンドルを回していた場合はスピンドルを始動します。",
+    }
+}
+
 /// What a refusal or a failure says to the person, in their language: the text of the code of the server, followed by the detail the server gave when the
 /// text does not already hold it (`bad_gcode` and `line 3: no`).
 pub fn error_message(e: &sc::ClientError, lang: sc::Lang) -> String {
@@ -703,6 +718,12 @@ mod tests {
         assert_eq!((i.id.as_str(), i.percent(), i.line), ("j1", 25, 9));
         assert!(i.active() && i.held() && !i.finished());
         assert_eq!(i.pause, "resume");
+        // the wait of a job that goes on says in the eight languages what happens when it is let go, the spindle included
+        let mut notices: Vec<&str> = sc::Lang::ALL.iter().map(|l| resume_notice(*l)).collect();
+        notices.sort_unstable();
+        notices.dedup();
+        assert_eq!(notices.len(), 8);
+        assert!(resume_notice(sc::Lang::En).contains("starts the spindle"));
         let done = JobInfo::from_json(&json!({"state":"done","items_done":5,"items_total":5}));
         assert!(done.finished() && !done.active());
         assert_eq!(done.percent(), 100);
