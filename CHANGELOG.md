@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.6] - The emergency stop reaches the job of the server, safer restarts and imports (not tried on a machine)
+
 - **The log of the session speaks the eight languages:** the answers to the jog, the stop, the travel, the probe, the tool setter and the height map, the end of a program and the lines the program stops at were written in English whatever the language of the window. They follow it now (the words a controller sends stay as it sends them), and the exported log still marks the errors in each language.
 - **Why a program is not resumed is told in your language:** the reasons (relative distances, a cycle or a cutter compensation left on, a shifted zero, a move in machine coordinates, an arc not said again, a feed mode, a tool length from the table, an offset set again) were English only.
 - **The log of the link to the server and of the queue is in the eight languages:** sending and following a job, its state, the link, the refusals of this program to send a job again and every line of the queue.
