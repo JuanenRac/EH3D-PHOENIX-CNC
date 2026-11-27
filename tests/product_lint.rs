@@ -232,3 +232,92 @@ fn programs_of_nonsense_from_a_fixed_seed_give_findings_that_point_inside_the_pr
         }
     }
 }
+
+// ---- a line is read as the controller reads it ----
+
+#[test]
+fn a_semicolon_inside_a_comment_hides_nothing() {
+    let words = eh3d_phoenix_cnc::gcode::words("G0 (a;b) X999");
+    assert_eq!(words, vec![('G', 0.0), ('X', 999.0)]);
+    let path = eh3d_phoenix_cnc::gcode::toolpath(&l(&["G0 (a;b) X999"]));
+    assert_eq!(path.len(), 1);
+    assert_eq!(path[0].to.0, 999.0);
+}
+
+#[test]
+fn the_characters_a_controller_takes_out_do_not_drop_the_word() {
+    let words = eh3d_phoenix_cnc::gcode::words("G0 X9!99 Y1~0 Z?5");
+    assert_eq!(
+        words,
+        vec![('G', 0.0), ('X', 999.0), ('Y', 10.0), ('Z', 5.0)]
+    );
+}
+
+#[test]
+fn the_guard_sees_a_move_behind_a_comment_and_with_blanks_in_it() {
+    use eh3d_phoenix_cnc::guard::{line_motion, line_moves};
+    for line in [
+        "(note) G0 X10",
+        "M5 (x) G0 X10",
+        "G 0 X10",
+        "X10",
+        "z-5 f100",
+        "$ J=G91 X1 F100",
+        "(a) $H",
+        "G0(;)X1",
+    ] {
+        assert!(line_motion(line), "{line:?}");
+    }
+    for line in ["(go) M3 S1000", "M 3 S1000", "M0 3"] {
+        assert!(line_moves(line), "{line:?}");
+    }
+    assert!(line_moves("QUAD_GANTRY_LEVEL"));
+    for line in [
+        "G92 X0",
+        "G10 L20 P1 X0",
+        "G4 P1",
+        "M5",
+        "$G",
+        "$X",
+        "(G0 X10)",
+        "; X10",
+        "F100",
+        "M117 X marks it",
+    ] {
+        assert!(!line_moves(line), "{line:?}");
+    }
+}
+
+#[test]
+fn a_command_of_the_controller_behind_a_comment_stops_the_program() {
+    use eh3d_controller::sim::SimController;
+    use eh3d_phoenix_cnc::session::Session;
+    for line in ["(set) $130=9999", " ( a ) ( b ) $RST=*"] {
+        let mut s = Session::new(Box::new(SimController::new()));
+        s.load(&format!("G21\n{line}\nG0 X1\n"));
+        s.start();
+        s.pump(10);
+        assert!(
+            s.log.iter().any(|m| m.starts_with("line 2 ")),
+            "{line:?}: {:?}",
+            s.log
+        );
+    }
+}
+
+#[test]
+fn what_cannot_be_read_or_judged_is_said() {
+    for (program, line) in [
+        (["G0 X1", "G1 X5.5.5 F100", "M30"], 2),
+        (["G0 X1", "G1 #5 X2 F100", "M30"], 2),
+        (["G93", "G1 X5 F10", "M30"], 1),
+        (["M3 S1000", "M0", "M30"], 2),
+    ] {
+        let found = run(&program);
+        assert!(
+            found.iter().any(|f| f.line == line),
+            "{program:?}: {found:?}"
+        );
+    }
+    assert!(run(&["M3 S1000", "G0 X1", "M5", "M0", "M30"]).is_empty());
+}
