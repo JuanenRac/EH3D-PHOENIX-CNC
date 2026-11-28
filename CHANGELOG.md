@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.7] - The position follows the machine and an option stops the spindle on pause (not tried on a machine)
+
 - **Third-party notices in every package (`docs/THIRD_PARTY_NOTICES`):** the packages of the releases now carry the copyright notices and licence texts of the Rust crates and of the data the program is built with, and the CI fails when a new dependency or licence is not in the file.
 
 - **The CI compiles the build with the serial port** (`--features serial`), which nothing built before.
